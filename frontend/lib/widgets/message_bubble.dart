@@ -25,7 +25,7 @@ class MessageBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isMe
-              ? AppTheme.secondaryColor.withOpacity(0.2)
+              ? AppTheme.secondaryColor.withValues(alpha: 0.2)
               : AppTheme.cardBackground,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
@@ -35,8 +35,8 @@ class MessageBubble extends StatelessWidget {
           ),
           border: Border.all(
             color: isMe
-                ? AppTheme.secondaryColor.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.2),
+                ? AppTheme.secondaryColor.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.2),
           ),
         ),
         child: Column(
@@ -51,7 +51,7 @@ class MessageBubble extends StatelessWidget {
                   message.senderNickname,
                   style: TextStyle(
                     fontSize: 11,
-                    color: AppTheme.secondaryColor.withOpacity(0.8),
+                    color: AppTheme.secondaryColor.withValues(alpha: 0.8),
                     fontWeight: FontWeight.bold,
                   ),
                 ),

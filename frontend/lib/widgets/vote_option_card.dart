@@ -26,13 +26,13 @@ class VoteOptionCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppTheme.secondaryColor.withOpacity(0.2)
+              ? AppTheme.secondaryColor.withValues(alpha: 0.2)
               : AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? AppTheme.secondaryColor
-                : Colors.grey.withOpacity(0.3),
+                : Colors.grey.withValues(alpha: 0.3),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -45,7 +45,7 @@ class VoteOptionCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppTheme.secondaryColor
-                    : Colors.grey.withOpacity(0.2),
+                    : Colors.grey.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Center(

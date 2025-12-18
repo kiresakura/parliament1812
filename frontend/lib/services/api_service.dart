@@ -229,7 +229,7 @@ class ApiService {
     );
     return _handleResponse(response, (data) {
       final options = data['options'] as List;
-      return options.map((o) => VoteOption.fromJson(o)).toList();
+      return options.map<VoteOption>((o) => VoteOption.fromJson(o)).toList();
     });
   }
 
@@ -319,6 +319,61 @@ class ApiService {
       body: jsonEncode({'duration_minutes': durationMinutes}),
     );
     return _handleResponse(response, (data) => Room.fromJson(data));
+  }
+
+  /// 開始計時器（僅主持人）
+  Future<DateTime> startTimer({
+    required String roomCode,
+    required String hostId,
+    required int minutes,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/timer?host_id=$hostId'),
+      headers: _headers,
+      body: jsonEncode({'duration_minutes': minutes}),
+    );
+    return _handleResponse(response, (data) {
+      final endAt = data['timer_end_at'] ?? data['timerEndAt'];
+      if (endAt != null) {
+        return DateTime.parse(endAt);
+      }
+      return DateTime.now().add(Duration(minutes: minutes));
+    });
+  }
+
+  /// 停止計時器（僅主持人）
+  Future<void> stopTimer({
+    required String roomCode,
+    required String hostId,
+  }) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/timer?host_id=$hostId'),
+      headers: _headers,
+    );
+    _handleResponse(response, (data) => null);
+  }
+
+  /// 開始投票（僅主持人）
+  Future<void> startVoting({
+    required String roomCode,
+    required String hostId,
+    required int round,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/votes/start?host_id=$hostId'),
+      headers: _headers,
+      body: jsonEncode({'round': round}),
+    );
+    _handleResponse(response, (data) => null);
+  }
+
+  /// 關閉房間（僅主持人）
+  Future<void> closeRoom(String roomCode) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/rooms/$roomCode'),
+      headers: _headers,
+    );
+    _handleResponse(response, (data) => null);
   }
 
   // ==================== 通用處理 ====================

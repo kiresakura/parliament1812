@@ -184,6 +184,28 @@ class RoomProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// 關閉房間（僅主持人）
+  Future<bool> closeRoom() async {
+    if (_room == null) return false;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _api.closeRoom(_room!.code);
+      disconnectWebSocket();
+      _room = null;
+      _players = [];
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();

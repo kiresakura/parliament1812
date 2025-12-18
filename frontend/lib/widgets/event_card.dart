@@ -23,13 +23,13 @@ class EventCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            _getSeverityColor(event.severity).withOpacity(0.3),
+            _getSeverityColor(event.severity).withValues(alpha: 0.3),
             AppTheme.cardBackground,
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _getSeverityColor(event.severity).withOpacity(0.5),
+          color: _getSeverityColor(event.severity).withValues(alpha: 0.5),
           width: 2,
         ),
       ),
@@ -39,7 +39,7 @@ class EventCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: _getSeverityColor(event.severity).withOpacity(0.2),
+              color: _getSeverityColor(event.severity).withValues(alpha: 0.2),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(14),
               ),
@@ -68,7 +68,7 @@ class EventCard extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -131,7 +131,7 @@ class EventCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
+                      color: Colors.green.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
@@ -228,7 +228,7 @@ class EventPopupDialog extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    _getSeverityColor(event.severity).withOpacity(0.3),
+                    _getSeverityColor(event.severity).withValues(alpha: 0.3),
                     Colors.transparent,
                   ],
                 ),

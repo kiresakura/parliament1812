@@ -4,11 +4,16 @@ import '../models/vote.dart';
 import '../models/event.dart';
 import '../services/api_service.dart';
 import '../services/websocket_service.dart';
+import '../utils/constants.dart' hide VoteOption;
 
 /// 遊戲狀態管理
 class GameProvider with ChangeNotifier {
   final _api = ApiService();
   final _ws = WebSocketService();
+
+  // 遊戲階段相關
+  int _currentPhase = 1;
+  String _phaseName = '等待中';
 
   // 投票相關
   List<VoteOption> _voteOptions = [];
@@ -16,6 +21,7 @@ class GameProvider with ChangeNotifier {
   Round1Result? _round1Result;
   Round2Result? _round2Result;
   double _voteProgress = 0;
+  Map<String, int> _voteResults = {};
 
   // 事件相關
   List<GameEvent> _availableEvents = [];
@@ -30,12 +36,24 @@ class GameProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // 房間與玩家資訊（用於 API 調用）
+  String? _roomCode;
+  String? _playerId;
+  bool _isHost = false;
+
+  // Getter for isHost
+  bool get isHost => _isHost;
+
   // Getters
+  int get currentPhase => _currentPhase;
+  String get phaseName => _phaseName;
+
   List<VoteOption> get voteOptions => _voteOptions;
   Vote? get myVote => _myVote;
   Round1Result? get round1Result => _round1Result;
   Round2Result? get round2Result => _round2Result;
   double get voteProgress => _voteProgress;
+  Map<String, int> get voteResults => _voteResults;
 
   List<GameEvent> get availableEvents => _availableEvents;
   List<TriggeredEvent> get eventHistory => _eventHistory;
@@ -269,6 +287,149 @@ class GameProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // ==================== 主持人控制功能 ====================
+
+  /// 設置房間資訊
+  void setRoomInfo({
+    required String roomCode,
+    required String playerId,
+    required bool isHost,
+  }) {
+    _roomCode = roomCode;
+    _playerId = playerId;
+    _isHost = isHost;
+  }
+
+  /// 切換遊戲階段（僅主持人）
+  Future<bool> changePhase(int phase) async {
+    if (_roomCode == null || _playerId == null) return false;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _api.changePhase(
+        roomCode: _roomCode!,
+        hostId: _playerId!,
+        phase: phase,
+      );
+      _currentPhase = phase;
+      _phaseName = _getPhaseName(phase);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// 開始計時器（僅主持人）
+  Future<bool> startTimer(int minutes) async {
+    if (_roomCode == null || _playerId == null) return false;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final endAt = await _api.startTimer(
+        roomCode: _roomCode!,
+        hostId: _playerId!,
+        minutes: minutes,
+      );
+      _timerEndAt = endAt;
+      _startTimerUpdate();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// 停止計時器（僅主持人）
+  Future<bool> stopTimer() async {
+    if (_roomCode == null || _playerId == null) return false;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _api.stopTimer(
+        roomCode: _roomCode!,
+        hostId: _playerId!,
+      );
+      _timerEndAt = null;
+      _stopTimerUpdate();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// 隨機觸發事件（僅主持人）- 快捷方法
+  Future<bool> triggerRandomEvent() async {
+    if (_roomCode == null || _playerId == null) return false;
+
+    return randomTriggerEvent(
+      roomCode: _roomCode!,
+      hostId: _playerId!,
+    );
+  }
+
+  /// 開始投票（僅主持人）
+  Future<bool> startVoting(int round) async {
+    if (_roomCode == null || _playerId == null) return false;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _api.startVoting(
+        roomCode: _roomCode!,
+        hostId: _playerId!,
+        round: round,
+      );
+      // 切換到對應的投票階段
+      if (round == 1) {
+        _currentPhase = 8;
+        _phaseName = '第一輪投票';
+      } else {
+        _currentPhase = 10;
+        _phaseName = '第二輪投票';
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// 更新階段資訊（來自 WebSocket）
+  void updatePhase(int phase, String phaseName) {
+    _currentPhase = phase;
+    _phaseName = phaseName;
+    notifyListeners();
+  }
+
+  /// 獲取階段名稱
+  String _getPhaseName(int phase) {
+    if (phase < 0 || phase >= GamePhase.values.length) {
+      return '未知';
+    }
+    return GamePhase.values[phase].name;
+  }
+
   // ==================== 計時器功能 ====================
 
   void _onTimerSync(Map<String, dynamic> data) {
@@ -316,15 +477,21 @@ class GameProvider with ChangeNotifier {
 
   /// 重置遊戲狀態
   void resetGame() {
+    _currentPhase = 1;
+    _phaseName = '等待中';
     _voteOptions = [];
     _myVote = null;
     _round1Result = null;
     _round2Result = null;
     _voteProgress = 0;
+    _voteResults = {};
     _availableEvents = [];
     _eventHistory = [];
     _currentEvent = null;
     _timerEndAt = null;
+    _roomCode = null;
+    _playerId = null;
+    _isHost = false;
     _stopTimerUpdate();
     notifyListeners();
   }

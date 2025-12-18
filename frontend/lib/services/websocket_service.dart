@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/app_config.dart';
 
@@ -168,7 +169,7 @@ class WebSocketService {
 
       _eventController.add(WSEvent(type: type, data: eventData));
     } catch (e) {
-      print('WebSocket 解析錯誤: $e');
+      debugPrint('WebSocket 解析錯誤: $e');
     }
   }
 
@@ -192,7 +193,7 @@ class WebSocketService {
   void _startHeartbeat() {
     _stopHeartbeat();
     _heartbeatTimer = Timer.periodic(
-      Duration(milliseconds: AppConfig.wsHeartbeatInterval),
+      const Duration(milliseconds: AppConfig.wsHeartbeatInterval),
       (_) {
         if (_isConnected) {
           send('ping', {});
@@ -211,7 +212,7 @@ class WebSocketService {
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(
-      Duration(milliseconds: AppConfig.wsReconnectDelay),
+      const Duration(milliseconds: AppConfig.wsReconnectDelay),
       _doConnect,
     );
   }

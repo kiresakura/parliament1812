@@ -42,19 +42,22 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _loadMessages() async {
     final roomCode = context.read<RoomProvider>().room?.code;
     final playerId = context.read<PlayerProvider>().currentPlayer?.id;
+    final messageProvider = context.read<MessageProvider>();
 
     if (roomCode != null && playerId != null) {
-      await context.read<MessageProvider>().loadMessages(
+      await messageProvider.loadMessages(
             roomCode: roomCode,
             playerId: playerId,
             otherPlayerId: widget.otherPlayerId,
           );
 
       // 標記為已讀
-      await context.read<MessageProvider>().markAsRead(
-            playerId: playerId,
-            senderId: widget.otherPlayerId,
-          );
+      if (mounted) {
+        await messageProvider.markAsRead(
+              playerId: playerId,
+              senderId: widget.otherPlayerId,
+            );
+      }
     }
   }
 
@@ -139,7 +142,7 @@ class _MessageScreenState extends State<MessageScreen> {
         color: AppTheme.cardBackground,
         border: Border(
           top: BorderSide(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withValues(alpha: 0.2),
           ),
         ),
       ),
@@ -173,7 +176,7 @@ class _MessageScreenState extends State<MessageScreen> {
               icon: const Icon(Icons.send),
               color: AppTheme.secondaryColor,
               style: IconButton.styleFrom(
-                backgroundColor: AppTheme.secondaryColor.withOpacity(0.1),
+                backgroundColor: AppTheme.secondaryColor.withValues(alpha: 0.1),
               ),
             ),
           ],
@@ -187,8 +190,9 @@ class _MessageScreenState extends State<MessageScreen> {
     if (content.isEmpty) return;
 
     _messageController.clear();
+    final messageProvider = context.read<MessageProvider>();
 
-    final success = await context.read<MessageProvider>().sendMessage(
+    final success = await messageProvider.sendMessage(
           roomCode: roomCode,
           senderId: currentPlayerId,
           receiverId: widget.otherPlayerId,
@@ -228,9 +232,10 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   Future<void> _loadConversations() async {
     final roomCode = context.read<RoomProvider>().room?.code;
     final playerId = context.read<PlayerProvider>().currentPlayer?.id;
+    final messageProvider = context.read<MessageProvider>();
 
     if (roomCode != null && playerId != null) {
-      await context.read<MessageProvider>().loadConversations(
+      await messageProvider.loadConversations(
             roomCode: roomCode,
             playerId: playerId,
           );

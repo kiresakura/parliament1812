@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import '../config/app_config.dart';
 
@@ -16,7 +17,7 @@ class NfcService {
     try {
       return await NfcManager.instance.isAvailable();
     } catch (e) {
-      print('NFC 檢查失敗: $e');
+      debugPrint('NFC 檢查失敗: $e');
       return false;
     }
   }
@@ -80,7 +81,7 @@ class NfcService {
     try {
       await NfcManager.instance.stopSession();
     } catch (e) {
-      print('停止 NFC 掃描失敗: $e');
+      debugPrint('停止 NFC 掃描失敗: $e');
     } finally {
       _isScanning = false;
     }

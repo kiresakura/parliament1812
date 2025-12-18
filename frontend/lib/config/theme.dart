@@ -26,7 +26,6 @@ class AppTheme {
       seedColor: primaryColor,
       brightness: Brightness.light,
     ),
-    fontFamily: 'NotoSansTC',
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       elevation: 0,
@@ -38,19 +37,17 @@ class AppTheme {
     useMaterial3: true,
     brightness: Brightness.dark,
     scaffoldBackgroundColor: darkBackground,
-    colorScheme: ColorScheme.dark(
+    colorScheme: const ColorScheme.dark(
       primary: secondaryColor,
       secondary: primaryColor,
       surface: cardBackground,
-      background: darkBackground,
     ),
-    fontFamily: 'NotoSansTC',
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       elevation: 0,
       backgroundColor: Colors.transparent,
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: cardBackground,
       elevation: 4,
       shape: RoundedRectangleBorder(
