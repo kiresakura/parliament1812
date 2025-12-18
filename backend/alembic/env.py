@@ -16,8 +16,8 @@ from app.models import *  # noqa: F401, F403 - 載入所有模型
 # Alembic Config 物件
 config = context.config
 
-# 設定資料庫 URL
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# 設定資料庫 URL (使用 async 格式)
+config.set_main_option("sqlalchemy.url", settings.async_database_url)
 
 # 設定日誌
 if config.config_file_name is not None:
