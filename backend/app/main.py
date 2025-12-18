@@ -19,53 +19,92 @@ from app.websocket import manager as ws_manager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     應用程式生命週期管理
-    
+
     啟動時：
     - 初始化資料庫
     - 連接 Redis
     - 啟動 WebSocket 管理器
-    
+
     關閉時：
     - 關閉 WebSocket 管理器
     - 斷開 Redis 連線
     - 關閉資料庫連線
     """
+    import traceback
+
     # 啟動
-    print("🚀 啟動 Parliament 1812 伺服器...")
-    
+    print("🚀 啟動 Parliament 1812 伺服器...", flush=True)
+
+    db_connected = False
+    redis_connected = False
+    ws_started = False
+
     # 初始化資料庫
-    await init_db()
-    print("✅ 資料庫連線成功")
-    
+    try:
+        print(f"📊 正在連線資料庫...", flush=True)
+        await init_db()
+        db_connected = True
+        print("✅ 資料庫連線成功", flush=True)
+    except Exception as e:
+        print(f"❌ 資料庫連線失敗: {e}", flush=True)
+        print(traceback.format_exc(), flush=True)
+
     # 連接 Redis
-    await redis_manager.connect()
-    print("✅ Redis 連線成功")
-    
-    # 啟動 WebSocket 管理器
-    await ws_manager.start()
-    print("✅ WebSocket 管理器啟動")
-    
-    print(f"🎭 Parliament 1812 伺服器已就緒！")
-    print(f"📍 API 文件：http://localhost:8000/docs")
-    
+    try:
+        print(f"📮 正在連線 Redis...", flush=True)
+        await redis_manager.connect()
+        redis_connected = True
+        print("✅ Redis 連線成功", flush=True)
+    except Exception as e:
+        print(f"❌ Redis 連線失敗: {e}", flush=True)
+        print(traceback.format_exc(), flush=True)
+
+    # 啟動 WebSocket 管理器 (需要 Redis 已連線)
+    if redis_connected:
+        try:
+            print(f"🔌 正在啟動 WebSocket 管理器...", flush=True)
+            await ws_manager.start()
+            ws_started = True
+            print("✅ WebSocket 管理器啟動", flush=True)
+        except Exception as e:
+            print(f"❌ WebSocket 管理器啟動失敗: {e}", flush=True)
+            print(traceback.format_exc(), flush=True)
+    else:
+        print("⚠️ 跳過 WebSocket 管理器啟動 (Redis 未連線)", flush=True)
+
+    print(f"🎭 Parliament 1812 伺服器已就緒！", flush=True)
+    print(f"📍 狀態: DB={db_connected}, Redis={redis_connected}, WS={ws_started}", flush=True)
+
     yield
-    
+
     # 關閉
-    print("\n🛑 正在關閉伺服器...")
-    
+    print("\n🛑 正在關閉伺服器...", flush=True)
+
     # 停止 WebSocket 管理器
-    await ws_manager.stop()
-    print("✅ WebSocket 管理器已停止")
-    
+    if ws_started:
+        try:
+            await ws_manager.stop()
+            print("✅ WebSocket 管理器已停止", flush=True)
+        except Exception as e:
+            print(f"⚠️ WebSocket 管理器停止失敗: {e}", flush=True)
+
     # 斷開 Redis
-    await redis_manager.disconnect()
-    print("✅ Redis 已斷開")
-    
+    if redis_connected:
+        try:
+            await redis_manager.disconnect()
+            print("✅ Redis 已斷開", flush=True)
+        except Exception as e:
+            print(f"⚠️ Redis 斷開失敗: {e}", flush=True)
+
     # 關閉資料庫
-    await close_db()
-    print("✅ 資料庫已關閉")
-    
-    print("👋 伺服器已安全關閉")
+    if db_connected:
+        try:
+            await close_db()
+            print("✅ 資料庫已關閉", flush=True)
+        except Exception as e:
+            print(f"⚠️ 資料庫關閉失敗: {e}", flush=True)
+
+    print("👋 伺服器已安全關閉", flush=True)
 
 
 # 建立 FastAPI 應用程式
@@ -135,12 +174,49 @@ async def root() -> dict:
 async def health_check() -> dict:
     """
     健康檢查端點
-    
+
     Returns:
         健康狀態資訊
     """
+    # 簡單檢查 - 只要伺服器能回應就是健康的
+    # 詳細的連線狀態會在 /status 端點
     return {
         "status": "healthy",
-        "database": "connected",
-        "redis": "connected",
+        "version": settings.app_version,
+    }
+
+
+@app.get("/status", tags=["root"])
+async def detailed_status() -> dict:
+    """
+    詳細狀態檢查端點
+
+    Returns:
+        詳細服務狀態
+    """
+    db_status = "unknown"
+    redis_status = "unknown"
+
+    # 檢查資料庫
+    try:
+        from sqlalchemy import text
+        from app.database import async_session_maker
+        async with async_session_maker() as session:
+            await session.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+
+    # 檢查 Redis
+    try:
+        await redis_manager.client.ping()
+        redis_status = "connected"
+    except Exception as e:
+        redis_status = f"error: {str(e)}"
+
+    return {
+        "status": "running",
+        "version": settings.app_version,
+        "database": db_status,
+        "redis": redis_status,
     }
