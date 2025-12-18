@@ -1,0 +1,350 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
+import '../models/room.dart';
+import '../models/player.dart';
+import '../models/message.dart';
+import '../models/vote.dart';
+import '../models/event.dart';
+
+/// API 服務 - 處理所有 HTTP 請求
+class ApiService {
+  static final ApiService _instance = ApiService._internal();
+  factory ApiService() => _instance;
+  ApiService._internal();
+
+  String get baseUrl => AppConfig.currentApiUrl;
+
+  // HTTP Headers
+  Map<String, String> get _headers => {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+  // ==================== 房間 API ====================
+
+  /// 建立房間
+  Future<Room> createRoom({required String hostNickname}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms'),
+      headers: _headers,
+      body: jsonEncode({'host_nickname': hostNickname}),
+    );
+    return _handleResponse(response, (data) => Room.fromJson(data));
+  }
+
+  /// 取得房間資訊
+  Future<Room> getRoom(String roomCode) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rooms/$roomCode'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) => Room.fromJson(data));
+  }
+
+  /// 加入房間
+  Future<Player> joinRoom({
+    required String roomCode,
+    required String nickname,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/join'),
+      headers: _headers,
+      body: jsonEncode({'nickname': nickname}),
+    );
+    return _handleResponse(response, (data) => Player.fromJson(data));
+  }
+
+  /// 取得房間內所有玩家
+  Future<List<Player>> getRoomPlayers(String roomCode) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/players'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) {
+      final players = data['players'] as List;
+      return players.map((p) => Player.fromJson(p)).toList();
+    });
+  }
+
+  // ==================== 玩家 API ====================
+
+  /// NFC 掃卡分配角色
+  Future<Player> scanNfc({
+    required String roomCode,
+    required String playerId,
+    required String cardId,
+    required String signature,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/scan-nfc'),
+      headers: _headers,
+      body: jsonEncode({
+        'player_id': playerId,
+        'card_id': cardId,
+        'signature': signature,
+      }),
+    );
+    return _handleResponse(response, (data) => Player.fromJson(data));
+  }
+
+  /// 取得玩家的秘密任務
+  Future<SecretMission> getSecretMission(String playerId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/players/$playerId/secret'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) => SecretMission.fromJson(data));
+  }
+
+  // ==================== 私訊 API ====================
+
+  /// 發送私訊
+  Future<Message> sendMessage({
+    required String roomCode,
+    required String senderId,
+    required String receiverId,
+    required String content,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/messages?sender_id=$senderId&room_code=$roomCode'),
+      headers: _headers,
+      body: jsonEncode({
+        'receiver_id': receiverId,
+        'content': content,
+      }),
+    );
+    return _handleResponse(response, (data) => Message.fromJson(data));
+  }
+
+  /// 取得私訊列表
+  Future<List<Message>> getMessages({
+    required String roomCode,
+    required String playerId,
+    String? otherPlayerId,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    var url = '$baseUrl/api/messages?player_id=$playerId&room_code=$roomCode&limit=$limit&offset=$offset';
+    if (otherPlayerId != null) {
+      url += '&other_player_id=$otherPlayerId';
+    }
+
+    final response = await http.get(Uri.parse(url), headers: _headers);
+    return _handleResponse(response, (data) {
+      final messages = data['messages'] as List;
+      return messages.map((m) => Message.fromJson(m)).toList();
+    });
+  }
+
+  /// 取得對話列表
+  Future<List<Conversation>> getConversations({
+    required String roomCode,
+    required String playerId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/messages/conversations?player_id=$playerId&room_code=$roomCode'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) {
+      final conversations = data['conversations'] as List;
+      return conversations.map((c) => Conversation.fromJson(c)).toList();
+    });
+  }
+
+  /// 標記訊息為已讀
+  Future<void> markMessagesAsRead({
+    required String playerId,
+    List<String>? messageIds,
+    String? senderId,
+  }) async {
+    var url = '$baseUrl/api/messages/read?player_id=$playerId';
+    if (senderId != null) {
+      url += '&sender_id=$senderId';
+    }
+
+    final response = await http.put(
+      Uri.parse(url),
+      headers: _headers,
+      body: jsonEncode({'message_ids': messageIds}),
+    );
+    _handleResponse(response, (data) => null);
+  }
+
+  // ==================== 投票 API ====================
+
+  /// 投票
+  Future<Vote> castVote({
+    required String roomCode,
+    required String playerId,
+    required int round,
+    required String choice,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/votes?player_id=$playerId'),
+      headers: _headers,
+      body: jsonEncode({
+        'round': round,
+        'choice': choice,
+      }),
+    );
+    return _handleResponse(response, (data) => Vote.fromJson(data));
+  }
+
+  /// 取得投票進度
+  Future<Map<String, dynamic>> getVoteProgress({
+    required String roomCode,
+    required int round,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/votes/progress?round=$round'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) => data as Map<String, dynamic>);
+  }
+
+  /// 取得投票結果
+  Future<dynamic> getVoteResult({
+    required String roomCode,
+    required int round,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/votes/result?round=$round'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) {
+      if (round == 1) {
+        return Round1Result.fromJson(data);
+      } else {
+        return Round2Result.fromJson(data);
+      }
+    });
+  }
+
+  /// 取得投票選項
+  Future<List<VoteOption>> getVoteOptions(String roomCode) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/votes/options'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) {
+      final options = data['options'] as List;
+      return options.map((o) => VoteOption.fromJson(o)).toList();
+    });
+  }
+
+  // ==================== 事件 API ====================
+
+  /// 取得可用事件（僅主持人）
+  Future<List<GameEvent>> getAvailableEvents({
+    required String roomCode,
+    required String hostId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/events?host_id=$hostId'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) {
+      final events = data['events'] as List;
+      return events.map((e) => GameEvent.fromJson(e)).toList();
+    });
+  }
+
+  /// 觸發事件（僅主持人）
+  Future<TriggeredEvent> triggerEvent({
+    required String roomCode,
+    required String hostId,
+    required String eventId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/events/trigger?host_id=$hostId'),
+      headers: _headers,
+      body: jsonEncode({'event_id': eventId}),
+    );
+    return _handleResponse(response, (data) => TriggeredEvent.fromJson(data));
+  }
+
+  /// 隨機觸發事件（僅主持人）
+  Future<TriggeredEvent> randomTriggerEvent({
+    required String roomCode,
+    required String hostId,
+    int? minSeverity,
+    int? maxSeverity,
+  }) async {
+    var url = '$baseUrl/api/rooms/$roomCode/events/random?host_id=$hostId';
+    if (minSeverity != null) url += '&min_severity=$minSeverity';
+    if (maxSeverity != null) url += '&max_severity=$maxSeverity';
+
+    final response = await http.post(Uri.parse(url), headers: _headers);
+    return _handleResponse(response, (data) => TriggeredEvent.fromJson(data));
+  }
+
+  /// 取得已觸發事件歷史
+  Future<List<TriggeredEvent>> getEventHistory(String roomCode) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/events/history'),
+      headers: _headers,
+    );
+    return _handleResponse(response, (data) {
+      final events = data['events'] as List;
+      return events.map((e) => TriggeredEvent.fromJson(e)).toList();
+    });
+  }
+
+  // ==================== 遊戲流程 API ====================
+
+  /// 切換遊戲階段（僅主持人）
+  Future<Room> changePhase({
+    required String roomCode,
+    required String hostId,
+    required int phase,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/phase?host_id=$hostId'),
+      headers: _headers,
+      body: jsonEncode({'phase': phase}),
+    );
+    return _handleResponse(response, (data) => Room.fromJson(data));
+  }
+
+  /// 設定計時器（僅主持人）
+  Future<Room> setTimer({
+    required String roomCode,
+    required String hostId,
+    required int durationMinutes,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/timer?host_id=$hostId'),
+      headers: _headers,
+      body: jsonEncode({'duration_minutes': durationMinutes}),
+    );
+    return _handleResponse(response, (data) => Room.fromJson(data));
+  }
+
+  // ==================== 通用處理 ====================
+
+  /// 處理 API 回應
+  T _handleResponse<T>(http.Response response, T Function(dynamic) parser) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return parser(data);
+    } else {
+      final error = jsonDecode(utf8.decode(response.bodyBytes));
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: error['detail'] ?? '發生錯誤',
+      );
+    }
+  }
+}
+
+/// API 例外
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+
+  ApiException({required this.statusCode, required this.message});
+
+  @override
+  String toString() => 'ApiException: [$statusCode] $message';
+}
