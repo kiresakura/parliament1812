@@ -7,9 +7,9 @@ class AppConfig {
   static const String apiBaseUrl = 'http://localhost:8000';
   static const String wsBaseUrl = 'ws://localhost:8000';
 
-  // 生產環境
-  static const String prodApiBaseUrl = 'https://parliament1812-production.up.railway.app';
-  static const String prodWsBaseUrl = 'wss://parliament1812-production.up.railway.app';
+  // 生產環境 (Railway)
+  static const String prodApiBaseUrl = 'https://1812-production.up.railway.app';
+  static const String prodWsBaseUrl = 'wss://1812-production.up.railway.app';
 
   // 是否為開發模式
   static const bool isDevelopment = true;
