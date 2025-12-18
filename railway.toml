@@ -5,9 +5,10 @@ builder = "dockerfile"
 dockerfilePath = "backend/Dockerfile"
 
 [deploy]
-# 健康檢查
+# 健康檢查 (增加啟動時間給資料庫遷移)
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 120
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
 # 重啟策略
 restartPolicyType = "on_failure"
