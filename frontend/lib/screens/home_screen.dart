@@ -28,24 +28,41 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo / 標題
-                _buildHeader(),
-                const SizedBox(height: 48),
-
-                // 切換按鈕
-                _buildToggleButtons(),
-                const SizedBox(height: 32),
-
-                // 表單
-                _buildForm(),
-              ],
+      body: Container(
+        // 背景圖片
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/parliament_bg.png'),
+            fit: BoxFit.cover,
+            opacity: 0.3, // 半透明讓文字更清楚
+          ),
+          // 漸層疊加讓上方內容更清晰
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppTheme.darkBackground,
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo / 標題
+                  _buildHeader(),
+                  const SizedBox(height: 48),
+                  // 切換按鈕
+                  _buildToggleButtons(),
+                  const SizedBox(height: 32),
+                  // 表單
+                  _buildForm(),
+                ],
+              ),
             ),
           ),
         ),
@@ -62,6 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             border: Border.all(color: AppTheme.secondaryColor, width: 2),
             borderRadius: BorderRadius.circular(8),
+            // 加點背景讓文字更清楚
+            color: AppTheme.darkBackground.withValues(alpha: 0.7),
           ),
           child: const Text(
             '1812',
@@ -74,12 +93,20 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        // 加陰影讓文字在背景上更清楚
+        Text(
           '國會風雲',
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.bold,
             color: Colors.white,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.8),
+                blurRadius: 10,
+                offset: const Offset(2, 2),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -87,8 +114,14 @@ class _HomeScreenState extends State<HomeScreen> {
           'Parliament Debates',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[400],
+            color: Colors.grey[300],
             letterSpacing: 4,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.8),
+                blurRadius: 8,
+              ),
+            ],
           ),
         ),
       ],
@@ -98,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildToggleButtons() {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
+        color: AppTheme.cardBackground.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -143,11 +176,18 @@ class _HomeScreenState extends State<HomeScreen> {
           constraints: const BoxConstraints(maxWidth: 400),
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: AppTheme.cardBackground,
+            color: AppTheme.cardBackground.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: AppTheme.secondaryColor.withValues(alpha: 0.3),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                spreadRadius: 5,
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -163,7 +203,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 maxLength: 20,
               ),
               const SizedBox(height: 16),
-
               // 房間碼輸入（僅加入房間時顯示）
               if (!_isCreating) ...[
                 TextField(
@@ -178,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               // 錯誤訊息
               if (roomProvider.error != null)
                 Padding(
@@ -189,7 +227,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-
               // 提交按鈕
               ElevatedButton(
                 onPressed: roomProvider.isLoading ? null : _submit,
