@@ -24,17 +24,19 @@ class Room {
 
   factory Room.fromJson(Map<String, dynamic> json) {
     return Room(
-      id: json['id'],
-      code: json['code'],
-      status: json['status'],
-      phase: json['phase'] ?? 1,
-      phaseName: json['phase_name'] ?? 'waiting',
-      currentRound: json['current_round'] ?? 0,
+      id: json['id'] as String? ?? '',
+      code: json['code'] as String? ?? '',
+      status: json['status'] as String? ?? 'waiting',
+      phase: json['phase'] as int? ?? 1,
+      phaseName: json['phase_name'] as String? ?? 'waiting',
+      currentRound: json['current_round'] as int? ?? 0,
       timerEndAt: json['timer_end_at'] != null
           ? DateTime.parse(json['timer_end_at'])
           : null,
-      playerCount: json['player_count'] ?? 0,
-      createdAt: DateTime.parse(json['created_at']),
+      playerCount: json['player_count'] as int? ?? 0,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
     );
   }
 

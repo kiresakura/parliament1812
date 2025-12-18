@@ -28,14 +28,16 @@ class Player {
 
   factory Player.fromJson(Map<String, dynamic> json) {
     return Player(
-      id: json['id'],
-      roomId: json['room_id'],
-      nickname: json['nickname'],
-      roleType: json['role_type'],
-      roleIndex: json['role_index'],
-      secretMissionId: json['secret_mission_id'],
-      isHost: json['is_host'] ?? false,
-      joinedAt: DateTime.parse(json['joined_at']),
+      id: json['id'] as String? ?? '',
+      roomId: json['room_id'] as String? ?? '',
+      nickname: json['nickname'] as String? ?? '',
+      roleType: json['role_type'] as String?,
+      roleIndex: json['role_index'] as int?,
+      secretMissionId: json['secret_mission_id'] as String?,
+      isHost: json['is_host'] as bool? ?? false,
+      joinedAt: json['joined_at'] != null
+          ? DateTime.parse(json['joined_at'])
+          : DateTime.now(),
       role: json['role'] != null ? Role.fromJson(json['role']) : null,
       secretMission: json['secret_mission'] != null
           ? SecretMission.fromJson(json['secret_mission'])

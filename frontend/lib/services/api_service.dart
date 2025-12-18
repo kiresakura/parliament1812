@@ -25,21 +25,37 @@ class ApiService {
 
   /// 建立房間
   Future<Room> createRoom({required String hostNickname}) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/rooms'),
-      headers: _headers,
-      body: jsonEncode({'host_nickname': hostNickname}),
-    );
-    return _handleResponse(response, (data) => Room.fromJson(data));
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/rooms'),
+        headers: _headers,
+        body: jsonEncode({'host_nickname': hostNickname}),
+      );
+      return _handleResponse(response, (data) => Room.fromJson(data));
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(
+        statusCode: 0,
+        message: '無法連接伺服器，請檢查網路連線',
+      );
+    }
   }
 
   /// 取得房間資訊
   Future<Room> getRoom(String roomCode) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/rooms/$roomCode'),
-      headers: _headers,
-    );
-    return _handleResponse(response, (data) => Room.fromJson(data));
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/rooms/$roomCode'),
+        headers: _headers,
+      );
+      return _handleResponse(response, (data) => Room.fromJson(data));
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(
+        statusCode: 0,
+        message: '無法連接伺服器，請檢查網路連線',
+      );
+    }
   }
 
   /// 加入房間
@@ -47,12 +63,20 @@ class ApiService {
     required String roomCode,
     required String nickname,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/rooms/$roomCode/join'),
-      headers: _headers,
-      body: jsonEncode({'nickname': nickname}),
-    );
-    return _handleResponse(response, (data) => Player.fromJson(data));
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/rooms/$roomCode/join'),
+        headers: _headers,
+        body: jsonEncode({'nickname': nickname}),
+      );
+      return _handleResponse(response, (data) => Player.fromJson(data));
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(
+        statusCode: 0,
+        message: '無法連接伺服器，請檢查網路連線',
+      );
+    }
   }
 
   /// 取得房間內所有玩家
@@ -381,13 +405,26 @@ class ApiService {
   /// 處理 API 回應
   T _handleResponse<T>(http.Response response, T Function(dynamic) parser) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      final data = jsonDecode(utf8.decode(response.bodyBytes));
-      return parser(data);
+      try {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        return parser(data);
+      } catch (e) {
+        throw ApiException(
+          statusCode: response.statusCode,
+          message: '解析回應失敗: $e',
+        );
+      }
     } else {
-      final error = jsonDecode(utf8.decode(response.bodyBytes));
+      String errorMessage = '發生錯誤';
+      try {
+        final error = jsonDecode(utf8.decode(response.bodyBytes));
+        errorMessage = error['detail'] ?? error['message'] ?? '伺服器錯誤';
+      } catch (_) {
+        errorMessage = '伺服器無回應 (${response.statusCode})';
+      }
       throw ApiException(
         statusCode: response.statusCode,
-        message: error['detail'] ?? '發生錯誤',
+        message: errorMessage,
       );
     }
   }
