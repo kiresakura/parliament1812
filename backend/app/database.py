@@ -13,7 +13,7 @@ from app.config import settings
 
 # 建立非同步資料庫引擎
 engine = create_async_engine(
-    settings.database_url,
+    settings.async_database_url,  # 使用自動轉換的 asyncpg URL
     echo=settings.debug,
     pool_pre_ping=True,
     pool_size=10,

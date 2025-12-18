@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     
     # 資料庫設定
     database_url: str = "postgresql+asyncpg://postgres:password@localhost:5432/parliament1812"
+
+    @property
+    def async_database_url(self) -> str:
+        """取得 async SQLAlchemy 格式的資料庫 URL"""
+        url = self.database_url
+        # Railway 提供 postgresql:// 但 asyncpg 需要 postgresql+asyncpg://
+        if url.startswith("postgresql://") and "+asyncpg" not in url:
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
     
     # Redis 設定
     redis_url: str = "redis://localhost:6379/0"
