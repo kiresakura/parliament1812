@@ -65,39 +65,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // 國會背景圖片 - 裝飾性元素，排除語義
+          // 國會背景圖片 - 全彩高可見度
           ExcludeSemantics(
             child: Positioned.fill(
               child: Opacity(
-                opacity: 0.15,
-                child: ColorFiltered(
-                  colorFilter: const ColorFilter.mode(
-                    Colors.grey,
-                    BlendMode.saturation,
-                  ),
-                  child: Image.asset(
-                    'assets/images/parliament_background.png',
-                    fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                  ),
+                opacity: 0.45,
+                child: Image.asset(
+                  'assets/images/parliament_background.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
                 ),
               ),
             ),
           ),
 
-          // 漸層暈影效果 - 裝飾性元素，排除語義
+          // 漸層暈影效果 - 優化為更柔和的邊緣暗角
           ExcludeSemantics(
             child: Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     center: Alignment.center,
-                    radius: 1.2,
+                    radius: 1.0,
                     colors: [
                       Colors.transparent,
-                      AppTheme.primaryBackground.withValues(alpha: 0.6),
-                      AppTheme.primaryBackground.withValues(alpha: 0.9),
+                      AppTheme.primaryBackground.withValues(alpha: 0.3),
+                      AppTheme.primaryBackground.withValues(alpha: 0.7),
                     ],
+                    stops: const [0.3, 0.7, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 底部漸層 - 讓表單區域更清晰
+          ExcludeSemantics(
+            child: Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      AppTheme.primaryBackground.withValues(alpha: 0.8),
+                      AppTheme.primaryBackground.withValues(alpha: 0.95),
+                    ],
+                    stops: const [0.0, 0.4, 1.0],
                   ),
                 ),
               ),
@@ -112,109 +130,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // 主內容
+          // 主內容 - 優化為無需滾動的緊湊佈局
           SafeArea(
-            child: Column(
+            child: Stack(
               children: [
-                // Victoria 3 風格頂部狀態欄
-                _buildTopStatsBar(),
-
-                // 主內容區 (可滾動)
-                Expanded(
-                  child: Stack(
-                    children: [
-                      SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // Logo / 標題
-                              _buildHeader(),
-                              const SizedBox(height: 40),
-                              // 切換按鈕
-                              _buildToggleButtons(),
-                              const SizedBox(height: 28),
-                              // 表單
-                              _buildForm(),
-                              const SizedBox(height: 24),
-                              // 歷史引言
-                              _buildQuote(),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // 設定按鈕
-                      Positioned(
-                        top: 12,
-                        right: 16,
-                        child: _buildSettingsButton(),
-                      ),
-                    ],
+                // 主內容區 - 置中顯示
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Logo / 標題
+                        _buildHeader(),
+                        const SizedBox(height: 28),
+                        // 切換按鈕
+                        _buildToggleButtons(),
+                        const SizedBox(height: 20),
+                        // 表單
+                        _buildForm(),
+                        const SizedBox(height: 16),
+                        // 歷史引言
+                        _buildQuote(),
+                      ],
+                    ),
                   ),
                 ),
-
-                // 固定底部操作欄
-                _buildFixedBottomBar(),
+                // 設定按鈕
+                Positioned(
+                  top: 12,
+                  right: 16,
+                  child: _buildSettingsButton(),
+                ),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  /// 固定底部操作欄
-  Widget _buildFixedBottomBar() {
-    return Consumer<RoomProvider>(
-      builder: (context, roomProvider, _) {
-        return FixedBottomBar(
-          children: [
-            // 幫助按鈕
-            Semantics(
-              button: true,
-              label: '遊戲說明，點擊查看遊戲規則和流程',
-              child: BottomBarButton(
-                icon: Icons.help_outline,
-                label: '遊戲說明',
-                onTap: () {
-                  soundService.buttonFeedback();
-                  _showHelpDialog();
-                },
-              ),
-            ),
-            // 主要操作按鈕
-            Semantics(
-              button: true,
-              label: _isCreating ? '建立房間，點擊建立新的遊戲房間' : '加入房間，點擊加入現有的遊戲房間',
-              enabled: !roomProvider.isLoading,
-              child: BottomBarButton(
-                icon: _isCreating ? Icons.add_circle : Icons.login,
-                label: _isCreating ? '建立房間' : '加入房間',
-                isPrimary: true,
-                isLoading: roomProvider.isLoading,
-                onTap: roomProvider.isLoading ? null : _submit,
-              ),
-            ),
-            // 設定按鈕
-            Semantics(
-              button: true,
-              label: '設定，點擊開啟應用程式設定',
-              child: BottomBarButton(
-                icon: Icons.settings,
-                label: '設定',
-                onTap: () {
-                  soundService.buttonFeedback();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -319,104 +272,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// Victoria 3 風格頂部狀態欄
-  Widget _buildTopStatsBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.panelBackground.withValues(alpha: 0.95),
-        border: Border(
-          bottom: BorderSide(
-            color: AppTheme.accentGold.withValues(alpha: 0.3),
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // 左側：攝政王時代標誌
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.accentGold.withValues(alpha: 0.2),
-                  border: Border.all(
-                    color: AppTheme.accentGold,
-                    width: 2,
-                  ),
-                ),
-                child: const Center(
-                  child: CrownIcon(size: 18, color: AppTheme.accentGold),
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'REGENCY ERA',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 12,
-                      color: AppTheme.accentGold,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  Text(
-                    '1812 • British Parliament',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 10,
-                      color: AppTheme.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const Spacer(),
-
-          // 右側：數據面板
-          const Row(
-            children: [
-              DataPanel(
-                title: '玩家在線',
-                value: '847',
-                icon: Icon(
-                  Icons.people_outline,
-                  size: 16,
-                  color: AppTheme.accentGold,
-                ),
-                trend: 'up',
-              ),
-              SizedBox(width: 8),
-              DataPanel(
-                title: '活躍房間',
-                value: '23',
-                icon: Icon(
-                  Icons.public,
-                  size: 16,
-                  color: AppTheme.accentGold,
-                ),
-                trend: 'neutral',
-              ),
-            ],
-          ),
-        ],
-      ),
-    ).animate().slideY(begin: -1, end: 0, duration: 400.ms, curve: Curves.easeOut);
-  }
-
   Widget _buildSettingsButton() {
     return GestureDetector(
       onTap: () {
@@ -462,11 +317,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildHeader() {
     return Column(
       children: [
-        // 六角形徽章 + 皇冠
+        // 六角形徽章 + 星形圖標
         const HexagonBadge(
-          size: 80,
-          child: CrownIcon(
-            size: 40,
+          size: 70,
+          child: Icon(
+            Icons.star,
+            size: 36,
             color: AppTheme.accentGold,
           ),
         ).animate().scale(
@@ -476,71 +332,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               curve: Curves.elasticOut,
             ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // 主標題 1812 - 帶動畫
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 左側齒輪裝飾
-            GearIcon(
-              size: 28,
-              color: AppTheme.textTertiary.withValues(alpha: 0.3),
-              spinning: true,
-            ),
-            const SizedBox(width: 16),
-
-            // 年份標誌
-            AnimatedBuilder(
-              animation: _glowController,
-              builder: (context, child) {
-                return Text(
-                  '1812',
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 64,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.accentGold,
-                    letterSpacing: 12,
-                    shadows: [
-                      Shadow(
-                        color: AppTheme.accentGold.withValues(
-                          alpha: 0.4 + (_glowController.value * 0.2),
-                        ),
-                        blurRadius: 30,
-                      ),
-                      const Shadow(
-                        color: Colors.black,
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
+        // 主標題 1812 - 簡潔版
+        AnimatedBuilder(
+          animation: _glowController,
+          builder: (context, child) {
+            return Text(
+              '1812',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 56,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.accentGold,
+                letterSpacing: 10,
+                shadows: [
+                  Shadow(
+                    color: AppTheme.accentGold.withValues(
+                      alpha: 0.4 + (_glowController.value * 0.2),
+                    ),
+                    blurRadius: 30,
                   ),
-                );
-              },
-            ),
-
-            const SizedBox(width: 16),
-
-            // 右側齒輪裝飾
-            GearIcon(
-              size: 28,
-              color: AppTheme.textTertiary.withValues(alpha: 0.3),
-              spinning: true,
-            ),
-          ],
+                  const Shadow(
+                    color: Colors.black,
+                    blurRadius: 8,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+            );
+          },
         ).animate().fadeIn(duration: 800.ms),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
 
         // 中文標題
         Text(
           '國會風雲',
           style: TextStyle(
             fontFamily: 'Georgia',
-            fontSize: 32,
+            fontSize: 28,
             color: AppTheme.textSecondary,
-            letterSpacing: 18,
+            letterSpacing: 14,
             shadows: [
               Shadow(
                 color: Colors.black.withValues(alpha: 0.9),
@@ -554,28 +387,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             .fadeIn(delay: 200.ms, duration: 600.ms)
             .slideY(begin: -0.2, end: 0, curve: Curves.easeOut),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
         // 英文副標題
         Text(
           'PARLIAMENT DEBATES',
           style: TextStyle(
             fontFamily: 'Georgia',
-            fontSize: 12,
+            fontSize: 11,
             color: AppTheme.textTertiary.withValues(alpha: 0.6),
-            letterSpacing: 8,
+            letterSpacing: 6,
           ),
         )
             .animate()
             .fadeIn(delay: 400.ms, duration: 600.ms)
             .slideY(begin: 0.2, end: 0),
-
-        const SizedBox(height: 20),
-
-        // 維多利亞風格分隔線
-        const VictorianDivider(width: 200)
-            .animate()
-            .scaleX(begin: 0, end: 1, delay: 600.ms, duration: 600.ms),
       ],
     );
   }
@@ -696,18 +522,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return Container(
           width: double.infinity,
           constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: AppTheme.cardBackground.withValues(alpha: 0.9),
+            color: AppTheme.cardBackground.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppTheme.accentGold.withValues(alpha: 0.3),
+              color: AppTheme.accentGold.withValues(alpha: 0.4),
+              width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.5),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: AppTheme.accentGold.withValues(alpha: 0.1),
+                blurRadius: 12,
+                spreadRadius: -2,
               ),
             ],
           ),
@@ -722,7 +554,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 hint: '輸入暱稱...',
                 maxLength: 20,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               // 房間碼輸入（僅加入房間時顯示）
               AnimatedSize(
                 duration: const Duration(milliseconds: 300),
@@ -739,7 +571,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             textCapitalization: TextCapitalization.characters,
                             isRoomCode: true,
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                         ],
                       )
                     : const SizedBox.shrink(),
@@ -799,7 +631,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         Row(
           children: [
             HexagonIcon(
-              size: 16,
+              size: 14,
               color: AppTheme.accentGold.withValues(alpha: 0.8),
             ),
             const SizedBox(width: 8),
@@ -807,25 +639,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               label,
               style: const TextStyle(
                 fontFamily: 'Georgia',
-                fontSize: 14,
+                fontSize: 13,
                 color: AppTheme.textSecondary,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               labelEn,
               style: TextStyle(
                 fontFamily: 'Georgia',
-                fontSize: 11,
-                color: AppTheme.textTertiary.withValues(alpha: 0.7),
+                fontSize: 10,
+                color: AppTheme.textTertiary.withValues(alpha: 0.6),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: AppTheme.primaryBackground.withValues(alpha: 0.8),
+            color: AppTheme.primaryBackground.withValues(alpha: 0.9),
             border: Border.all(color: AppTheme.accentGold, width: 2),
             boxShadow: [
               BoxShadow(
@@ -833,53 +665,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
+              BoxShadow(
+                color: AppTheme.accentGold.withValues(alpha: 0.15),
+                blurRadius: 4,
+              ),
             ],
           ),
-          child: Stack(
-            children: [
-              TextField(
-                controller: controller,
-                textCapitalization: textCapitalization,
-                maxLength: maxLength,
-                textAlign: isRoomCode ? TextAlign.center : TextAlign.start,
-                style: TextStyle(
-                  fontFamily: isRoomCode ? 'monospace' : 'Georgia',
-                  fontSize: isRoomCode ? 24 : 16,
-                  color: AppTheme.textPrimary,
-                  letterSpacing: isRoomCode ? 8 : 0,
-                ),
-                decoration: InputDecoration(
-                  hintText: hint,
-                  hintStyle: TextStyle(
-                    color: AppTheme.textTertiary.withValues(alpha: 0.5),
-                    fontFamily: isRoomCode ? 'monospace' : 'Georgia',
-                    fontSize: isRoomCode ? 24 : 16,
-                    letterSpacing: isRoomCode ? 8 : 0,
-                  ),
-                  counterText: '',
-                  filled: false,
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: isRoomCode ? 16 : 48,
-                    vertical: 14,
-                  ),
-                ),
-                onTap: () => soundService.haptic(HapticType.selection),
+          child: TextField(
+            controller: controller,
+            textCapitalization: textCapitalization,
+            maxLength: maxLength,
+            textAlign: isRoomCode ? TextAlign.center : TextAlign.start,
+            style: TextStyle(
+              fontFamily: isRoomCode ? 'monospace' : 'Georgia',
+              fontSize: isRoomCode ? 22 : 15,
+              color: AppTheme.textPrimary,
+              letterSpacing: isRoomCode ? 6 : 0,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                color: AppTheme.textTertiary.withValues(alpha: 0.5),
+                fontFamily: isRoomCode ? 'monospace' : 'Georgia',
+                fontSize: isRoomCode ? 22 : 15,
+                letterSpacing: isRoomCode ? 6 : 0,
               ),
-              // 右側齒輪裝飾 (非房間碼)
-              if (!isRoomCode)
-                Positioned(
-                  right: 12,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: GearIcon(
-                      size: 20,
-                      color: AppTheme.textTertiary.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ),
-            ],
+              counterText: '',
+              filled: false,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: isRoomCode ? 12 : 14,
+              ),
+            ),
+            onTap: () => soundService.haptic(HapticType.selection),
           ),
         ),
       ],
@@ -893,7 +712,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return GestureDetector(
           onTap: roomProvider.isLoading ? null : _submit,
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
@@ -1000,48 +819,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildQuote() {
     return Container(
       constraints: const BoxConstraints(maxWidth: 400),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppTheme.cardBackground.withValues(alpha: 0.6),
+        color: AppTheme.cardBackground.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: AppTheme.textTertiary.withValues(alpha: 0.3),
+          color: AppTheme.textTertiary.withValues(alpha: 0.2),
         ),
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // 時鐘圖標
           Icon(
             Icons.access_time,
             color: AppTheme.textTertiary.withValues(alpha: 0.4),
-            size: 20,
+            size: 16,
           ),
-          const SizedBox(height: 8),
-          // 中文引言
-          const Text(
-            '「在攝政王的注視下，國會的權力鬥爭即將展開」',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 14,
-              fontStyle: FontStyle.italic,
-              color: AppTheme.textSecondary,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          // 英文副文
-          Text(
-            "Under the Prince Regent's gaze...",
-            style: TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 11,
-              color: AppTheme.textTertiary.withValues(alpha: 0.7),
+          const SizedBox(width: 10),
+          // 引言文字
+          Flexible(
+            child: Text(
+              '「在攝政王的注視下，國會的權力鬥爭即將展開」',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: AppTheme.textSecondary.withValues(alpha: 0.8),
+              ),
             ),
           ),
         ],
       ),
-    ).animate().fadeIn(delay: 1200.ms, duration: 800.ms);
+    ).animate().fadeIn(delay: 1000.ms, duration: 600.ms);
   }
 
   Future<void> _submit() async {
