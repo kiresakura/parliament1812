@@ -29,6 +29,7 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks!
+  use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
@@ -40,33 +41,57 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
+      # 設定 iOS 部署目標
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+
       # 修復模擬器程式碼簽署問題
-      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-      config.build_settings['CODE_SIGN_IDENTITY'] = ''
-      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+      if config.build_settings['SDKROOT'] == 'iphonesimulator' || config.name == 'Debug'
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        config.build_settings['CODE_SIGN_IDENTITY'] = ''
+        config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+      end
 
-      # 修復 Xcode 26.x 模組驗證問題
-      config.build_settings['OTHER_SWIFT_FLAGS'] ||= ['$(inherited)']
-      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      # 完全禁用模組驗證 - 修復 Xcode 26.x 問題
       config.build_settings['ENABLE_MODULE_VERIFIER'] = 'NO'
-
-      # 完全禁用模組驗證
       config.build_settings['SKIP_MODULE_VERIFIER'] = 'YES'
       config.build_settings['MODULE_VERIFIER_SUPPORTED_LANGUAGES'] = ''
       config.build_settings['MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS'] = ''
 
-      # 修復 Flutter.h 找不到問題 - 添加所有可能的路徑
-      flutter_framework_dir = File.join(installer.sandbox.root.to_s, '..', 'Flutter')
+      # 允許非模組化導入
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
+      config.build_settings['OTHER_CFLAGS'] << '-Wno-error=non-modular-include-in-framework-module'
+
+      # 修復 Flutter.h 找不到問題 - 添加完整搜索路徑
       config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
       config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
       config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/Flutter"'
+      config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/Headers/Public"'
+      config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/Headers/Public/Flutter"'
+
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}"'
+      config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_XCFRAMEWORKS_BUILD_DIR}/Flutter"'
 
-      # 抑制第三方套件的棄用警告
+      # 抑制警告
       config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
       config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+    end
+  end
+
+  # 特別處理 device_info_plus - 修復 Flutter.h 問題
+  installer.pods_project.targets.each do |target|
+    if target.name == 'device_info_plus'
+      target.build_configurations.each do |config|
+        config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_XCFRAMEWORKS_BUILD_DIR}/Flutter/Flutter.framework/Headers"'
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_XCFRAMEWORKS_BUILD_DIR}/Flutter"'
+      end
     end
   end
 end
