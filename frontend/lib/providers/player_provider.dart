@@ -79,6 +79,43 @@ class PlayerProvider with ChangeNotifier {
     await _nfc.stopScan();
   }
 
+  /// 手動輸入角色代碼分配角色（NFC 備用方案）
+  Future<Player?> assignRoleManually(String roomCode, String roleCode) async {
+    if (_currentPlayer == null) return null;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // 驗證角色代碼格式 (如 W01, F02, L03, R04, M01 等)
+      final validPattern = RegExp(r'^[WFLRM][0-9]{2}$');
+      if (!validPattern.hasMatch(roleCode)) {
+        _setError('角色代碼格式錯誤，請輸入如 W01、F02 等格式');
+        return null;
+      }
+
+      // 發送到後端驗證並分配角色
+      final player = await _api.assignRoleManually(
+        roomCode: roomCode,
+        playerId: _currentPlayer!.id,
+        roleCode: roleCode,
+      );
+
+      _currentPlayer = player;
+      notifyListeners();
+
+      // 載入秘密任務
+      await loadSecretMission();
+
+      return player;
+    } catch (e) {
+      _setError(e.toString());
+      return null;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   /// 載入秘密任務
   Future<void> loadSecretMission() async {
     if (_currentPlayer == null || !hasRole) return;

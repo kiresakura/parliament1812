@@ -63,6 +63,10 @@ post_install do |installer|
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}"'
+
+      # 抑制第三方套件的棄用警告
+      config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
     end
   end
 end

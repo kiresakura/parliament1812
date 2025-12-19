@@ -7,11 +7,17 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:parliament_1812/main.dart';
+import 'package:parliament_1812/providers/accessibility_provider.dart';
 
 void main() {
   testWidgets('App loads successfully', (WidgetTester tester) async {
+    // Create accessibility provider for testing
+    final accessibilityProvider = AccessibilityProvider();
+
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const Parliament1812App());
+    await tester.pumpWidget(Parliament1812App(
+      accessibilityProvider: accessibilityProvider,
+    ));
 
     // Verify that the app title components are displayed
     expect(find.text('1812'), findsOneWidget);

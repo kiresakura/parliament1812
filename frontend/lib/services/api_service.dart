@@ -112,6 +112,23 @@ class ApiService {
     return _handleResponse(response, (data) => Player.fromJson(data));
   }
 
+  /// 手動輸入角色代碼分配角色（NFC 備用方案）
+  Future<Player> assignRoleManually({
+    required String roomCode,
+    required String playerId,
+    required String roleCode,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/assign-role-manual'),
+      headers: _headers,
+      body: jsonEncode({
+        'player_id': playerId,
+        'role_code': roleCode,
+      }),
+    );
+    return _handleResponse(response, (data) => Player.fromJson(data));
+  }
+
   /// 取得玩家的秘密任務
   Future<SecretMission> getSecretMission(String playerId) async {
     final response = await http.get(
