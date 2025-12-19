@@ -58,8 +58,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       body: Stack(
         children: [
           // 六角形紋理背景 (Civ 6 風格) - 裝飾性元素，排除語義
-          ExcludeSemantics(
-            child: const HexagonPatternBackground(
+          const ExcludeSemantics(
+            child: HexagonPatternBackground(
               color: AppTheme.accentGold,
               opacity: 0.03,
             ),
@@ -105,8 +105,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
 
           // 大氣粒子效果 - 裝飾性元素，排除語義
-          ExcludeSemantics(
-            child: const AtmosphereParticles(
+          const ExcludeSemantics(
+            child: AtmosphereParticles(
               particleCount: 25,
               color: AppTheme.accentGold,
             ),
@@ -230,10 +230,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             color: AppTheme.accentGold.withValues(alpha: 0.3),
           ),
         ),
-        title: Row(
+        title: const Row(
           children: [
-            const HexagonIcon(size: 24, color: AppTheme.accentGold),
-            const SizedBox(width: 12),
+            HexagonIcon(size: 24, color: AppTheme.accentGold),
+            SizedBox(width: 12),
             Text(
               '遊戲說明',
               style: TextStyle(
@@ -278,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               soundService.buttonFeedback();
               Navigator.pop(context);
             },
-            child: Text(
+            child: const Text(
               '了解了',
               style: TextStyle(
                 fontFamily: 'Georgia',
@@ -298,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       children: [
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Georgia',
             fontSize: 14,
             fontWeight: FontWeight.bold,
@@ -308,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         const SizedBox(height: 4),
         Text(
           content,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Georgia',
             fontSize: 13,
             color: AppTheme.textTertiary,
@@ -359,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               const SizedBox(width: 10),
-              Column(
+              const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -387,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const Spacer(),
 
           // 右側：數據面板
-          Row(
+          const Row(
             children: [
               DataPanel(
                 title: '玩家在線',
@@ -399,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 trend: 'up',
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               DataPanel(
                 title: '活躍房間',
                 value: '23',
@@ -805,7 +805,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(width: 8),
             Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Georgia',
                 fontSize: 14,
                 color: AppTheme.textSecondary,
@@ -943,7 +943,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 // 按鈕內容
                 Center(
                   child: roomProvider.isLoading
-                      ? Row(
+                      ? const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             SizedBox(
@@ -954,7 +954,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 color: AppTheme.primaryBackground,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Text(
                               '請稍候...',
                               style: TextStyle(
@@ -970,7 +970,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            HexagonIcon(
+                            const HexagonIcon(
                               size: 20,
                               color: AppTheme.primaryBackground,
                               filled: true,
@@ -978,7 +978,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             const SizedBox(width: 10),
                             Text(
                               _isCreating ? '建立新會議' : '進入議事廳',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontFamily: 'Georgia',
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -1018,7 +1018,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 8),
           // 中文引言
-          Text(
+          const Text(
             '「在攝政王的注視下，國會的權力鬥爭即將展開」',
             textAlign: TextAlign.center,
             style: TextStyle(

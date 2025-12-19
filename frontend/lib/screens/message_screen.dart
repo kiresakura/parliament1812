@@ -138,11 +138,11 @@ class _MessageScreenState extends State<MessageScreen>
                     );
 
                     if (roomCode == null || currentPlayerId == null) {
-                      return Center(
+                      return const Center(
                         child: HexagonBadge(
                           size: 80,
                           glowColor: AppTheme.accentGold,
-                          child: const CircularProgressIndicator(
+                          child: CircularProgressIndicator(
                             color: AppTheme.accentGold,
                             strokeWidth: 2,
                           ),
@@ -224,10 +224,10 @@ class _MessageScreenState extends State<MessageScreen>
                 ),
               ),
               // 六角形信封圖示
-              HexagonBadge(
+              const HexagonBadge(
                 size: 44,
                 glowColor: AppTheme.accentGold,
-                child: const Icon(
+                child: Icon(
                   Icons.mail_outline,
                   color: AppTheme.accentGold,
                   size: 20,
@@ -291,10 +291,10 @@ class _MessageScreenState extends State<MessageScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // 六角形信封圖示
-            HexagonBadge(
+            const HexagonBadge(
               size: 100,
               glowColor: AppTheme.accentGold,
-              child: const Icon(
+              child: Icon(
                 Icons.markunread_mailbox_outlined,
                 size: 48,
                 color: AppTheme.accentGold,
@@ -685,11 +685,11 @@ class _ConversationListScreenState extends State<ConversationListScreen>
                     final conversations = provider.conversations;
 
                     if (provider.isLoading) {
-                      return Center(
+                      return const Center(
                         child: HexagonBadge(
                           size: 80,
                           glowColor: AppTheme.accentGold,
-                          child: const CircularProgressIndicator(
+                          child: CircularProgressIndicator(
                             color: AppTheme.accentGold,
                             strokeWidth: 2,
                           ),
@@ -774,10 +774,10 @@ class _ConversationListScreenState extends State<ConversationListScreen>
               ),
               const SizedBox(width: 8),
               // 六角形標題圖示
-              HexagonBadge(
+              const HexagonBadge(
                 size: 44,
                 glowColor: AppTheme.accentGold,
-                child: const Icon(
+                child: Icon(
                   Icons.drafts_outlined,
                   color: AppTheme.accentGold,
                   size: 20,

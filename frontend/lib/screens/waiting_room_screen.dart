@@ -127,15 +127,15 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
             ),
           ),
           // 標題
-          Expanded(
+          const Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const HexagonIcon(
+                HexagonIcon(
                   size: 18,
                   color: AppTheme.accentGold,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Text(
                   '等候大廳',
                   style: TextStyle(
@@ -145,8 +145,8 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                     letterSpacing: 4,
                   ),
                 ),
-                const SizedBox(width: 10),
-                const HexagonIcon(
+                SizedBox(width: 10),
+                HexagonIcon(
                   size: 18,
                   color: AppTheme.accentGold,
                 ),
@@ -222,11 +222,11 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                         child: Column(
                           children: [
                             // 標題
-                            Row(
+                            const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const CrownIcon(size: 14, color: AppTheme.accentGold),
-                                const SizedBox(width: 8),
+                                CrownIcon(size: 14, color: AppTheme.accentGold),
+                                SizedBox(width: 8),
                                 Text(
                                   '皇家通行證',
                                   style: TextStyle(
@@ -236,8 +236,8 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                                     letterSpacing: 6,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                const CrownIcon(size: 14, color: AppTheme.accentGold),
+                                SizedBox(width: 8),
+                                CrownIcon(size: 14, color: AppTheme.accentGold),
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -305,7 +305,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                                     color: AppTheme.accentGold.withValues(alpha: 0.3),
                                   ),
                                 ),
-                                child: Row(
+                                child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
@@ -313,7 +313,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                                       size: 12,
                                       color: AppTheme.accentGold,
                                     ),
-                                    const SizedBox(width: 6),
+                                    SizedBox(width: 6),
                                     Text(
                                       '複製通行碼',
                                       style: TextStyle(
@@ -447,7 +447,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Georgia',
               fontSize: 10,
               color: AppTheme.textTertiary,
@@ -500,7 +500,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
               ),
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               '靜候各位議員蒞臨...',
               style: TextStyle(
                 fontFamily: 'Georgia',
@@ -654,7 +654,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                 const SizedBox(width: 8),
                 Text(
                   '已有 $playerCount 位議員就座',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 12,
                     color: AppTheme.textTertiary,
@@ -671,7 +671,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(
+                    child: const Text(
                       '可開始',
                       style: TextStyle(
                         fontFamily: 'Georgia',
@@ -725,15 +725,15 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
             ),
           ],
         ),
-        child: Row(
+        child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.nfc,
               color: AppTheme.primaryBackground,
               size: 24,
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Text(
               '領取身份令牌',
               style: TextStyle(
@@ -762,15 +762,15 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
           width: 2,
         ),
       ),
-      child: Row(
+      child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.check_circle,
             color: AppTheme.voteAye,
             size: 24,
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Text(
             '身份已確認',
             style: TextStyle(
@@ -789,11 +789,11 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
   void _copyRoomCode(BuildContext context, String roomCode) {
     Clipboard.setData(ClipboardData(text: roomCode));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: AppTheme.accentGold),
-            const SizedBox(width: 8),
+            Icon(Icons.check_circle, color: AppTheme.accentGold),
+            SizedBox(width: 8),
             Text(
               '房間碼已複製',
               style: TextStyle(
@@ -805,7 +805,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         ),
         backgroundColor: AppTheme.cardBackground,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
+        duration: Duration(seconds: 1),
       ),
     );
   }
@@ -817,11 +817,11 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
       ClipboardData(text: '誠邀閣下參與 1812 國會風雲！房間代碼：$roomCode'),
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.share, color: AppTheme.accentGold),
-            const SizedBox(width: 8),
+            Icon(Icons.share, color: AppTheme.accentGold),
+            SizedBox(width: 8),
             Text(
               '分享訊息已複製',
               style: TextStyle(
@@ -833,7 +833,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         ),
         backgroundColor: AppTheme.cardBackground,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
+        duration: Duration(seconds: 1),
       ),
     );
   }
@@ -848,13 +848,13 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: AppTheme.accentGold.withValues(alpha: 0.5)),
         ),
-        title: Row(
+        title: const Row(
           children: [
-            const HexagonIcon(
+            HexagonIcon(
               size: 20,
               color: AppTheme.accentGold,
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Text(
               '告辭離席',
               style: TextStyle(
@@ -865,7 +865,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
             ),
           ],
         ),
-        content: Text(
+        content: const Text(
           '確定要離開議會廳嗎？',
           style: TextStyle(
             fontFamily: 'Georgia',
@@ -879,7 +879,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
               soundService.haptic(HapticType.light);
               Navigator.pop(context);
             },
-            child: Text(
+            child: const Text(
               '留步',
               style: TextStyle(
                 fontFamily: 'Georgia',
@@ -904,7 +904,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                 color: AppTheme.voteNay,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
+              child: const Text(
                 '離席',
                 style: TextStyle(
                   fontFamily: 'Georgia',
@@ -1120,7 +1120,7 @@ class _PlayerCardState extends State<_PlayerCard>
                 // 玩家暱稱
                 Text(
                   widget.nickname,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -1142,7 +1142,7 @@ class _PlayerCardState extends State<_PlayerCard>
                   // 角色名稱（中文）
                   Text(
                     char.nameChinese,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Georgia',
                       fontSize: 9,
                       color: AppTheme.accentGold,
@@ -1182,12 +1182,6 @@ class _PlayerCardState extends State<_PlayerCard>
 
   /// 動畫頭像元件
   Widget _buildAnimatedAvatar(Character? char, Color partyColor) {
-    final glowColor = widget.isHost
-        ? AppTheme.accentGold
-        : widget.hasRole
-            ? AppTheme.voteAye
-            : AppTheme.textTertiary;
-
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -1290,7 +1284,7 @@ class _PlayerCardState extends State<_PlayerCard>
                       child: Center(
                         child: Text(
                           widget.nickname.isNotEmpty ? widget.nickname[0].toUpperCase() : '?',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'Georgia',
                             fontSize: 18,
                             fontWeight: FontWeight.bold,

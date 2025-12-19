@@ -62,7 +62,7 @@ post_install do |installer|
       config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
       config.build_settings['OTHER_CFLAGS'] << '-Wno-error=non-modular-include-in-framework-module'
 
-      # 修復 Flutter.h 找不到問題 - 添加完整搜索路徑
+      # 修復 Flutter.h 找不到問題 - 添加搜索路徑
       config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
       config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
       config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}/Flutter"'
@@ -72,9 +72,8 @@ post_install do |installer|
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
       config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_CONFIGURATION_BUILD_DIR}"'
-      config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_XCFRAMEWORKS_BUILD_DIR}/Flutter"'
 
-      # 抑制警告
+      # 抑制編譯警告
       config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
       config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
       config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
@@ -87,10 +86,8 @@ post_install do |installer|
       target.build_configurations.each do |config|
         config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
         config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
-        config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_XCFRAMEWORKS_BUILD_DIR}/Flutter/Flutter.framework/Headers"'
         config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
         config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_ROOT}/../Flutter"'
-        config.build_settings['FRAMEWORK_SEARCH_PATHS'] << '"${PODS_XCFRAMEWORKS_BUILD_DIR}/Flutter"'
       end
     end
   end

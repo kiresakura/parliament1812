@@ -188,20 +188,20 @@ class _VoteScreenState extends State<VoteScreen>
                 final player = playerProvider.currentPlayer;
 
                 if (room == null || player == null) {
-                  return Center(
+                  return const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         HexagonBadge(
                           size: 100,
                           glowColor: AppTheme.accentGold,
-                          child: const Icon(
+                          child: Icon(
                             Icons.how_to_vote,
                             size: 50,
                             color: AppTheme.accentGold,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: 24),
                         Text(
                           '準備投票中...',
                           style: TextStyle(
@@ -211,7 +211,7 @@ class _VoteScreenState extends State<VoteScreen>
                             letterSpacing: 2,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         Text(
                           'Preparing ballot...',
                           style: TextStyle(
@@ -330,7 +330,7 @@ class _VoteScreenState extends State<VoteScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    HexagonIcon(
+                    const HexagonIcon(
                       size: 18,
                       color: AppTheme.accentGold,
                       filled: true,
@@ -340,7 +340,7 @@ class _VoteScreenState extends State<VoteScreen>
                       children: [
                         Text(
                           '第 ${widget.round} 輪表決',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'Georgia',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -350,7 +350,7 @@ class _VoteScreenState extends State<VoteScreen>
                         ),
                         Text(
                           'VOTE ROUND ${widget.round}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'Georgia',
                             fontSize: 10,
                             color: AppTheme.textTertiary,
@@ -360,7 +360,7 @@ class _VoteScreenState extends State<VoteScreen>
                       ],
                     ),
                     const SizedBox(width: 12),
-                    HexagonIcon(
+                    const HexagonIcon(
                       size: 18,
                       color: AppTheme.accentGold,
                       filled: true,
@@ -410,10 +410,10 @@ class _VoteScreenState extends State<VoteScreen>
       child: Column(
         children: [
           // 羊皮紙捲軸圖標
-          HexagonBadge(
+          const HexagonBadge(
             size: 60,
             glowColor: AppTheme.accentGold,
-            child: const Icon(
+            child: Icon(
               Icons.article_outlined,
               size: 30,
               color: AppTheme.accentGold,
@@ -434,7 +434,7 @@ class _VoteScreenState extends State<VoteScreen>
           const SizedBox(height: 4),
           Text(
             _defaultBill.titleEnglish.toUpperCase(),
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Georgia',
               fontSize: 11,
               color: AppTheme.textTertiary,
@@ -442,12 +442,12 @@ class _VoteScreenState extends State<VoteScreen>
             ),
           ),
           const SizedBox(height: 16),
-          VictorianDivider(width: 200, color: AppTheme.accentGold),
+          const VictorianDivider(width: 200, color: AppTheme.accentGold),
           const SizedBox(height: 16),
           // 法案說明
           Text(
             _defaultBill.description,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Georgia',
               fontSize: 13,
               color: AppTheme.textSecondary,
@@ -468,7 +468,7 @@ class _VoteScreenState extends State<VoteScreen>
             ),
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.info_outline,
                   size: 16,
                   color: AppTheme.textSecondary,
@@ -477,7 +477,7 @@ class _VoteScreenState extends State<VoteScreen>
                 Expanded(
                   child: Text(
                     _defaultBill.context,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Georgia',
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
@@ -523,7 +523,7 @@ class _VoteScreenState extends State<VoteScreen>
                     color: timerColor,
                   ),
                   const SizedBox(width: 10),
-                  Text(
+                  const Text(
                     '表決時間',
                     style: TextStyle(
                       fontFamily: 'Georgia',
@@ -532,7 +532,7 @@ class _VoteScreenState extends State<VoteScreen>
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
+                  const Text(
                     'Time Remaining',
                     style: TextStyle(
                       fontFamily: 'Georgia',
@@ -689,13 +689,13 @@ class _VoteScreenState extends State<VoteScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.do_not_disturb_alt,
                     size: 16,
                     color: AppTheme.textTertiary,
                   ),
                   const SizedBox(width: 8),
-                  Text(
+                  const Text(
                     '棄權',
                     style: TextStyle(
                       fontFamily: 'Georgia',
@@ -842,7 +842,7 @@ class _VoteScreenState extends State<VoteScreen>
           // 印章效果
           _buildInkStamp(choiceText, choiceColor),
           const SizedBox(height: 30),
-          Text(
+          const Text(
             '選票已投入票箱',
             style: TextStyle(
               fontFamily: 'Georgia',
@@ -853,7 +853,7 @@ class _VoteScreenState extends State<VoteScreen>
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Your vote has been cast',
             style: TextStyle(
               fontFamily: 'Georgia',
@@ -864,7 +864,7 @@ class _VoteScreenState extends State<VoteScreen>
           ),
           const SizedBox(height: 24),
           // 等待提示
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
@@ -875,7 +875,7 @@ class _VoteScreenState extends State<VoteScreen>
                   color: AppTheme.brassColor,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Text(
                 '等待其他議員完成表決...',
                 style: TextStyle(
@@ -943,14 +943,14 @@ class _VoteScreenState extends State<VoteScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 結果標題
-          Center(
+          const Center(
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     GearIcon(size: 16, color: AppTheme.accentGold),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Text(
                       '表決結果',
                       style: TextStyle(
@@ -961,11 +961,11 @@ class _VoteScreenState extends State<VoteScreen>
                         letterSpacing: 3,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     GearIcon(size: 16, color: AppTheme.accentGold),
                   ],
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'VOTING RESULTS',
                   style: TextStyle(
@@ -1043,7 +1043,7 @@ class _VoteScreenState extends State<VoteScreen>
                     _results[VoteChoice.aye]! > _results[VoteChoice.nay]!
                         ? 'BILL PASSED'
                         : 'BILL REJECTED',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Georgia',
                       fontSize: 12,
                       color: AppTheme.textTertiary,
@@ -1084,7 +1084,7 @@ class _VoteScreenState extends State<VoteScreen>
             ),
             Text(
               '$count 票 (${(percent * 100).toInt()}%)',
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Georgia',
                 fontSize: 14,
                 color: AppTheme.textSecondary,

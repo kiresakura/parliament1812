@@ -514,7 +514,7 @@ class HexagonPatternPainter extends CustomPainter {
       ..strokeWidth = 0.5;
 
     const hexSize = 40.0;
-    final hexWidth = hexSize * 2;
+    const hexWidth = hexSize * 2;
     final hexHeight = hexSize * math.sqrt(3);
 
     for (double y = -hexHeight; y < size.height + hexHeight; y += hexHeight * 0.75) {
@@ -1628,8 +1628,8 @@ class ConnectorLinePainter extends CustomPainter {
     }
 
     // Draw dashed line
-    final dashWidth = 5.0;
-    final dashSpace = 5.0;
+    const dashWidth = 5.0;
+    const dashSpace = 5.0;
     double distance = 0;
     for (final metric in path.computeMetrics()) {
       while (distance < metric.length) {
@@ -2306,7 +2306,7 @@ class _BallotPaperState extends State<BallotPaper>
                     ),
                     if (widget.isSelected) ...[
                       const SizedBox(height: 8),
-                      Icon(
+                      const Icon(
                         Icons.check_circle,
                         color: AppTheme.waxSealColor,
                         size: 32,

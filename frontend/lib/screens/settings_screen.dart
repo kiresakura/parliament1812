@@ -125,7 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       color: AppTheme.secondaryColor.withValues(alpha: 0.3),
                     ),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.arrow_back,
                     color: AppTheme.secondaryColor,
                     size: 20,
@@ -167,7 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ],
                   ),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.settings,
                   color: AppTheme.secondaryColor,
                   size: 22,
@@ -469,7 +469,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              const Icon(
                 Icons.restart_alt,
                 color: AppTheme.ludditeColor,
                 size: 20,
@@ -691,7 +691,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
         title: Row(
           children: [
-            Icon(
+            const Icon(
               Icons.warning_amber_rounded,
               color: AppTheme.candleGlow,
               size: 24,

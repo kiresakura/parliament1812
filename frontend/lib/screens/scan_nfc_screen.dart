@@ -248,16 +248,16 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
             ),
           ),
           // 標題
-          Expanded(
+          const Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   Icons.nfc,
                   color: AppTheme.accentGold,
                   size: 20,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Text(
                   '領取身份令牌',
                   style: TextStyle(
@@ -389,7 +389,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
         // 主要提示
         Text(
           _isScanning ? '請將卡片靠近手機背面' : '準備掃描身份令牌',
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Georgia',
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -408,14 +408,14 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
               color: AppTheme.accentGold.withValues(alpha: 0.2),
             ),
           ),
-          child: Row(
+          child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const HexagonIcon(
+              HexagonIcon(
                 size: 16,
                 color: AppTheme.textTertiary,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Text(
                 '每張卡片對應獨特的角色和秘密任務',
                 style: TextStyle(
@@ -465,7 +465,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   '掃描失敗',
                   style: TextStyle(
                     fontFamily: 'Georgia',
@@ -477,7 +477,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
                 const SizedBox(height: 4),
                 Text(
                   error,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 12,
                     color: AppTheme.textSecondary,
@@ -520,15 +520,15 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
                     ),
                   ],
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.refresh,
                       color: AppTheme.primaryBackground,
                       size: 22,
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Text(
                       '重新掃描',
                       style: TextStyle(
@@ -548,7 +548,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
         // 載入指示器
         if (provider.isLoading) ...[
           const SizedBox(height: 20),
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
@@ -559,7 +559,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
                   color: AppTheme.accentGold,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               Text(
                 '正在驗證卡片...',
                 style: TextStyle(
@@ -604,7 +604,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
                 const SizedBox(width: 10),
                 Text(
                   _showManualInput ? '使用 NFC 掃描' : 'NFC 無法使用？手動輸入',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 13,
                     color: AppTheme.textTertiary,
@@ -641,13 +641,13 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 標題
-          Row(
+          const Row(
             children: [
-              const HexagonIcon(
+              HexagonIcon(
                 size: 18,
                 color: AppTheme.accentGold,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Text(
                 '手動輸入角色代碼',
                 style: TextStyle(
@@ -660,7 +660,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
             ],
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             '請輸入卡片上的角色代碼（例如：W01, F02, L03）',
             style: TextStyle(
               fontFamily: 'Georgia',
@@ -681,7 +681,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
               textCapitalization: TextCapitalization.characters,
               textAlign: TextAlign.center,
               maxLength: 6,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 28,
                 color: AppTheme.textPrimary,
@@ -730,15 +730,15 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
                     ),
                   ],
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.check_circle,
                       color: AppTheme.primaryBackground,
                       size: 20,
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     Text(
                       '確認代碼',
                       style: TextStyle(

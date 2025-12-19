@@ -174,7 +174,7 @@ class MessageBubble extends StatelessWidget {
           ),
           if (message.isRead) ...[
             const SizedBox(width: 3),
-            Text(
+            const Text(
               '已讀',
               style: TextStyle(
                 fontSize: 9,
@@ -409,7 +409,7 @@ class TypingIndicator extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 羽毛筆圖示
-            Icon(
+            const Icon(
               Icons.edit,
               size: 14,
               color: AppTheme.candleGlow,
@@ -439,7 +439,7 @@ class TypingIndicator extends StatelessWidget {
                   margin: const EdgeInsets.only(left: 2),
                   width: 4,
                   height: 4,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppTheme.candleGlow,
                   ),

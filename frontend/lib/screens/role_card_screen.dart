@@ -147,16 +147,16 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                 final mission = provider.secretMission;
 
                 if (player == null || role == null) {
-                  return Center(
+                  return const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         HexagonBadge(
                           size: 100,
                           glowColor: AppTheme.accentGold,
-                          child: const CrownIcon(size: 50),
+                          child: CrownIcon(size: 50),
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: 24),
                         Text(
                           '正在準備您的身份文件...',
                           style: TextStyle(
@@ -166,7 +166,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                             letterSpacing: 2,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         Text(
                           'Preparing your credentials...',
                           style: TextStyle(
@@ -326,7 +326,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                       filled: true,
                     ),
                     const SizedBox(width: 10),
-                    Column(
+                    const Column(
                       children: [
                         Text(
                           '身份證明書',
@@ -466,7 +466,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                     childAspectRatio: 0.866,
                   ),
                   itemCount: 36,
-                  itemBuilder: (context, index) => Center(
+                  itemBuilder: (context, index) => const Center(
                     child: HexagonIcon(
                       size: 30,
                       color: AppTheme.inkColor,
@@ -829,7 +829,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                 const SizedBox(height: 2),
                 Text(
                   _showSecret ? 'Hide Secret Mission' : 'View Secret Mission',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 11,
                     color: AppTheme.textTertiary,
@@ -859,7 +859,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
           color: AppTheme.accentGold.withValues(alpha: 0.3),
         ),
       ),
-      child: Row(
+      child: const Row(
         children: [
           HexagonBadge(
             size: 50,
@@ -870,7 +870,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
               size: 24,
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -885,7 +885,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   '議會開議後將無法再次查閱密函',
                   style: TextStyle(
@@ -938,7 +938,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                 Navigator.pop(context);
               },
               borderRadius: BorderRadius.circular(12),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   HexagonIcon(
@@ -946,7 +946,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                     color: AppTheme.primaryBackground,
                     filled: true,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text(
                     '吾已熟知，準備就緒',
                     style: TextStyle(

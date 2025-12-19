@@ -152,7 +152,7 @@ class SecretMissionCard extends StatelessWidget {
               vertical: 8,
             ),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [
                   AppTheme.secondaryColor,
                   AppTheme.candleGlow,
@@ -300,7 +300,7 @@ class SecretMissionCard extends StatelessWidget {
               shape: BoxShape.circle,
               color: AppTheme.workerColor.withValues(alpha: 0.2),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.check_circle_outline,
               color: AppTheme.workerColor,
               size: 20,
@@ -346,7 +346,7 @@ class SecretMissionCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.visibility_off,
             color: AppTheme.ludditeColor,
             size: 18,

@@ -192,13 +192,13 @@ class RoleCardWidget extends StatelessWidget {
             children: [
               // 背景漸層
               Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      const Color(0xFF3d2817),
-                      const Color(0xFF2d1810),
+                      Color(0xFF3d2817),
+                      Color(0xFF2d1810),
                     ],
                   ),
                 ),
@@ -218,7 +218,7 @@ class RoleCardWidget extends StatelessWidget {
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         color: const Color(0xFF2d1810),
-                        child: Center(
+                        child: const Center(
                           child: Icon(
                             Icons.person,
                             size: 80,
@@ -232,7 +232,7 @@ class RoleCardWidget extends StatelessWidget {
               else
                 Container(
                   color: const Color(0xFF2d1810),
-                  child: Center(
+                  child: const Center(
                     child: Icon(
                       Icons.person,
                       size: 80,
@@ -390,7 +390,7 @@ class RoleCardWidget extends StatelessWidget {
               // 英文名稱
               Text(
                 char?.nameEnglish ?? '',
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Georgia',
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
@@ -401,7 +401,7 @@ class RoleCardWidget extends StatelessWidget {
               // 頭銜
               Text(
                 char?.title ?? role.typeName,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Georgia',
                   fontSize: 12,
                   color: AppTheme.textTertiary,
@@ -443,7 +443,7 @@ class RoleCardWidget extends StatelessWidget {
           ),
           Text(
             char?.description ?? role.description,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Georgia',
               fontSize: 14,
               height: 1.6,
@@ -496,13 +496,13 @@ class RoleCardWidget extends StatelessWidget {
               // 標題
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.chevron_right,
                     size: 18,
                     color: AppTheme.accentGold,
                   ),
                   const SizedBox(width: 4),
-                  Text(
+                  const Text(
                     '您的目標',
                     style: TextStyle(
                       fontFamily: 'Georgia',
@@ -527,7 +527,7 @@ class RoleCardWidget extends StatelessWidget {
               // 目標內容
               Text(
                 char?.objective ?? role.stance,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Georgia',
                   fontSize: 14,
                   height: 1.6,
@@ -565,13 +565,13 @@ class RoleCardWidget extends StatelessWidget {
           // 標題
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.groups,
                 size: 18,
                 color: AppTheme.textSecondary,
               ),
               const SizedBox(width: 8),
-              Text(
+              const Text(
                 '已知盟友',
                 style: TextStyle(
                   fontFamily: 'Georgia',
@@ -620,7 +620,7 @@ class RoleCardWidget extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       ally,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontFamily: 'Georgia',
                         fontSize: 13,
                         color: AppTheme.parchmentColor,
