@@ -237,7 +237,9 @@ async def assign_role_manually(
     Args:
         db: 資料庫 session
         player: 玩家物件
-        role_code: 角色代碼（如 W01, F02 等）
+        role_code: 角色代碼（支援兩種格式）
+            - 短格式：W01, F02, L03, R04, M01 等
+            - 長格式：WORKER01, FACTORY02 等
 
     Returns:
         角色分配結果
@@ -249,13 +251,29 @@ async def assign_role_manually(
     if player.role_type:
         raise ValueError("你已經有角色了")
 
-    # 驗證角色代碼格式
-    import re
-    if not re.match(r'^[WFLRM][0-9]{2}$', role_code.upper()):
-        raise ValueError("角色代碼格式錯誤，請輸入如 W01、F02 等格式")
+    # 代碼格式轉換映射（短碼 -> 長碼前綴）
+    short_to_long = {
+        'W': 'WORKER',
+        'F': 'FACTORY',
+        'L': 'LUDDITE',
+        'R': 'REFORMER',
+        'M': 'MP',
+    }
 
-    # 將代碼轉換為 card_id 格式
-    card_id = role_code.upper()
+    import re
+    role_code = role_code.upper().strip()
+
+    # 嘗試解析短格式 (W01, F02 等)
+    short_match = re.match(r'^([WFLRM])(\d{2})$', role_code)
+    if short_match:
+        prefix = short_match.group(1)
+        number = short_match.group(2)
+        card_id = f"{short_to_long[prefix]}{number}"
+    # 嘗試解析長格式 (WORKER01, FACTORY02 等)
+    elif re.match(r'^(WORKER|FACTORY|LUDDITE|REFORMER|MP)\d{2}$', role_code):
+        card_id = role_code
+    else:
+        raise ValueError("角色代碼格式錯誤，請輸入如 W01、WORKER01 等格式")
 
     # 解析卡片 ID
     role_info = get_role_from_card_id(card_id)
