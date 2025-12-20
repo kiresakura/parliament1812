@@ -132,9 +132,10 @@ class ApiService {
   }
 
   /// 取得玩家的秘密任務
+  /// 後端需要 requesting_player_id 來驗證是否為本人請求
   Future<SecretMission> getSecretMission(String playerId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/players/$playerId/secret'),
+      Uri.parse('$baseUrl/api/players/$playerId/secret?requesting_player_id=$playerId'),
       headers: _headers,
     );
     return _handleResponse(response, (data) => SecretMission.fromJson(data));
