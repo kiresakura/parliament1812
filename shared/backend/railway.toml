@@ -1,0 +1,21 @@
+# Railway 配置檔案
+[build]
+# 使用 Dockerfile 建置
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# 健康檢查
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+
+# 重啟策略
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# 資源限制
+numReplicas = 1
+
+[env]
+# 環境變數（實際值在 Railway 控制台設定）
+PORT = "8000"

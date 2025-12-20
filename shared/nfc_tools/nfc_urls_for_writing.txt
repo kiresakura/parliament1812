@@ -1,0 +1,78 @@
+============================================================
+1812 國會風雲 - NFC 卡片寫入清單
+============================================================
+
+使用方式：
+1. 下載 NFC Tools App (iOS/Android)
+2. 選擇「寫入」→「新增紀錄」→「URL/URI」
+3. 複製下方對應的 URL 貼上
+4. 將 NFC 卡放在手機背面進行寫入
+
+============================================================
+
+
+👑 【喬治三世】George III
+  職稱: 大不列顛國王
+--------------------------------------------------
+
+卡片 george_iii_01:
+parliament1812://role?id=george_iii_01&secret=E5729F23
+
+【湯瑪斯】Thomas
+  職稱: 紡織工人
+--------------------------------------------------
+
+卡片 worker_01:
+parliament1812://role?id=worker_01&secret=0362F89D
+
+卡片 worker_02:
+parliament1812://role?id=worker_02&secret=45B5E9C5
+
+卡片 worker_03:
+parliament1812://role?id=worker_03&secret=0FBCBB64
+
+【理查·威爾森】Richard Wilson
+  職稱: 工廠主
+--------------------------------------------------
+
+卡片 factory_01:
+parliament1812://role?id=factory_01&secret=CB32D9DB
+
+卡片 factory_02:
+parliament1812://role?id=factory_02&secret=37F85D5B
+
+【喬治】George
+  職稱: 盧德派成員
+--------------------------------------------------
+
+卡片 luddite_01:
+parliament1812://role?id=luddite_01&secret=A989A317
+
+卡片 luddite_02:
+parliament1812://role?id=luddite_02&secret=65BF0F03
+
+卡片 luddite_03:
+parliament1812://role?id=luddite_03&secret=23E4B422
+
+【羅伯特·烏爾文】Robert Owens
+  職稱: 社會改革者
+--------------------------------------------------
+
+卡片 reformer_01:
+parliament1812://role?id=reformer_01&secret=8E3A0928
+
+卡片 reformer_02:
+parliament1812://role?id=reformer_02&secret=5664C5F7
+
+【威廉·菲茨傑拉德】William Fitzgerald
+  職稱: 國會議員
+--------------------------------------------------
+
+卡片 mp_01:
+parliament1812://role?id=mp_01&secret=04773C5E
+
+卡片 mp_02:
+parliament1812://role?id=mp_02&secret=D31F0AAA
+
+============================================================
+總共 13 張卡片

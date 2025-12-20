@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ========== NFC Capabilities ========== -->
+	<key>com.apple.developer.nfc.readersession.formats</key>
+	<array>
+		<string>NDEF</string>
+		<string>TAG</string>
+	</array>
+
+	<!-- ========== Associated Domains (Universal Links) ========== -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:1812-production.up.railway.app</string>
+		<string>webcredentials:1812-production.up.railway.app</string>
+	</array>
+
+	<!-- ========== Push Notifications ========== -->
+	<key>aps-environment</key>
+	<string>development</string>
+
+	<!-- ========== Keychain Access Groups ========== -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.parliament1812.app</string>
+	</array>
+
+	<!-- ========== App Groups (for sharing data) ========== -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.parliament1812.app</string>
+	</array>
+</dict>
+</plist>

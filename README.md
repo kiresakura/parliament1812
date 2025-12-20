@@ -1,56 +1,85 @@
-# 1812 國會風雲 (Parliament 1812)
+# 1812 國會風雲 Parliament Debate
 
-> 🏛️ 一個模擬1812年英國國會辯論的角色扮演遊戲 App
+> 一款以 1812 年英國盧德運動為背景的國會辯論角色扮演遊戲
 
-## 📁 專案結構
+## 🏗️ 專案結構
 
 ```
 parliament1812/
-├── backend/                 # FastAPI 後端
-│   ├── app/
-│   │   ├── api/            # API 路由
-│   │   ├── models/         # SQLAlchemy ORM 模型
-│   │   ├── schemas/        # Pydantic 資料結構
-│   │   ├── services/       # 業務邏輯
-│   │   └── websocket/      # WebSocket 處理
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/               # Flutter App
-│   ├── lib/
-│   │   ├── screens/        # 頁面
-│   │   ├── widgets/        # 元件
-│   │   ├── services/       # API 服務
-│   │   ├── models/         # 資料模型
-│   │   └── providers/      # 狀態管理
-│   ├── android/
-│   ├── ios/
-│   └── pubspec.yaml
-├── nfc_tools/              # NFC 卡片工具
-├── docs/                   # 文件
-└── scripts/                # 腳本
+├── platforms/           # 各平台獨立開發環境
+│   ├── ios/            # iOS 版本 (Swift/Flutter)
+│   ├── android/        # Android 版本 (Kotlin/Flutter)
+│   └── web/            # Web 版本 (Flutter/React)
+│
+├── shared/             # 共用資源
+│   ├── backend/        # FastAPI 後端 (Railway 部署)
+│   ├── nfc_tools/      # NFC 工具和卡片資料
+│   ├── docs/           # 文檔
+│   ├── scripts/        # 腳本工具
+│   ├── flutter_original/  # Flutter 原始專案備份
+│   └── Mobile_Game_UI_Design/  # UI 設計參考
+│
+├── CLAUDE.md           # Claude AI 開發指南
+├── DEPLOYMENT.md       # 部署說明
+└── README.md           # 本文件
 ```
 
-## 🎮 功能列表
+## 🎭 角色系統
 
-- [x] NFC 卡片角色分配
-- [ ] 房間建立/加入
-- [ ] 即時 WebSocket 同步
-- [ ] 秘密任務系統
-- [ ] 私訊功能
-- [ ] 突發事件系統
-- [ ] 多輪投票（匿名 + 記名）
-- [ ] 結果統計與歷史揭曉
+| 角色 | 卡片 ID | 陣營 |
+|------|---------|------|
+| 👑 喬治三世 | GEORGEIII01~04 | 皇室 |
+| 🔨 工人 | WORKER01~04 | 勞工 |
+| 🏭 工廠主 | FACTORY01~04 | 資方 |
+| ⚔️ 盧德派 | LUDDITE01~04 | 激進派 |
+| 📜 改革者 | REFORMER01~04 | 改革派 |
+| 🎩 議員 | MP01~04 | 國會 |
 
-## 🚀 開發時程
+## 🔗 後端 API
 
-- **Week 1** (12/17-24): 後端 API + NFC 卡片
-- **Week 2** (12/25-31): Flutter UI + WebSocket
-- **Week 3** (1/1-7): 投票系統 + 測試
-- **1/7**: 學術部部會 Demo
+- **生產環境**: https://1812-production.up.railway.app
+- **API 文檔**: https://1812-production.up.railway.app/docs
 
-## 🛠️ 技術棧
+## 📱 NFC 防作弊系統
 
-- **後端**: FastAPI + PostgreSQL + Redis
-- **前端**: Flutter (iOS + Android)
-- **部署**: Railway
-- **即時通訊**: WebSocket + Redis Pub/Sub
+- 本地 NFC 服務: `shared/nfc_local_service.py`
+- NFC 卡片資料: `shared/nfc_tools/nfc_cards.json`
+- 讀卡器: ACR122U
+
+## 🚀 快速開始
+
+### iOS
+```bash
+cd platforms/ios
+flutter pub get
+flutter run -d ios
+```
+
+### Android
+```bash
+cd platforms/android
+flutter pub get
+flutter run -d android
+```
+
+### Web
+```bash
+cd platforms/web
+flutter pub get
+flutter run -d chrome
+```
+
+### 後端
+```bash
+cd shared/backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+## 📅 里程碑
+
+- **Alpha Demo**: 2026/01/07
+- **目標**: 6 人遊玩完整流程
+
+---
+*開發工具: Claude AI, Claude Code, Xcode, Android Studio*

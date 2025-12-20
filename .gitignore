@@ -1,0 +1,13 @@
+
+# IDE and tool files
+.idea/
+.playwright-mcp/
+
+# Large binary files
+*.apk
+*.ipa
+platforms/android/releases/
+
+# Build directories
+build/
+*.xcuserstate
