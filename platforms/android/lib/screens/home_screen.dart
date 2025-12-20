@@ -81,8 +81,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
 
           // 國會背景圖片 - 全彩高可見度
-          ExcludeSemantics(
-            child: Positioned.fill(
+          Positioned.fill(
+            child: ExcludeSemantics(
               child: Opacity(
                 opacity: 0.45,
                 child: Image.asset(
@@ -95,8 +95,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
 
           // 漸層暈影效果 - 優化為更柔和的邊緣暗角
-          ExcludeSemantics(
-            child: Positioned.fill(
+          Positioned.fill(
+            child: ExcludeSemantics(
               child: Container(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
@@ -114,12 +114,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           // 底部漸層 - 讓表單區域更清晰
-          ExcludeSemantics(
-            child: Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: MediaQuery.of(context).size.height * 0.6,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: ExcludeSemantics(
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(

@@ -92,10 +92,11 @@ class PlayerProvider with ChangeNotifier {
     _clearError();
 
     try {
-      // 驗證角色代碼格式 (如 W01, F02, L03, R04, M01 等)
-      final validPattern = RegExp(r'^[WFLRM][0-9]{2}$', caseSensitive: false);
+      // 驗證角色代碼格式 (如 W01, F02, L03, R04, M01, G01 等)
+      // W = Worker, F = Factory, L = Luddite, R = Reformer, M = MP, G = George III
+      final validPattern = RegExp(r'^[WFLRMG][0-9]{2}$', caseSensitive: false);
       if (!validPattern.hasMatch(roleCode)) {
-        _setError('角色代碼格式錯誤，請輸入如 W01、F02 等格式');
+        _setError('角色代碼格式錯誤，請輸入如 W01、F02、G01 等格式');
         return null;
       }
 

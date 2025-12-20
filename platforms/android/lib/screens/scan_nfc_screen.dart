@@ -661,7 +661,7 @@ class _ScanNfcScreenState extends State<ScanNfcScreen>
           ),
           const SizedBox(height: 8),
           const Text(
-            '請輸入卡片上的角色代碼（例如：W01, F02, L03）',
+            '請輸入卡片上的角色代碼（例如：W01, F02, G01）',
             style: TextStyle(
               fontFamily: 'Georgia',
               fontSize: 12,
