@@ -33,14 +33,16 @@ class RoomProvider with ChangeNotifier {
 
     try {
       final result = await _api.createRoom(hostNickname: hostNickname);
-      
+
       // 儲存主持人玩家 ID
       _hostPlayerId = result.playerId;
-      
+
       // 取得完整房間資訊
       _room = await _api.getRoom(result.code);
-      await loadPlayers();
-      
+
+      // 靜默載入玩家列表，不設置錯誤（避免顯示警告訊息）
+      await _loadPlayersSilently();
+
       notifyListeners();
       return result;
     } catch (e) {
@@ -63,10 +65,9 @@ class RoomProvider with ChangeNotifier {
       );
 
       _room = await _api.getRoom(roomCode);
-      await loadPlayers();
 
-      // 確保成功返回前清除任何可能由 loadPlayers 設置的錯誤
-      _clearError();
+      // 靜默載入玩家列表，不設置錯誤（避免顯示警告訊息）
+      await _loadPlayersSilently();
 
       notifyListeners();
       return player;
@@ -75,6 +76,18 @@ class RoomProvider with ChangeNotifier {
       return null;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// 靜默載入玩家列表（不設置錯誤）
+  Future<void> _loadPlayersSilently() async {
+    if (_room == null) return;
+
+    try {
+      _players = await _api.getRoomPlayers(_room!.code);
+    } catch (e) {
+      // 靜默失敗，不設置錯誤訊息
+      debugPrint('載入玩家列表失敗: $e');
     }
   }
 

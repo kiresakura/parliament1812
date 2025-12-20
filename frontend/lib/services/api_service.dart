@@ -114,7 +114,8 @@ class ApiService {
   }
 
   /// 手動輸入角色代碼分配角色（NFC 備用方案）
-  Future<Player> assignRoleManually({
+  /// 返回結果類似 NFC 掃描，包含 role_type, role_index 等資訊
+  Future<ManualRoleResult> assignRoleManually({
     required String roomCode,
     required String playerId,
     required String roleCode,
@@ -127,7 +128,7 @@ class ApiService {
         'role_code': roleCode,
       }),
     );
-    return _handleResponse(response, (data) => Player.fromJson(data));
+    return _handleResponse(response, (data) => ManualRoleResult.fromJson(data));
   }
 
   /// 取得玩家的秘密任務
@@ -497,6 +498,51 @@ class NfcScanResult {
       roleType: json['role_type'] as String? ?? '',
       roleIndex: json['role_index'] as int? ?? 0,
       roleName: json['role_name'] as String?,
+      secretMissionId: json['secret_mission_id'] as String?,
+    );
+  }
+}
+
+/// 手動角色分配結果
+class ManualRoleResult {
+  final String message;
+  final String playerId;
+  final String roleType;
+  final int roleIndex;
+  final String? roleName;
+  final String? roleOccupation;
+  final String? roleDescription;
+  final String? roleBackground;
+  final String? rolePublicStance;
+  final String? avatarColor;
+  final String? secretMissionId;
+
+  ManualRoleResult({
+    required this.message,
+    required this.playerId,
+    required this.roleType,
+    required this.roleIndex,
+    this.roleName,
+    this.roleOccupation,
+    this.roleDescription,
+    this.roleBackground,
+    this.rolePublicStance,
+    this.avatarColor,
+    this.secretMissionId,
+  });
+
+  factory ManualRoleResult.fromJson(Map<String, dynamic> json) {
+    return ManualRoleResult(
+      message: json['message'] as String? ?? '',
+      playerId: json['player_id'] as String? ?? '',
+      roleType: json['role_type'] as String? ?? '',
+      roleIndex: json['role_index'] as int? ?? 0,
+      roleName: json['role_name'] as String?,
+      roleOccupation: json['role_occupation'] as String?,
+      roleDescription: json['role_description'] as String?,
+      roleBackground: json['role_background'] as String?,
+      rolePublicStance: json['role_public_stance'] as String?,
+      avatarColor: json['avatar_color'] as String?,
       secretMissionId: json['secret_mission_id'] as String?,
     );
   }

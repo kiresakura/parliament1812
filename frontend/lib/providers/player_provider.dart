@@ -93,26 +93,31 @@ class PlayerProvider with ChangeNotifier {
 
     try {
       // 驗證角色代碼格式 (如 W01, F02, L03, R04, M01 等)
-      final validPattern = RegExp(r'^[WFLRM][0-9]{2}$');
+      final validPattern = RegExp(r'^[WFLRM][0-9]{2}$', caseSensitive: false);
       if (!validPattern.hasMatch(roleCode)) {
         _setError('角色代碼格式錯誤，請輸入如 W01、F02 等格式');
         return null;
       }
 
-      // 發送到後端驗證並分配角色
-      final player = await _api.assignRoleManually(
+      // 發送到後端驗證並分配角色，返回 ManualRoleResult
+      final result = await _api.assignRoleManually(
         roomCode: roomCode,
         playerId: _currentPlayer!.id,
-        roleCode: roleCode,
+        roleCode: roleCode.toUpperCase(),
       );
 
-      _currentPlayer = player;
+      // 使用結果更新當前玩家的角色資訊（與 NFC 掃描相同的模式）
+      _currentPlayer = _currentPlayer!.copyWith(
+        roleType: result.roleType,
+        roleIndex: result.roleIndex,
+        secretMissionId: result.secretMissionId,
+      );
       notifyListeners();
 
       // 載入秘密任務
       await loadSecretMission();
 
-      return player;
+      return _currentPlayer;
     } catch (e) {
       _setError(_formatError(e));
       return null;
