@@ -6,6 +6,7 @@ import '../providers/room_provider.dart';
 import '../providers/player_provider.dart';
 import '../widgets/animated_widgets.dart';
 import '../services/sound_service.dart';
+import '../models/player.dart';
 import 'waiting_room_screen.dart';
 import 'settings_screen.dart';
 
@@ -130,38 +131,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // 主內容 - 優化為無需滾動的緊湊佈局
+          // 主內容 - 可滾動的緊湊佈局
           SafeArea(
             child: Stack(
               children: [
-                // 主內容區 - 置中顯示
+                // 主內容區 - 置中顯示，支援滾動
                 Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Logo / 標題
                         _buildHeader(),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 24),
                         // 切換按鈕
                         _buildToggleButtons(),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                         // 表單
                         _buildForm(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         // 歷史引言
                         _buildQuote(),
                       ],
                     ),
                   ),
                 ),
-                // 設定按鈕
+                // 右上角按鈕群組
                 Positioned(
                   top: 12,
                   right: 16,
-                  child: _buildSettingsButton(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildHelpButton(),
+                      const SizedBox(width: 8),
+                      _buildSettingsButton(),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -270,6 +278,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       ],
     );
+  }
+
+  Widget _buildHelpButton() {
+    return GestureDetector(
+      onTap: () {
+        soundService.buttonFeedback();
+        _showHelpDialog();
+      },
+      child: AnimatedBuilder(
+        animation: _glowController,
+        builder: (context, child) {
+          return Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.accentGold.withValues(
+                  alpha: 0.3 + (_glowController.value * 0.2),
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.accentGold.withValues(
+                    alpha: 0.1 + (_glowController.value * 0.1),
+                  ),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.help_outline,
+              size: 22,
+              color: AppTheme.accentGold.withValues(
+                alpha: 0.8 + (_glowController.value * 0.2),
+              ),
+            ),
+          );
+        },
+      ),
+    ).animate().fadeIn(delay: 900.ms, duration: 500.ms);
   }
 
   Widget _buildSettingsButton() {
@@ -855,6 +904,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     ).animate().fadeIn(delay: 1000.ms, duration: 600.ms);
   }
 
+
   Future<void> _submit() async {
     final nickname = _nicknameController.text.trim();
     if (nickname.isEmpty) {
@@ -881,21 +931,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final playerProvider = context.read<PlayerProvider>();
 
     if (_isCreating) {
-      // 建立房間
-      final room = await roomProvider.createRoom(nickname);
-      if (room != null && mounted) {
-        // 主持人自動加入房間
-        final player = await roomProvider.joinRoom(room.code, nickname);
-        if (player != null) {
-          playerProvider.setCurrentPlayer(player);
-          await roomProvider.connectWebSocket(player.id);
-          soundService.play(SoundEffect.gavel);
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              FadePageRoute(page: const WaitingRoomScreen()),
-            );
-          }
+      // 建立房間 - createRoom 現在返回 CreateRoomResult
+      final result = await roomProvider.createRoom(nickname);
+      if (result != null && mounted) {
+        // 主持人已在 createRoom 時自動加入，從 players 列表中取得玩家資訊
+        final hostPlayer = roomProvider.players.isNotEmpty
+            ? roomProvider.players.firstWhere(
+                (p) => p.id == result.playerId,
+                orElse: () => Player(
+                  id: result.playerId,
+                  roomId: result.roomId,
+                  nickname: nickname,
+                  isHost: true,
+                  joinedAt: DateTime.now(),
+                ),
+              )
+            : Player(
+                id: result.playerId,
+                roomId: result.roomId,
+                nickname: nickname,
+                isHost: true,
+                joinedAt: DateTime.now(),
+              );
+        playerProvider.setCurrentPlayer(hostPlayer);
+        await roomProvider.connectWebSocket(result.playerId);
+        soundService.play(SoundEffect.gavel);
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            FadePageRoute(page: const WaitingRoomScreen()),
+          );
         }
       }
     } else {

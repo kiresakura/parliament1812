@@ -66,11 +66,19 @@ class SoundService {
     SoundEffect.clockTick: 'assets/sounds/clock_tick.mp3',
   };
 
+  bool _isInitialized = false;
+
   /// 初始化音效服務
   Future<void> init() async {
     await _loadSettings();
-    await _effectPlayer.setVolume(_volume);
-    await _ambientPlayer.setVolume(_volume * 0.5); // 環境音較小聲
+    try {
+      await _effectPlayer.setVolume(_volume);
+      await _ambientPlayer.setVolume(_volume * 0.5); // 環境音較小聲
+      _isInitialized = true;
+    } catch (e) {
+      // 音效插件不可用時（如模擬器）靜默失敗
+      _isInitialized = false;
+    }
   }
 
   /// 載入設定
@@ -93,7 +101,7 @@ class SoundService {
 
   /// 播放音效
   Future<void> play(SoundEffect effect) async {
-    if (!_soundEnabled) return;
+    if (!_soundEnabled || !_isInitialized) return;
 
     final path = _soundPaths[effect];
     if (path == null) return;
@@ -103,14 +111,13 @@ class SoundService {
       await _effectPlayer.setAsset(path);
       await _effectPlayer.play();
     } catch (e) {
-      // 音效檔案不存在時靜默失敗
-      // print('Sound effect not found: $path');
+      // 音效檔案不存在或插件不可用時靜默失敗
     }
   }
 
   /// 播放環境音樂
   Future<void> playAmbient(SoundEffect effect) async {
-    if (!_musicEnabled) return;
+    if (!_musicEnabled || !_isInitialized) return;
 
     final path = _soundPaths[effect];
     if (path == null) return;
@@ -120,13 +127,18 @@ class SoundService {
       await _ambientPlayer.setAsset(path);
       await _ambientPlayer.play();
     } catch (e) {
-      // 音效檔案不存在時靜默失敗
+      // 音效檔案不存在或插件不可用時靜默失敗
     }
   }
 
   /// 停止環境音樂
   Future<void> stopAmbient() async {
-    await _ambientPlayer.stop();
+    if (!_isInitialized) return;
+    try {
+      await _ambientPlayer.stop();
+    } catch (e) {
+      // 插件不可用時靜默失敗
+    }
   }
 
   /// 觸發震動回饋
@@ -208,15 +220,25 @@ class SoundService {
   /// 設定音量
   Future<void> setVolume(double volume) async {
     _volume = volume.clamp(0.0, 1.0);
-    await _effectPlayer.setVolume(_volume);
-    await _ambientPlayer.setVolume(_volume * 0.5);
+    if (_isInitialized) {
+      try {
+        await _effectPlayer.setVolume(_volume);
+        await _ambientPlayer.setVolume(_volume * 0.5);
+      } catch (e) {
+        // 插件不可用時靜默失敗
+      }
+    }
     await _saveSettings();
   }
 
   /// 釋放資源
   Future<void> dispose() async {
-    await _effectPlayer.dispose();
-    await _ambientPlayer.dispose();
+    try {
+      await _effectPlayer.dispose();
+      await _ambientPlayer.dispose();
+    } catch (e) {
+      // 插件不可用時靜默失敗
+    }
   }
 }
 

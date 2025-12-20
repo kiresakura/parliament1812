@@ -13,26 +13,38 @@ class RoomProvider with ChangeNotifier {
   List<Player> _players = [];
   bool _isLoading = false;
   String? _error;
+  
+  // 儲存建立房間時的玩家 ID
+  String? _hostPlayerId;
 
   Room? get room => _room;
   List<Player> get players => _players;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get hostPlayerId => _hostPlayerId;
 
   bool get isInRoom => _room != null;
   String? get roomCode => _room?.code;
 
   /// 建立房間
-  Future<Room?> createRoom(String hostNickname) async {
+  Future<CreateRoomResult?> createRoom(String hostNickname) async {
     _setLoading(true);
     _clearError();
 
     try {
-      _room = await _api.createRoom(hostNickname: hostNickname);
+      final result = await _api.createRoom(hostNickname: hostNickname);
+      
+      // 儲存主持人玩家 ID
+      _hostPlayerId = result.playerId;
+      
+      // 取得完整房間資訊
+      _room = await _api.getRoom(result.code);
+      await loadPlayers();
+      
       notifyListeners();
-      return _room;
+      return result;
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
       return null;
     } finally {
       _setLoading(false);
@@ -53,10 +65,13 @@ class RoomProvider with ChangeNotifier {
       _room = await _api.getRoom(roomCode);
       await loadPlayers();
 
+      // 確保成功返回前清除任何可能由 loadPlayers 設置的錯誤
+      _clearError();
+
       notifyListeners();
       return player;
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
       return null;
     } finally {
       _setLoading(false);
@@ -72,7 +87,7 @@ class RoomProvider with ChangeNotifier {
       _room = await _api.getRoom(roomCode);
       notifyListeners();
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
     } finally {
       _setLoading(false);
     }
@@ -86,7 +101,7 @@ class RoomProvider with ChangeNotifier {
       _players = await _api.getRoomPlayers(_room!.code);
       notifyListeners();
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
     }
   }
 
@@ -129,7 +144,13 @@ class RoomProvider with ChangeNotifier {
   }
 
   void _onPlayerJoin(Map<String, dynamic> data) {
-    final player = Player.fromJson(data['player']);
+    // 確保 player 資料存在且為有效的 Map
+    final playerData = data['player'];
+    if (playerData == null || playerData is! Map<String, dynamic>) {
+      return;
+    }
+
+    final player = Player.fromJson(playerData);
     if (!_players.any((p) => p.id == player.id)) {
       _players.add(player);
       notifyListeners();
@@ -137,7 +158,9 @@ class RoomProvider with ChangeNotifier {
   }
 
   void _onPlayerLeave(Map<String, dynamic> data) {
-    final playerId = data['player_id'] as String;
+    final playerId = data['player_id'] as String?;
+    if (playerId == null) return;
+
     _players.removeWhere((p) => p.id == playerId);
     notifyListeners();
   }
@@ -181,6 +204,8 @@ class RoomProvider with ChangeNotifier {
     disconnectWebSocket();
     _room = null;
     _players = [];
+    _hostPlayerId = null;
+    _clearError();
     notifyListeners();
   }
 
@@ -196,10 +221,11 @@ class RoomProvider with ChangeNotifier {
       disconnectWebSocket();
       _room = null;
       _players = [];
+      _hostPlayerId = null;
       notifyListeners();
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
       return false;
     } finally {
       _setLoading(false);
@@ -218,5 +244,22 @@ class RoomProvider with ChangeNotifier {
 
   void _clearError() {
     _error = null;
+  }
+  
+  /// 格式化錯誤訊息
+  String _formatError(dynamic e) {
+    if (e is ApiException) {
+      return e.message;
+    }
+    final str = e.toString();
+    // 移除 "Instance of 'XXX'" 格式
+    if (str.startsWith("Instance of '")) {
+      return '發生未知錯誤，請重試';
+    }
+    // 移除 "ApiException: [xxx]" 前綴
+    if (str.contains('ApiException:')) {
+      return str.replaceFirst(RegExp(r'ApiException: \[\d+\] '), '');
+    }
+    return str;
   }
 }

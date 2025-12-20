@@ -23,24 +23,30 @@ class RoleCardWidget extends StatelessWidget {
     return null;
   }
 
-  /// 取得黨派顏色
-  Color get partyColor {
-    if (role.roleType == 'tory') return PartyColors.tory;
-    if (role.roleType == 'whig') return PartyColors.whig;
-    return PartyColors.neutral;
+  /// 取得角色顏色
+  Color get roleColor => AppTheme.getRoleColor(role.roleType);
+
+  /// 取得角色類型名稱
+  String get roleTypeChinese {
+    const names = {
+      'worker': '紡織工人',
+      'factory': '工廠主',
+      'luddite': '盧德派成員',
+      'reformer': '社會改革者',
+      'mp': '國會議員',
+    };
+    return names[role.roleType] ?? '未知身份';
   }
 
-  /// 取得黨派名稱
-  String get partyNameChinese {
-    if (role.roleType == 'tory') return '托利黨';
-    if (role.roleType == 'whig') return '輝格黨';
-    return '中立';
-  }
-
-  String get partyNameEnglish {
-    if (role.roleType == 'tory') return 'TORY PARTY';
-    if (role.roleType == 'whig') return 'WHIG PARTY';
-    return 'NEUTRAL';
+  String get roleTypeEnglish {
+    const names = {
+      'worker': 'TEXTILE WORKER',
+      'factory': 'FACTORY OWNER',
+      'luddite': 'LUDDITE MEMBER',
+      'reformer': 'SOCIAL REFORMER',
+      'mp': 'MEMBER OF PARLIAMENT',
+    };
+    return names[role.roleType] ?? 'UNKNOWN';
   }
 
   /// 取得同黨盟友
@@ -142,8 +148,8 @@ class RoleCardWidget extends StatelessWidget {
           // 六角形徽章
           HexagonBadge(
             size: 60,
-            glowColor: partyColor,
-            child: Icon(Icons.groups, size: 30, color: partyColor),
+            glowColor: roleColor,
+            child: Icon(Icons.groups, size: 30, color: roleColor),
           )
               .animate()
               .fadeIn(duration: 500.ms)
@@ -269,18 +275,18 @@ class RoleCardWidget extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            partyColor.withValues(alpha: 0.3),
-            partyColor.withValues(alpha: 0.1),
+            roleColor.withValues(alpha: 0.3),
+            roleColor.withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: partyColor,
+          color: roleColor,
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: partyColor.withValues(alpha: 0.4),
+            color: roleColor.withValues(alpha: 0.4),
             blurRadius: 16,
           ),
         ],
@@ -288,16 +294,16 @@ class RoleCardWidget extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            partyNameChinese,
+            roleTypeChinese,
             style: TextStyle(
               fontFamily: 'Georgia',
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: partyColor,
+              color: roleColor,
               letterSpacing: 4,
               shadows: [
                 Shadow(
-                  color: partyColor.withValues(alpha: 0.8),
+                  color: roleColor.withValues(alpha: 0.8),
                   blurRadius: 10,
                 ),
               ],
@@ -305,11 +311,11 @@ class RoleCardWidget extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            partyNameEnglish,
+            roleTypeEnglish,
             style: TextStyle(
               fontFamily: 'Georgia',
               fontSize: 11,
-              color: partyColor.withValues(alpha: 0.7),
+              color: roleColor.withValues(alpha: 0.7),
               letterSpacing: 2,
             ),
           ),
@@ -547,10 +553,10 @@ class RoleCardWidget extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: partyColor.withValues(alpha: 0.1),
+        color: roleColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: partyColor.withValues(alpha: 0.4),
+          color: roleColor.withValues(alpha: 0.4),
         ),
         boxShadow: [
           BoxShadow(
@@ -603,10 +609,10 @@ class RoleCardWidget extends StatelessWidget {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: partyColor.withValues(alpha: 0.2),
+                  color: roleColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: partyColor.withValues(alpha: 0.5),
+                    color: roleColor.withValues(alpha: 0.5),
                   ),
                 ),
                 child: Row(
@@ -614,7 +620,7 @@ class RoleCardWidget extends StatelessWidget {
                   children: [
                     HexagonIcon(
                       size: 12,
-                      color: partyColor,
+                      color: roleColor,
                       filled: true,
                     ),
                     const SizedBox(width: 8),

@@ -23,15 +23,15 @@ class ApiService {
 
   // ==================== 房間 API ====================
 
-  /// 建立房間
-  Future<Room> createRoom({required String hostNickname}) async {
+  /// 建立房間 - 返回簡化結果
+  Future<CreateRoomResult> createRoom({required String hostNickname}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/rooms'),
         headers: _headers,
         body: jsonEncode({'host_nickname': hostNickname}),
       );
-      return _handleResponse(response, (data) => Room.fromJson(data));
+      return _handleResponse(response, (data) => CreateRoomResult.fromJson(data));
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(
@@ -94,22 +94,23 @@ class ApiService {
   // ==================== 玩家 API ====================
 
   /// NFC 掃卡分配角色
-  Future<Player> scanNfc({
+  /// 返回掃卡結果，包含 role_type, role_index 等資訊
+  Future<NfcScanResult> scanNfc({
     required String roomCode,
     required String playerId,
     required String cardId,
     required String signature,
   }) async {
+    // player_id 應該是 query parameter
     final response = await http.post(
-      Uri.parse('$baseUrl/api/rooms/$roomCode/scan-nfc'),
+      Uri.parse('$baseUrl/api/rooms/$roomCode/scan-nfc?player_id=$playerId'),
       headers: _headers,
       body: jsonEncode({
-        'player_id': playerId,
         'card_id': cardId,
-        'signature': signature,
+        'secret_hash': signature, // 後端期望 secret_hash
       }),
     );
-    return _handleResponse(response, (data) => Player.fromJson(data));
+    return _handleResponse(response, (data) => NfcScanResult.fromJson(data));
   }
 
   /// 手動輸入角色代碼分配角色（NFC 備用方案）
@@ -444,6 +445,60 @@ class ApiService {
         message: errorMessage,
       );
     }
+  }
+}
+
+/// 建立房間結果
+class CreateRoomResult {
+  final String code;
+  final String roomId;
+  final String playerId;
+  final String message;
+
+  CreateRoomResult({
+    required this.code,
+    required this.roomId,
+    required this.playerId,
+    required this.message,
+  });
+
+  factory CreateRoomResult.fromJson(Map<String, dynamic> json) {
+    return CreateRoomResult(
+      code: json['code'] as String? ?? '',
+      roomId: json['room_id'] as String? ?? '',
+      playerId: json['player_id'] as String? ?? '',
+      message: json['message'] as String? ?? '',
+    );
+  }
+}
+
+/// NFC 掃描結果
+class NfcScanResult {
+  final String message;
+  final String playerId;
+  final String roleType;
+  final int roleIndex;
+  final String? roleName;
+  final String? secretMissionId;
+
+  NfcScanResult({
+    required this.message,
+    required this.playerId,
+    required this.roleType,
+    required this.roleIndex,
+    this.roleName,
+    this.secretMissionId,
+  });
+
+  factory NfcScanResult.fromJson(Map<String, dynamic> json) {
+    return NfcScanResult(
+      message: json['message'] as String? ?? '',
+      playerId: json['player_id'] as String? ?? '',
+      roleType: json['role_type'] as String? ?? '',
+      roleIndex: json['role_index'] as int? ?? 0,
+      roleName: json['role_name'] as String?,
+      secretMissionId: json['secret_mission_id'] as String?,
+    );
   }
 }
 

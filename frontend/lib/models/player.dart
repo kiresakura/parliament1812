@@ -27,12 +27,20 @@ class Player {
   });
 
   factory Player.fromJson(Map<String, dynamic> json) {
+    // 安全解析 role_index，支援字串或整數
+    int? parseRoleIndex(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
     return Player(
       id: json['id'] as String? ?? '',
       roomId: json['room_id'] as String? ?? '',
       nickname: json['nickname'] as String? ?? '',
       roleType: json['role_type'] as String?,
-      roleIndex: json['role_index'] as int?,
+      roleIndex: parseRoleIndex(json['role_index']),
       secretMissionId: json['secret_mission_id'] as String?,
       isHost: json['is_host'] as bool? ?? false,
       joinedAt: json['joined_at'] != null
@@ -59,6 +67,33 @@ class Player {
   }
 
   bool get hasRole => roleType != null;
+
+  /// 複製並更新部分屬性
+  Player copyWith({
+    String? id,
+    String? roomId,
+    String? nickname,
+    String? roleType,
+    int? roleIndex,
+    String? secretMissionId,
+    bool? isHost,
+    DateTime? joinedAt,
+    Role? role,
+    SecretMission? secretMission,
+  }) {
+    return Player(
+      id: id ?? this.id,
+      roomId: roomId ?? this.roomId,
+      nickname: nickname ?? this.nickname,
+      roleType: roleType ?? this.roleType,
+      roleIndex: roleIndex ?? this.roleIndex,
+      secretMissionId: secretMissionId ?? this.secretMissionId,
+      isHost: isHost ?? this.isHost,
+      joinedAt: joinedAt ?? this.joinedAt,
+      role: role ?? this.role,
+      secretMission: secretMission ?? this.secretMission,
+    );
+  }
 }
 
 /// 角色模型
@@ -88,12 +123,20 @@ class Role {
   });
 
   factory Role.fromJson(Map<String, dynamic> json) {
+    // 安全解析整數欄位，支援字串或整數
+    int parseIntField(dynamic value, [int defaultValue = 0]) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
+
     return Role(
-      roleType: json['role_type'],
-      index: json['index'],
-      name: json['name'],
-      age: json['age'],
-      description: json['description'],
+      roleType: json['role_type'] ?? '',
+      index: parseIntField(json['index']),
+      name: json['name'] ?? '',
+      age: parseIntField(json['age']),
+      description: json['description'] ?? '',
       stance: json['stance'] ?? '',
       background: json['background'] ?? '',
       characteristics: List<String>.from(json['characteristics'] ?? []),
@@ -102,13 +145,13 @@ class Role {
     );
   }
 
-  // 角色類型中文名稱
+  // 角色類型中文名稱 - 根據企劃書設定
   static const Map<String, String> typeNames = {
     'worker': '紡織工人',
     'factory': '工廠主',
-    'luddite': '盧德派',
-    'reformer': '改革者',
-    'mp': '議員',
+    'luddite': '盧德派成員',
+    'reformer': '社會改革者',
+    'mp': '國會議員',
   };
 
   String get typeName => typeNames[roleType] ?? '未知';
@@ -133,13 +176,21 @@ class SecretMission {
   });
 
   factory SecretMission.fromJson(Map<String, dynamic> json) {
+    // 安全解析整數欄位
+    int parsePoints(dynamic value) {
+      if (value == null) return 50;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 50;
+      return 50;
+    }
+
     return SecretMission(
-      id: json['id'],
-      roleType: json['role_type'],
-      title: json['title'],
-      description: json['description'],
+      id: json['id'] ?? '',
+      roleType: json['role_type'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
       successCondition: json['success_condition'],
-      points: json['points'] ?? 50,
+      points: parsePoints(json['points']),
     );
   }
 }

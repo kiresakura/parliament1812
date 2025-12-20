@@ -243,7 +243,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
   }
 
   Widget _buildAppBar(role) {
-    final partyColor = _getPartyColor(role.roleType);
+    final roleColor = _getRoleColor(role.roleType);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -322,7 +322,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                   children: [
                     HexagonIcon(
                       size: 16,
-                      color: partyColor,
+                      color: roleColor,
                       filled: true,
                     ),
                     const SizedBox(width: 10),
@@ -352,7 +352,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                     const SizedBox(width: 10),
                     HexagonIcon(
                       size: 16,
-                      color: partyColor,
+                      color: roleColor,
                       filled: true,
                     ),
                   ],
@@ -367,14 +367,9 @@ class _RoleCardScreenState extends State<RoleCardScreen>
     ).animate().fadeIn(duration: 500.ms).slideY(begin: -0.5, end: 0);
   }
 
-  Color _getPartyColor(String roleType) {
-    // 根據角色類型返回黨派顏色
-    if (roleType == 'tory') {
-      return AppTheme.toryBlue;
-    } else if (roleType == 'whig') {
-      return AppTheme.whigOrange;
-    }
-    return AppTheme.accentGold;
+  Color _getRoleColor(String roleType) {
+    // 使用 AppTheme 統一的角色顏色
+    return AppTheme.getRoleColor(roleType);
   }
 
   Widget _buildRoleCard(role) {
@@ -408,7 +403,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
   }
 
   Widget _buildSealedCard(role) {
-    final partyColor = _getPartyColor(role.roleType);
+    final roleColor = _getRoleColor(role.roleType);
 
     return GestureDetector(
       onTap: _breakSeal,
@@ -512,8 +507,8 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            partyColor,
-                            partyColor.withValues(alpha: 0.8),
+                            roleColor,
+                            roleColor.withValues(alpha: 0.8),
                             AppTheme.waxSealColor,
                           ],
                         ),
@@ -528,7 +523,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                             offset: const Offset(4, 4),
                           ),
                           BoxShadow(
-                            color: partyColor.withValues(
+                            color: roleColor.withValues(
                               alpha: 0.3 + (_glowController.value * 0.3),
                             ),
                             blurRadius: 25,
@@ -659,7 +654,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
   }
 
   Widget _buildCardBack(role) {
-    final partyColor = _getPartyColor(role.roleType);
+    final roleColor = _getRoleColor(role.roleType);
 
     return Container(
       width: double.infinity,
@@ -669,19 +664,19 @@ class _RoleCardScreenState extends State<RoleCardScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            partyColor.withValues(alpha: 0.4),
+            roleColor.withValues(alpha: 0.4),
             AppTheme.cardBackground,
-            partyColor.withValues(alpha: 0.2),
+            roleColor.withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: partyColor.withValues(alpha: 0.6),
+          color: roleColor.withValues(alpha: 0.6),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: partyColor.withValues(alpha: 0.3),
+            color: roleColor.withValues(alpha: 0.3),
             blurRadius: 20,
             spreadRadius: 2,
           ),
@@ -703,7 +698,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                 itemBuilder: (context, index) => Center(
                   child: HexagonIcon(
                     size: 40,
-                    color: partyColor,
+                    color: roleColor,
                     filled: false,
                   ),
                 ),
@@ -717,8 +712,8 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                 // 六角形徽章
                 HexagonBadge(
                   size: 100,
-                  glowColor: partyColor,
-                  child: CrownIcon(size: 50, color: partyColor),
+                  glowColor: roleColor,
+                  child: CrownIcon(size: 50, color: roleColor),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -727,7 +722,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                     fontFamily: 'Georgia',
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: partyColor,
+                    color: roleColor,
                     letterSpacing: 4,
                   ),
                 ),
@@ -739,7 +734,7 @@ class _RoleCardScreenState extends State<RoleCardScreen>
                   style: TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 14,
-                    color: partyColor.withValues(alpha: 0.7),
+                    color: roleColor.withValues(alpha: 0.7),
                     letterSpacing: 6,
                   ),
                 ),

@@ -51,23 +51,28 @@ class PlayerProvider with ChangeNotifier {
         return null;
       }
 
-      // 發送到後端驗證
-      final player = await _api.scanNfc(
+      // 發送到後端驗證，返回 NfcScanResult
+      final scanResult = await _api.scanNfc(
         roomCode: roomCode,
         playerId: _currentPlayer!.id,
         cardId: cardData.cardId,
         signature: cardData.signature,
       );
 
-      _currentPlayer = player;
+      // 使用掃描結果更新當前玩家的角色資訊
+      _currentPlayer = _currentPlayer!.copyWith(
+        roleType: scanResult.roleType,
+        roleIndex: scanResult.roleIndex,
+        secretMissionId: scanResult.secretMissionId,
+      );
       notifyListeners();
 
       // 載入秘密任務
       await loadSecretMission();
 
-      return player;
+      return _currentPlayer;
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
       return null;
     } finally {
       _setLoading(false);
@@ -109,7 +114,7 @@ class PlayerProvider with ChangeNotifier {
 
       return player;
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
       return null;
     } finally {
       _setLoading(false);
@@ -124,7 +129,7 @@ class PlayerProvider with ChangeNotifier {
       _secretMission = await _api.getSecretMission(_currentPlayer!.id);
       notifyListeners();
     } catch (e) {
-      _setError(e.toString());
+      _setError(_formatError(e));
     }
   }
 
@@ -174,5 +179,48 @@ class PlayerProvider with ChangeNotifier {
 
   void _clearError() {
     _error = null;
+  }
+  
+  /// 格式化錯誤訊息，避免顯示 "Instance of 'XXX'"
+  String _formatError(dynamic e) {
+    // 處理 NfcException
+    if (e is NfcException) {
+      return e.message;
+    }
+    // 處理 ApiException
+    if (e is ApiException) {
+      return e.message;
+    }
+    
+    final str = e.toString();
+    
+    // 移除 "Instance of 'XXX'" 格式
+    if (str.startsWith("Instance of '")) {
+      // 嘗試從類名推斷錯誤類型
+      if (str.contains('NfcError') || str.contains('Nfc')) {
+        return 'NFC 讀取失敗，請確認卡片位置後重試';
+      }
+      return '發生未知錯誤，請重試';
+    }
+    
+    // 移除 "NfcException: " 前綴
+    if (str.startsWith('NfcException: ')) {
+      return str.substring(14);
+    }
+    
+    // 移除 "ApiException: [xxx]" 前綴
+    if (str.contains('ApiException:')) {
+      return str.replaceFirst(RegExp(r'ApiException: \[\d+\] '), '');
+    }
+    
+    // 處理 PlatformException
+    if (str.contains('PlatformException')) {
+      if (str.contains('not available') || str.contains('NFC')) {
+        return 'NFC 功能不可用，請檢查是否已開啟 NFC';
+      }
+      return '裝置功能異常，請重試';
+    }
+    
+    return str;
   }
 }
