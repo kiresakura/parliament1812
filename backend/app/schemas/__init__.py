@@ -16,6 +16,7 @@ from app.schemas.room import (
 from app.schemas.player import (
     PlayerCreate,
     NFCScanRequest,
+    ManualRoleRequest,
     NFCScanResponse,
     PlayerResponse,
     PlayerDetailResponse,
@@ -73,6 +74,7 @@ __all__ = [
     # Player
     "PlayerCreate",
     "NFCScanRequest",
+    "ManualRoleRequest",
     "NFCScanResponse",
     "PlayerResponse",
     "PlayerDetailResponse",

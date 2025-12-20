@@ -18,6 +18,12 @@ class NFCScanRequest(BaseModel):
     secret_hash: str = Field(..., description="秘密驗證碼")
 
 
+class ManualRoleRequest(BaseModel):
+    """手動角色分配請求（NFC 備用方案）"""
+    player_id: str = Field(..., description="玩家 ID")
+    role_code: str = Field(..., description="角色代碼 (如 W01, F02, L03, R04, M01)")
+
+
 class NFCScanResponse(BaseModel):
     """NFC 掃卡回應"""
     player_id: UUID

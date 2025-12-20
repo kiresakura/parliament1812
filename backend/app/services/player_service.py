@@ -226,6 +226,81 @@ async def get_player_full_info(
     return result
 
 
+async def assign_role_manually(
+    db: AsyncSession,
+    player: Player,
+    role_code: str,
+) -> dict:
+    """
+    手動分配角色（NFC 備用方案）
+
+    Args:
+        db: 資料庫 session
+        player: 玩家物件
+        role_code: 角色代碼（如 W01, F02 等）
+
+    Returns:
+        角色分配結果
+
+    Raises:
+        ValueError: 代碼無效或角色已被使用
+    """
+    # 檢查玩家是否已有角色
+    if player.role_type:
+        raise ValueError("你已經有角色了")
+
+    # 驗證角色代碼格式
+    import re
+    if not re.match(r'^[WFLRM][0-9]{2}$', role_code.upper()):
+        raise ValueError("角色代碼格式錯誤，請輸入如 W01、F02 等格式")
+
+    # 將代碼轉換為 card_id 格式
+    card_id = role_code.upper()
+
+    # 解析卡片 ID
+    role_info = get_role_from_card_id(card_id)
+    if not role_info:
+        raise ValueError("無效的角色代碼")
+
+    role_type, role_index = role_info
+
+    # 取得角色資料
+    role_data = get_role_info(role_type)
+    if not role_data:
+        raise ValueError("找不到角色資料")
+
+    # 取得秘密任務
+    mission = get_mission_by_card_id(card_id)
+    if not mission:
+        raise ValueError("找不到秘密任務")
+
+    # 檢查同房間是否有人使用相同角色
+    room_players = await get_players_by_room(db, player.room_id)
+    for p in room_players:
+        if p.id != player.id and p.role_type == role_type and p.role_index == role_index:
+            raise ValueError("這個角色已被其他玩家使用")
+
+    # 更新玩家角色
+    player.role_type = role_type
+    player.role_index = role_index
+    player.secret_mission_id = mission["id"]
+
+    await db.flush()
+
+    return {
+        "player_id": player.id,
+        "role_type": role_type,
+        "role_index": role_index,
+        "role_name": role_data["name"],
+        "role_occupation": role_data["occupation"],
+        "role_description": role_data["description"],
+        "role_background": role_data["background"],
+        "role_public_stance": role_data["public_stance"],
+        "avatar_color": role_data["avatar_color"],
+        "secret_mission_id": mission["id"],
+    }
+
+
 def generate_nfc_hash(card_id: str) -> str:
     """
     為卡片生成驗證 hash（用於製作 NFC 卡片）

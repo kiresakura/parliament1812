@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas import (
     NFCScanRequest,
+    ManualRoleRequest,
     NFCScanResponse,
     PlayerResponse,
     PlayerDetailResponse,
@@ -94,6 +95,97 @@ async def scan_nfc(
         is_host=player.is_host,
     )
     
+    return {
+        "message": f"角色分配成功！你是 {result['role_name']}",
+        **result,
+    }
+
+
+@router.post(
+    "/api/rooms/{code}/assign-role-manual",
+    response_model=dict,
+    summary="手動分配角色（NFC 備用方案）",
+)
+async def assign_role_manual(
+    code: str,
+    request: ManualRoleRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    手動分配角色（NFC 備用方案）
+
+    當 NFC 掃描無法使用時，玩家可以輸入角色代碼手動選擇角色。
+
+    角色代碼格式：
+    - W01, W02, W03, W04 - 紡織工人（4 張卡）
+    - F01, F02, F03, F04 - 工廠主（4 張卡）
+    - L01, L02, L03, L04 - 盧德派成員（4 張卡）
+    - R01, R02, R03, R04 - 社會改革者（4 張卡）
+    - M01, M02, M03, M04 - 國會議員（4 張卡）
+
+    Args:
+        code: 房間碼
+        request: 手動角色分配請求（player_id, role_code）
+        db: 資料庫 session
+
+    Returns:
+        角色分配結果（包含角色資訊）
+    """
+    from uuid import UUID
+
+    # 取得房間
+    room = await room_service.get_room_by_code(db, code)
+    if not room:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到此房間",
+        )
+
+    # 取得玩家
+    try:
+        player_uuid = UUID(request.player_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="無效的玩家 ID 格式",
+        )
+
+    player = await player_service.get_player_by_id(db, player_uuid)
+    if not player:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到此玩家",
+        )
+
+    # 檢查玩家是否在此房間
+    if player.room_id != room.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="你不在這個房間中",
+        )
+
+    # 手動分配角色
+    try:
+        result = await player_service.assign_role_manually(
+            db=db,
+            player=player,
+            role_code=request.role_code,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    # 通知其他玩家（透過 WebSocket）
+    await notify_player_join(
+        room_code=code,
+        player_id=str(player.id),
+        nickname=player.nickname,
+        role_type=result["role_type"],
+        is_host=player.is_host,
+    )
+
     return {
         "message": f"角色分配成功！你是 {result['role_name']}",
         **result,
