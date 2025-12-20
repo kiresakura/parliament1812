@@ -6,6 +6,7 @@ from app.routers.websocket import router as websocket_router
 from app.routers.messages import router as messages_router
 from app.routers.votes import router as votes_router
 from app.routers.events import router as events_router
+from app.routers.nfc import router as nfc_router
 
 __all__ = [
     "rooms_router",
@@ -15,4 +16,5 @@ __all__ = [
     "messages_router",
     "votes_router",
     "events_router",
+    "nfc_router",
 ]
