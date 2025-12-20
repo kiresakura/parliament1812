@@ -251,6 +251,52 @@ SECRET_MISSIONS: dict[str, MissionData] = {
         "points": 40,
         "difficulty": "easy",
     },
+
+    # ========== 喬治三世 (George III) 秘密任務 ==========
+    "george_iii_01": {
+        "id": "george_iii_01",
+        "role_type": "george_iii",
+        "title": "清醒時刻",
+        "description": """你今天精神狀態良好，要在攝政王面前證明自己仍然清醒。
+世人稱你為「瘋王」，但你知道自己只是偶爾不適。
+今天你要展現真正的王者風範...""",
+        "success_condition": "整場辯論中沒有表現出任何精神錯亂的跡象",
+        "points": 50,
+        "difficulty": "medium",
+    },
+    "george_iii_02": {
+        "id": "george_iii_02",
+        "role_type": "george_iii",
+        "title": "帝國榮光",
+        "description": """你想在有生之年看到帝國戰勝拿破崙。
+工業革命帶來的生產力對戰爭至關重要，
+你不能讓任何事情阻礙帝國的軍事力量...""",
+        "success_condition": "最終決議有利於戰爭物資生產（不是選項 A）",
+        "points": 60,
+        "difficulty": "medium",
+    },
+    "george_iii_03": {
+        "id": "george_iii_03",
+        "role_type": "george_iii",
+        "title": "王室秘密",
+        "description": """你其實暗中同情那些失業的工人，因為他們讓你想起年輕時的自己。
+在成為國王之前，你曾在鄉間與普通人交談。
+你要在辯論中為工人說話，但不能太明顯...""",
+        "success_condition": "在辯論中為工人說至少一句好話，但不能太明顯影響你的王權威嚴",
+        "points": 70,
+        "difficulty": "hard",
+    },
+    "george_iii_04": {
+        "id": "george_iii_04",
+        "role_type": "george_iii",
+        "title": "瘋王的智慧",
+        "description": """有時候，裝瘋是最好的政治策略...
+當局勢對你不利時，一次「發作」可以巧妙地轉移話題。
+沒有人會責怪一個「病人」的失態...""",
+        "success_condition": "在關鍵時刻「發作」，成功轉移話題或打斷對你不利的討論",
+        "points": 80,
+        "difficulty": "hard",
+    },
 }
 
 
@@ -283,6 +329,11 @@ NFC_CARD_MAPPING: dict[str, str] = {
     "MP02": "mp_02",
     "MP03": "mp_03",
     "MP04": "mp_04",
+    # George III 卡片 (特殊角色)
+    "GEORGEIII01": "george_iii_01",
+    "GEORGEIII02": "george_iii_02",
+    "GEORGEIII03": "george_iii_03",
+    "GEORGEIII04": "george_iii_04",
 }
 
 
@@ -334,22 +385,24 @@ def get_mission_by_card_id(card_id: str) -> MissionData | None:
 def get_role_from_card_id(card_id: str) -> tuple[str, int] | None:
     """
     從卡片 ID 解析角色類型和索引
-    
+
     Args:
-        card_id: NFC 卡片 ID（如 "WORKER01"）
-        
+        card_id: NFC 卡片 ID（如 "WORKER01" 或 "GEORGEIII01"）
+
     Returns:
         (角色類型, 索引) 元組或 None
     """
     card_id = card_id.upper()
-    
-    # 解析卡片 ID
-    for role in ["WORKER", "FACTORY", "LUDDITE", "REFORMER", "MP"]:
+
+    # 解析卡片 ID (注意：GEORGEIII 要在其他角色之前檢查，因為它比較長)
+    for role in ["GEORGEIII", "WORKER", "FACTORY", "LUDDITE", "REFORMER", "MP"]:
         if card_id.startswith(role):
             try:
                 index = int(card_id[len(role):])
-                return (role.lower(), index)
+                # GEORGEIII 映射到 george_iii
+                role_type = "george_iii" if role == "GEORGEIII" else role.lower()
+                return (role_type, index)
             except ValueError:
                 return None
-    
+
     return None

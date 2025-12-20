@@ -3,7 +3,7 @@
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 import hashlib
 import secrets
 
@@ -28,6 +28,42 @@ class Role:
     greatest_fear: str
     arguments: List[str]
     secret_missions: List[SecretMission]
+    is_special: bool = False  # 特殊角色標記
+    special_ability: Optional[str] = None  # 特殊能力
+
+# ═══════════════════════════════════════════════════════════════
+# 👑 特殊角色
+# ═══════════════════════════════════════════════════════════════
+
+SPECIAL_ROLES = {
+    "george_iii": Role(
+        id="george_iii",
+        name_zh="喬治三世",
+        name_en="George III",
+        title="大不列顛國王",
+        age=73,
+        background="漢諾威王朝國王，統治大英帝國長達60年。你見證了美國獨立、法國大革命，如今又要面對工業革命帶來的社會動盪。晚年飽受精神疾病折磨，世人稱你為「瘋王」。",
+        core_stance="維護王權與帝國穩定，在各方勢力中保持平衡",
+        greatest_fear="失去理智、王權旁落、帝國分裂",
+        arguments=[
+            "朕是神授君權的體現，國家的穩定繫於王室的威嚴",
+            "無論托利黨還是輝格黨，都必須服從王權",
+            "朕不會讓任何人動搖大英帝國的根基"
+        ],
+        secret_missions=[
+            SecretMission("清醒時刻", "你今天精神狀態良好，要在攝政王面前證明自己仍然清醒。", "整場辯論中沒有表現出任何精神錯亂的跡象", 50),
+            SecretMission("帝國榮光", "你想在有生之年看到帝國戰勝拿破崙。", "最終決議有利於戰爭物資生產", 60),
+            SecretMission("王室秘密", "你其實暗中同情那些失業的工人，因為他們讓你想起年輕時的自己。", "在辯論中為工人說至少一句好話，但不能太明顯", 70),
+            SecretMission("瘋王的智慧", "有時候，裝瘋是最好的政治策略...", "在關鍵時刻「發作」，成功轉移話題或打斷對你不利的討論", 80)
+        ],
+        is_special=True,
+        special_ability="【王權宣言】每場遊戲可發動一次，強制結束當前辯論並進入投票階段。"
+    ),
+}
+
+# ═══════════════════════════════════════════════════════════════
+# 👥 一般角色
+# ═══════════════════════════════════════════════════════════════
 
 ROLES = {
     "worker": Role(
@@ -137,6 +173,9 @@ ROLES = {
     )
 }
 
+# 合併所有角色
+ALL_ROLES = {**SPECIAL_ROLES, **ROLES}
+
 EVENTS = [
     {"id": "newspaper_riot", "title": "📰 報紙號外", "description": "「曼徹斯特發生暴動，3名工人死於軍隊鎮壓！」\n\n輿論開始同情工人...", "effect": "所有人重新考慮對選項B的立場"},
     {"id": "bribery_scandal", "title": "💰 賄賂醜聞", "description": "「有匿名信指控某位議員收受工廠主賄賂！」\n\n（隨機指定一名議員玩家）", "effect": "被指控的議員必須公開回應"},
@@ -145,16 +184,62 @@ EVENTS = [
     {"id": "letter_exposed", "title": "🤫 密信曝光", "description": "「一封神秘的信件被公開了！」\n\n（隨機揭露一名玩家的秘密任務）", "effect": "被選中的玩家秘密任務曝光"},
     {"id": "child_testimony", "title": "👧 童工證詞", "description": "「一名10歲女童在國會門口哭訴：『我每天工作14小時，手指都變形了...』」", "effect": "所有人必須回應童工問題"},
     {"id": "french_news", "title": "🇫🇷 法國消息", "description": "「據報，法國已開始大規模採用蒸汽機！英國工業將被超越！」", "effect": "國際競爭壓力增加"},
-    {"id": "worker_death", "title": "💀 工人之死", "description": "「一名工人今晨餓死街頭，身上只有一張紙：『機器殺死了我』」", "effect": "情緒激動，可能影響投票"}
+    {"id": "worker_death", "title": "💀 工人之死", "description": "「一名工人今晨餓死街頭，身上只有一張紙：『機器殺死了我』」", "effect": "情緒激動，可能影響投票"},
+    {"id": "kings_madness", "title": "👑 國王發作", "description": "「國王陛下今日在宮中突然發作，高喊『朕是神！』」\n\n攝政王是否該正式接管？", "effect": "喬治三世玩家可選擇：裝作沒事/承認需要休息"}
 ]
 
 def generate_card_id(role_type: str, index: int) -> str:
-    return f"{role_type}_{index:02d}"
+    """
+    生成卡片 ID，格式需匹配後端
+    後端期望格式: WORKER01, FACTORY02, LUDDITE03, REFORMER04, MP01
+    """
+    # 角色類型映射 (本地 -> 後端)
+    role_mapping = {
+        "worker": "WORKER",
+        "factory": "FACTORY",
+        "luddite": "LUDDITE",
+        "reformer": "REFORMER",
+        "mp": "MP",
+        "george_iii": "GEORGE_III",  # 特殊角色 (需要後端支援)
+    }
+    backend_type = role_mapping.get(role_type, role_type.upper())
+    return f"{backend_type}{index:02d}"
 
-def generate_secret_hash(card_id: str) -> str:
-    salt = secrets.token_hex(4)
-    combined = f"{card_id}:{salt}"
-    return hashlib.sha256(combined.encode()).hexdigest()[:8].upper()
+
+def generate_secret_hash(card_id: str, secret_key: str = None) -> str:
+    """
+    生成 NFC 卡片驗證 hash
+
+    必須使用與後端相同的演算法：
+    - HMAC-SHA256
+    - 使用 SECRET_KEY 作為密鑰
+    - 取前 16 個字元
+
+    Args:
+        card_id: 卡片 ID (如 WORKER01)
+        secret_key: 後端的 SECRET_KEY (必須與 Railway 環境變數一致)
+
+    Returns:
+        16 字元的 hash
+    """
+    import hmac
+
+    if not secret_key:
+        raise ValueError(
+            "⚠️  需要提供 SECRET_KEY！\n"
+            "請從 Railway 環境變數取得 SECRET_KEY，或使用後端 API /api/admin/nfc-cards"
+        )
+
+    # 與後端相同的演算法
+    expected_hash = hmac.new(
+        secret_key.encode(),
+        card_id.upper().encode(),
+        hashlib.sha256,
+    ).hexdigest()[:16]
+
+    return expected_hash
+
 
 def get_nfc_url(card_id: str, secret_hash: str) -> str:
+    """生成 NFC URL"""
     return f"parliament1812://role?id={card_id}&secret={secret_hash}"

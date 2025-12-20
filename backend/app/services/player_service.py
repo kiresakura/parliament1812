@@ -258,22 +258,23 @@ async def assign_role_manually(
         'L': 'LUDDITE',
         'R': 'REFORMER',
         'M': 'MP',
+        'G': 'GEORGEIII',  # 特殊角色
     }
 
     import re
     role_code = role_code.upper().strip()
 
-    # 嘗試解析短格式 (W01, F02 等)
-    short_match = re.match(r'^([WFLRM])(\d{2})$', role_code)
+    # 嘗試解析短格式 (W01, F02, G01 等)
+    short_match = re.match(r'^([WFLRMG])(\d{2})$', role_code)
     if short_match:
         prefix = short_match.group(1)
         number = short_match.group(2)
         card_id = f"{short_to_long[prefix]}{number}"
-    # 嘗試解析長格式 (WORKER01, FACTORY02 等)
-    elif re.match(r'^(WORKER|FACTORY|LUDDITE|REFORMER|MP)\d{2}$', role_code):
+    # 嘗試解析長格式 (WORKER01, FACTORY02, GEORGEIII01 等)
+    elif re.match(r'^(WORKER|FACTORY|LUDDITE|REFORMER|MP|GEORGEIII)\d{2}$', role_code):
         card_id = role_code
     else:
-        raise ValueError("角色代碼格式錯誤，請輸入如 W01、WORKER01 等格式")
+        raise ValueError("角色代碼格式錯誤，請輸入如 W01、WORKER01、G01、GEORGEIII01 等格式")
 
     # 解析卡片 ID
     role_info = get_role_from_card_id(card_id)
