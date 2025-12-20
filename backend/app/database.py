@@ -59,6 +59,47 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
+async def seed_missions() -> None:
+    """
+    種子資料：填充秘密任務表
+    如果表為空，則插入所有秘密任務資料
+    """
+    from app.data.missions import SECRET_MISSIONS
+    from app.models.secret_mission import SecretMission
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        try:
+            # 檢查是否已有資料
+            result = await session.execute(select(SecretMission).limit(1))
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                print("✅ 秘密任務資料已存在，跳過種子資料", flush=True)
+                return
+
+            # 插入所有秘密任務
+            print(f"📝 正在填充 {len(SECRET_MISSIONS)} 個秘密任務...", flush=True)
+            for mission_id, mission_data in SECRET_MISSIONS.items():
+                mission = SecretMission(
+                    id=mission_data["id"],
+                    role_type=mission_data["role_type"],
+                    title=mission_data["title"],
+                    description=mission_data["description"],
+                    success_condition=mission_data.get("success_condition"),
+                    points=mission_data.get("points", 50),
+                )
+                session.add(mission)
+
+            await session.commit()
+            print(f"✅ 已成功填充 {len(SECRET_MISSIONS)} 個秘密任務", flush=True)
+
+        except Exception as e:
+            await session.rollback()
+            print(f"❌ 填充秘密任務失敗: {e}", flush=True)
+            raise
+
+
 async def close_db() -> None:
     """關閉資料庫連線"""
     await engine.dispose()

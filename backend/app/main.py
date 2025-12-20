@@ -10,8 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import init_db, close_db, redis_manager
-from app.routers import rooms_router, players_router, admin_router, websocket_router, messages_router, votes_router, events_router
+from app.database import init_db, close_db, redis_manager, seed_missions
+from app.routers import rooms_router, players_router, admin_router, websocket_router, messages_router, votes_router, events_router, nfc_router
 from app.websocket import manager as ws_manager
 
 
@@ -45,6 +45,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await init_db()
         db_connected = True
         print("✅ 資料庫連線成功", flush=True)
+
+        # 填充種子資料（秘密任務）
+        try:
+            await seed_missions()
+        except Exception as e:
+            print(f"⚠️ 種子資料填充失敗（非致命）: {e}", flush=True)
+
     except Exception as e:
         print(f"❌ 資料庫連線失敗: {e}", flush=True)
         print(traceback.format_exc(), flush=True)
@@ -152,6 +159,7 @@ app.include_router(websocket_router)
 app.include_router(messages_router)
 app.include_router(votes_router)
 app.include_router(events_router)
+app.include_router(nfc_router)
 
 
 @app.get("/", tags=["root"])
