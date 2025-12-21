@@ -16,18 +16,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# 複製依賴檔案 (從根目錄的 backend/ 資料夾)
-COPY backend/requirements.txt .
+# 複製依賴檔案（從 repo 根目錄的 shared/backend/ 複製）
+COPY shared/backend/requirements.txt .
 
 # 安裝 Python 依賴
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 複製應用程式碼 (從根目錄的 backend/ 資料夾)
-COPY backend/app ./app
+# 複製應用程式碼
+COPY shared/backend/app ./app
 
 # 複製 alembic 配置 (用於資料庫遷移)
-COPY backend/alembic.ini .
-COPY backend/alembic ./alembic
+COPY shared/backend/alembic.ini .
+COPY shared/backend/alembic ./alembic
 
 # 暴露埠口
 EXPOSE 8000

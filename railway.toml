@@ -2,7 +2,7 @@
 [build]
 # 使用 Dockerfile 建置
 builder = "dockerfile"
-dockerfilePath = "backend/Dockerfile"
+dockerfilePath = "shared/backend/Dockerfile"
 
 [deploy]
 # 健康檢查
