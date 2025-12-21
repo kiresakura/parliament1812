@@ -159,14 +159,17 @@ async def change_phase(
 ) -> Room:
     """
     切換遊戲階段
-    
+
     Args:
         db: 資料庫 session
         room: 房間物件
         phase: 目標階段
-        
+
     Returns:
         更新後的房間物件
+
+    Raises:
+        ValueError: 開始遊戲時不符合條件
     """
     # 階段對應狀態
     phase_status_map = {
@@ -183,18 +186,55 @@ async def change_phase(
         11: RoomStatus.REVEAL,
         12: RoomStatus.FINISHED,
     }
-    
+
+    # 從等待室進入遊戲時驗證所有玩家已準備
+    if room.phase == 1 and phase == 2:
+        await validate_game_start(room)
+
     room.phase = phase
     room.status = phase_status_map.get(phase, RoomStatus.WAITING).value
-    
+
     # 進入投票階段時更新輪次
     if phase == 8:
         room.current_round = 1
     elif phase == 10:
         room.current_round = 2
-    
+
     await db.flush()
     return room
+
+
+async def validate_game_start(room: Room) -> None:
+    """
+    驗證遊戲是否可以開始
+
+    Args:
+        room: 房間物件
+
+    Raises:
+        ValueError: 不符合開始條件
+    """
+    players = room.players or []
+
+    # 至少需要 2 名玩家
+    if len(players) < 2:
+        raise ValueError("至少需要 2 名玩家才能開始遊戲")
+
+    # 檢查每個玩家
+    not_ready_players = []
+    no_role_players = []
+
+    for player in players:
+        if not player.role_type:
+            no_role_players.append(player.nickname)
+        elif not player.is_ready:
+            not_ready_players.append(player.nickname)
+
+    if no_role_players:
+        raise ValueError(f"以下玩家尚未分配角色：{', '.join(no_role_players)}")
+
+    if not_ready_players:
+        raise ValueError(f"以下玩家尚未準備：{', '.join(not_ready_players)}")
 
 
 async def set_timer(

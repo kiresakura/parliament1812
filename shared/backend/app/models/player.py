@@ -22,7 +22,7 @@ class RoleType(str, Enum):
 class Player(Base):
     """
     玩家表
-    
+
     Attributes:
         id: 玩家唯一識別碼
         room_id: 所屬房間 ID
@@ -32,6 +32,7 @@ class Player(Base):
         role_index: 同類角色的索引（1-4）
         secret_mission_id: 秘密任務 ID
         is_host: 是否為主持人
+        is_ready: 是否已準備
         joined_at: 加入時間
     """
     __tablename__ = "players"
@@ -69,6 +70,10 @@ class Player(Base):
         nullable=True,
     )
     is_host: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+    )
+    is_ready: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
     )

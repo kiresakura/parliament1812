@@ -17,25 +17,27 @@ from app.data.missions import (
 )
 
 
-def verify_nfc_hash(card_id: str, secret_hash: str) -> bool:
+def verify_nfc_signature(card_id: str, uid: str, signature: str) -> bool:
     """
-    驗證 NFC 卡片的 hash 是否正確
-    
+    驗證 NFC 卡片的防偽簽名（新格式，含 UID 綁定）
+
     Args:
         card_id: 卡片 ID
-        secret_hash: 客戶端提供的 hash
-        
+        uid: 卡片 UID（7-byte hex string）
+        signature: 客戶端提供的簽名
+
     Returns:
         是否驗證通過
     """
-    # 使用 HMAC-SHA256 驗證
-    expected_hash = hmac.new(
+    # 使用 HMAC-SHA256 生成預期簽名：card_id + uid + secret_key
+    message = f"{card_id.upper()}:{uid.upper()}:{settings.secret_key}"
+    expected_sig = hmac.new(
         settings.secret_key.encode(),
-        card_id.upper().encode(),
+        message.encode(),
         hashlib.sha256,
-    ).hexdigest()[:16]  # 只取前 16 個字元
-    
-    return hmac.compare_digest(expected_hash, secret_hash.lower())
+    ).hexdigest()[:16].upper()
+
+    return hmac.compare_digest(expected_sig, signature.upper())
 
 
 async def get_player_by_id(
@@ -86,26 +88,28 @@ async def scan_nfc_card(
     db: AsyncSession,
     player: Player,
     card_id: str,
-    secret_hash: str,
+    signature: str,
+    uid: str,
 ) -> dict:
     """
-    NFC 掃卡分配角色
-    
+    NFC 掃卡分配角色（UID 綁定防偽格式）
+
     Args:
         db: 資料庫 session
         player: 玩家物件
         card_id: NFC 卡片 ID
-        secret_hash: 驗證 hash
-        
+        signature: 防偽簽名
+        uid: 卡片 UID（防複製）
+
     Returns:
         角色分配結果
-        
+
     Raises:
         ValueError: 驗證失敗或卡片無效
     """
-    # 驗證 hash
-    if not verify_nfc_hash(card_id, secret_hash):
-        raise ValueError("卡片驗證失敗")
+    # UID 綁定驗證（防複製）
+    if not verify_nfc_signature(card_id, uid, signature):
+        raise ValueError("卡片驗證失敗：簽名不符或可能為偽造卡片")
     
     # 檢查玩家是否已有角色
     if player.role_type:
@@ -205,6 +209,7 @@ async def get_player_full_info(
         "id": player.id,
         "nickname": player.nickname,
         "is_host": player.is_host,
+        "is_ready": player.is_ready,
         "joined_at": player.joined_at,
         "role_type": player.role_type,
         "role_index": player.role_index,
@@ -224,6 +229,27 @@ async def get_player_full_info(
             })
     
     return result
+
+
+async def set_player_ready(
+    db: AsyncSession,
+    player: Player,
+    is_ready: bool,
+) -> Player:
+    """
+    設定玩家準備狀態
+
+    Args:
+        db: 資料庫 session
+        player: 玩家物件
+        is_ready: 是否準備
+
+    Returns:
+        更新後的玩家物件
+    """
+    player.is_ready = is_ready
+    await db.flush()
+    return player
 
 
 async def assign_role_manually(

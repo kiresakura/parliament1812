@@ -12,6 +12,7 @@ class WSEventType(str, Enum):
     # Server → Client
     PLAYER_JOIN = "player_join"
     PLAYER_LEAVE = "player_leave"
+    PLAYER_READY = "player_ready"
     PHASE_CHANGE = "phase_change"
     TIMER_SYNC = "timer_sync"
     PRIVATE_MESSAGE = "private_message"
@@ -48,6 +49,12 @@ class WSPlayerLeaveData(BaseModel):
     """玩家離開資料"""
     player_id: UUID
     nickname: str
+
+
+class WSPlayerReadyData(BaseModel):
+    """玩家準備狀態資料"""
+    player_id: str
+    is_ready: bool
 
 
 class WSPhaseChangeData(BaseModel):

@@ -13,9 +13,10 @@ class PlayerCreate(BaseModel):
 
 
 class NFCScanRequest(BaseModel):
-    """NFC 掃卡請求"""
+    """NFC 掃卡請求（UID 綁定防偽格式）"""
     card_id: str = Field(..., description="NFC 卡片 ID")
-    secret_hash: str = Field(..., description="秘密驗證碼")
+    signature: str = Field(..., description="防偽簽名")
+    uid: str = Field(..., description="卡片 UID（防複製）")
 
 
 class ManualRoleRequest(BaseModel):
@@ -33,6 +34,11 @@ class NFCScanResponse(BaseModel):
     role_description: str
 
 
+class PlayerReadyRequest(BaseModel):
+    """設定準備狀態請求"""
+    is_ready: bool = Field(..., description="是否準備就緒")
+
+
 class PlayerResponse(BaseSchema):
     """玩家資訊回應"""
     id: UUID
@@ -40,6 +46,7 @@ class PlayerResponse(BaseSchema):
     role_type: str | None = None
     role_index: int | None = None
     is_host: bool = False
+    is_ready: bool = False
     joined_at: datetime
 
 

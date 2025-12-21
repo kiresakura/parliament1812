@@ -249,7 +249,7 @@ async def notify_player_leave(
 ) -> None:
     """
     通知玩家離開
-    
+
     Args:
         room_code: 房間碼
         player_id: 玩家 ID
@@ -261,6 +261,29 @@ async def notify_player_leave(
         {
             "player_id": player_id,
             "nickname": nickname,
+        },
+    )
+
+
+async def notify_player_ready(
+    room_code: str,
+    player_id: str,
+    is_ready: bool,
+) -> None:
+    """
+    通知玩家準備狀態變更
+
+    Args:
+        room_code: 房間碼
+        player_id: 玩家 ID
+        is_ready: 是否準備
+    """
+    await manager.broadcast(
+        room_code,
+        WSEventType.PLAYER_READY,
+        {
+            "player_id": player_id,
+            "is_ready": is_ready,
         },
     )
 

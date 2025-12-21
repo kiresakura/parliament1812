@@ -13,10 +13,11 @@ from app.schemas import (
     PlayerDetailResponse,
     SecretMissionResponse,
     RoleInfo,
+    PlayerReadyRequest,
 )
 from app.services import room_service, player_service
 from app.data.roles import ROLES, get_role_info
-from app.websocket import notify_player_join
+from app.websocket import notify_player_join, notify_player_ready
 
 
 router = APIRouter(tags=["players"])
@@ -35,17 +36,19 @@ async def scan_nfc(
 ) -> dict:
     """
     NFC 掃卡分配角色
-    
+
     玩家掃描 NFC 卡片後，根據卡片 ID 分配對應的角色和秘密任務。
-    
-    NFC URL 格式：`parliament1812://role?id={card_id}&secret={hash}`
-    
+
+    NFC URL 格式：`parliament1812://role?id={card_id}&sig={signature}&uid={uid}`
+
+    使用 UID 綁定防止卡片複製。
+
     Args:
         code: 房間碼
-        request: NFC 掃卡請求（card_id, secret_hash）
+        request: NFC 掃卡請求（card_id, signature, uid）
         player_id: 玩家 ID
         db: 資料庫 session
-        
+
     Returns:
         角色分配結果（包含角色資訊，但不包含秘密任務）
     """
@@ -78,7 +81,8 @@ async def scan_nfc(
             db=db,
             player=player,
             card_id=request.card_id,
-            secret_hash=request.secret_hash,
+            signature=request.signature,
+            uid=request.uid,
         )
     except ValueError as e:
         raise HTTPException(
@@ -229,6 +233,7 @@ async def get_room_players(
             role_type=p.role_type,
             role_index=p.role_index,
             is_host=p.is_host,
+            is_ready=p.is_ready,
             joined_at=p.joined_at,
         )
         for p in players
@@ -270,10 +275,72 @@ async def get_player_detail(
         role_type=info.get("role_type"),
         role_index=info.get("role_index"),
         is_host=info["is_host"],
+        is_ready=info.get("is_ready", False),
         joined_at=info["joined_at"],
         role_name=info.get("role_name"),
         role_description=info.get("role_description"),
         role_background=info.get("role_background"),
+    )
+
+
+@router.put(
+    "/api/players/{player_id}/ready",
+    response_model=PlayerResponse,
+    summary="設定玩家準備狀態",
+)
+async def set_player_ready(
+    player_id: UUID,
+    request: PlayerReadyRequest,
+    db: AsyncSession = Depends(get_db),
+) -> PlayerResponse:
+    """
+    設定玩家的準備狀態
+
+    玩家在確認角色後，需要點擊「準備」按鈕確認準備狀態。
+    當所有玩家都準備完成後，房主才能開始遊戲。
+
+    Args:
+        player_id: 玩家 ID
+        request: 準備狀態請求
+        db: 資料庫 session
+
+    Returns:
+        更新後的玩家資訊
+    """
+    player = await player_service.get_player_by_id(db, player_id)
+    if not player:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到此玩家",
+        )
+
+    # 檢查玩家是否已分配角色
+    if not player.role_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="請先掃描 NFC 卡片分配角色",
+        )
+
+    # 更新準備狀態
+    player = await player_service.set_player_ready(db, player, request.is_ready)
+
+    # 取得房間代碼並通知其他玩家
+    room = await room_service.get_room_by_id(db, player.room_id)
+    if room:
+        await notify_player_ready(
+            room_code=room.code,
+            player_id=str(player.id),
+            is_ready=player.is_ready,
+        )
+
+    return PlayerResponse(
+        id=player.id,
+        nickname=player.nickname,
+        role_type=player.role_type,
+        role_index=player.role_index,
+        is_host=player.is_host,
+        is_ready=player.is_ready,
+        joined_at=player.joined_at,
     )
 
 
