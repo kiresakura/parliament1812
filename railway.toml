@@ -9,8 +9,8 @@ dockerfilePath = "shared/backend/Dockerfile"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
 
-# 啟動伺服器 (先執行資料庫遷移)
-startCommand = "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+# 啟動伺服器
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
 # 重啟策略
 restartPolicyType = "on_failure"
