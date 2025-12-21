@@ -237,6 +237,72 @@ async def set_timer(
     )
 
 
+@router.post("/{code}/start", response_model=RoomResponse)
+async def start_game(
+    code: str,
+    player_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> RoomResponse:
+    """
+    開始遊戲（僅主持人）
+
+    驗證條件：
+    - 必須是主持人
+    - 所有玩家必須已分配角色
+    - 所有玩家必須已準備
+
+    Args:
+        code: 6 位房間碼
+        player_id: 玩家 ID（需為主持人）
+        db: 資料庫 session
+
+    Returns:
+        更新後的房間資訊
+    """
+    room = await room_service.get_room_by_code(db, code)
+
+    if not room:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到此房間",
+        )
+
+    # 檢查是否為主持人
+    host = next((p for p in room.players if p.id == player_id and p.is_host), None)
+    if not host:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有主持人可以開始遊戲",
+        )
+
+    # 檢查房間狀態
+    if room.phase != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="遊戲已經開始",
+        )
+
+    try:
+        # 切換到準備階段（phase 2），內部會驗證所有玩家已準備
+        room = await room_service.change_phase(db, room, 2)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    return RoomResponse(
+        id=room.id,
+        code=room.code,
+        status=room.status,
+        phase=room.phase,
+        current_round=room.current_round,
+        timer_end_at=room.timer_end_at,
+        created_at=room.created_at,
+        player_count=len(room.players),
+    )
+
+
 @router.delete("/{code}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_room(
     code: str,
