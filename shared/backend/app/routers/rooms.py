@@ -15,6 +15,7 @@ from app.schemas import (
     PlayerBrief,
 )
 from app.services import room_service
+from app.websocket.handlers import notify_phase_change
 
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
@@ -290,6 +291,14 @@ async def start_game(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+    # 廣播 phase_changed 事件通知所有客戶端
+    await notify_phase_change(
+        room_code=code,
+        phase=room.phase,
+        phase_name="preparing",
+        status=room.status,
+    )
 
     return RoomResponse(
         id=room.id,
