@@ -216,9 +216,10 @@ async def validate_game_start(room: Room) -> None:
     """
     players = room.players or []
 
-    # 至少需要 2 名玩家
-    if len(players) < 2:
-        raise ValueError("至少需要 2 名玩家才能開始遊戲")
+    # 至少需要 1 名玩家（開發/測試模式允許單人測試）
+    # TODO: 正式版改回 2 名玩家
+    if len(players) < 1:
+        raise ValueError("至少需要 1 名玩家才能開始遊戲")
 
     # 檢查每個玩家
     not_ready_players = []
