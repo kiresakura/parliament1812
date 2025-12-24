@@ -79,6 +79,7 @@ async def get_room(
             nickname=p.nickname,
             role_type=p.role_type,
             is_host=p.is_host,
+            is_ready=p.is_ready,
         )
         for p in room.players
     ]

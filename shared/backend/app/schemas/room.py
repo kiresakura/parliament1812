@@ -50,6 +50,7 @@ class PlayerBrief(BaseSchema):
     nickname: str
     role_type: str | None = None
     is_host: bool = False
+    is_ready: bool = False
 
 
 # 更新前向引用
