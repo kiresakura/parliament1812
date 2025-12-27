@@ -177,7 +177,29 @@ async def change_phase(
         )
     
     room = await room_service.change_phase(db, room, request.phase)
-    
+
+    # 廣播 phase_change 事件通知所有客戶端
+    phase_names = {
+        1: "waiting",
+        2: "preparing",
+        3: "conspiracy",
+        4: "debate",
+        5: "event1",
+        6: "debate2",
+        7: "event2",
+        8: "vote_round1",
+        9: "final_debate",
+        10: "vote_round2",
+        11: "reveal",
+        12: "finished",
+    }
+    await notify_phase_change(
+        room_code=code,
+        phase=room.phase,
+        phase_name=phase_names.get(room.phase, "unknown"),
+        status=room.status,
+    )
+
     return RoomResponse(
         id=room.id,
         code=room.code,
