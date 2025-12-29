@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.schemas.websocket import WSEventType, WSMessage
 from app.websocket.manager import manager
+from app.services import room_service, vote_service, game_flow_service
 
 
 async def handle_websocket_message(
@@ -143,7 +144,7 @@ async def handle_cast_vote(
 ) -> None:
     """
     處理投票
-    
+
     Args:
         room_code: 房間碼
         player_id: 玩家 ID
@@ -152,7 +153,7 @@ async def handle_cast_vote(
     """
     vote_round = data.get("round")
     choice = data.get("choice")
-    
+
     if not vote_round or not choice:
         await manager.send_to_player(
             room_code,
@@ -164,21 +165,66 @@ async def handle_cast_vote(
             },
         )
         return
-    
-    # TODO: 儲存投票到資料庫
-    # TODO: 計算投票進度並廣播
-    
-    # 廣播投票進度更新
+
+    # 取得房間
+    room = await room_service.get_room_by_code(db, room_code)
+    if not room:
+        await manager.send_to_player(
+            room_code,
+            player_id,
+            WSEventType.ERROR,
+            {
+                "code": "ROOM_NOT_FOUND",
+                "message": "找不到此房間",
+            },
+        )
+        return
+
+    # 儲存投票到資料庫
+    try:
+        vote = await vote_service.cast_vote(
+            db=db,
+            room_id=room.id,
+            player_id=UUID(player_id),
+            vote_round=vote_round,
+            choice=choice,
+        )
+        await db.commit()
+    except ValueError as e:
+        await manager.send_to_player(
+            room_code,
+            player_id,
+            WSEventType.ERROR,
+            {
+                "code": "VOTE_FAILED",
+                "message": str(e),
+            },
+        )
+        return
+
+    # 取得投票進度並廣播
+    progress = await vote_service.get_vote_progress(db, room.id, vote_round)
     await manager.broadcast(
         room_code,
         WSEventType.VOTE_UPDATE,
-        {
-            "round": vote_round,
-            "progress": 0.5,  # TODO: 計算實際進度
-            "voted_count": 10,
-            "total_players": 20,
-        },
+        progress,
     )
+
+    # 如果投票完成，廣播結果並觸發自動階段推進
+    if progress["is_complete"]:
+        if vote_round == 1:
+            result = await vote_service.get_round1_result(db, room.id)
+        else:
+            result = await vote_service.get_round2_result(db, room.id)
+
+        await manager.broadcast(
+            room_code,
+            WSEventType.VOTE_RESULT,
+            result,
+        )
+
+        # 觸發自動階段推進
+        await game_flow_service.check_vote_completion(room_code, room.id)
 
 
 async def handle_request_sync(
@@ -219,16 +265,18 @@ async def notify_player_join(
     nickname: str,
     role_type: str | None = None,
     is_host: bool = False,
+    is_ready: bool = False,
 ) -> None:
     """
     通知玩家加入
-    
+
     Args:
         room_code: 房間碼
         player_id: 玩家 ID
         nickname: 玩家暱稱
         role_type: 角色類型
         is_host: 是否為主持人
+        is_ready: 是否已準備
     """
     await manager.broadcast(
         room_code,
@@ -238,6 +286,7 @@ async def notify_player_join(
             "nickname": nickname,
             "role_type": role_type,
             "is_host": is_host,
+            "is_ready": is_ready,
         },
     )
 
@@ -316,23 +365,23 @@ async def notify_phase_change(
 
 async def notify_timer_sync(
     room_code: str,
-    end_at: datetime | None,
-    remaining_seconds: int,
+    end_at: str | None,
+    duration: int,
 ) -> None:
     """
     同步計時器
-    
+
     Args:
         room_code: 房間碼
-        end_at: 結束時間
-        remaining_seconds: 剩餘秒數
+        end_at: 結束時間 (ISO 格式字串)
+        duration: 持續時間（秒）
     """
     await manager.broadcast(
         room_code,
         WSEventType.TIMER_SYNC,
         {
-            "end_at": end_at.isoformat() if end_at else None,
-            "remaining_seconds": remaining_seconds,
+            "end_at": end_at,
+            "duration": duration,
         },
     )
 
@@ -340,8 +389,8 @@ async def notify_timer_sync(
 async def notify_event_trigger(
     room_code: str,
     event_id: str,
-    title: str,
-    description: str,
+    event_title: str,
+    event_description: str,
     effect_type: str | None = None,
 ) -> None:
     """
@@ -350,8 +399,8 @@ async def notify_event_trigger(
     Args:
         room_code: 房間碼
         event_id: 事件 ID
-        title: 事件標題
-        description: 事件描述
+        event_title: 事件標題
+        event_description: 事件描述
         effect_type: 效果類型
     """
     await manager.broadcast(
@@ -359,9 +408,32 @@ async def notify_event_trigger(
         WSEventType.EVENT_TRIGGER,
         {
             "event_id": event_id,
-            "title": title,
-            "description": description,
+            "event_title": event_title,
+            "event_description": event_description,
             "effect_type": effect_type,
+        },
+    )
+
+
+async def notify_vote_result(
+    room_code: str,
+    round_num: int,
+    results: dict,
+) -> None:
+    """
+    通知投票結果
+
+    Args:
+        room_code: 房間碼
+        round_num: 投票輪次
+        results: 投票結果
+    """
+    await manager.broadcast(
+        room_code,
+        WSEventType.VOTE_RESULT,
+        {
+            "round": round_num,
+            "results": results,
         },
     )
 
