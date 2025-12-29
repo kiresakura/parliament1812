@@ -185,6 +185,14 @@ async def get_round2_result(
     Returns:
         第二輪投票結果（包含玩家名單）
     """
+    # 投票選項定義
+    VOTE_OPTIONS = {
+        "A": {"title": "禁止機器", "description": "立法禁止工廠使用省力機器"},
+        "B": {"title": "保護財產", "description": "嚴厲打擊破壞機器的暴民"},
+        "C": {"title": "折衷改革", "description": "允許機器但立法保障工人權益"},
+        "D": {"title": "皇家調查", "description": "由皇室調查委員會處理"},
+    }
+
     # 取得所有第二輪投票（含玩家資訊）
     result = await db.execute(
         select(Vote)
@@ -201,11 +209,34 @@ async def get_round2_result(
     # 統計各選項和投票玩家
     results: dict[str, list[str]] = {"A": [], "B": [], "C": [], "D": []}
     counts = {"A": 0, "B": 0, "C": 0, "D": 0}
+    # 記錄玩家ID和選擇的對應關係
+    voters: dict[str, list[dict]] = {"A": [], "B": [], "C": [], "D": []}
 
     for vote in votes:
         if vote.choice in results:
             results[vote.choice].append(vote.player.nickname)
             counts[vote.choice] += 1
+            voters[vote.choice].append({
+                "player_id": str(vote.player_id),
+                "nickname": vote.player.nickname,
+            })
+
+    total = len(votes)
+
+    # 建立 iOS 相容的選項陣列格式
+    options = []
+    for letter in ["A", "B", "C", "D"]:
+        count = counts[letter]
+        percentage = round(count / total * 100, 1) if total > 0 else 0.0
+        options.append({
+            "option_id": letter,
+            "letter": letter,
+            "title": VOTE_OPTIONS[letter]["title"],
+            "description": VOTE_OPTIONS[letter]["description"],
+            "count": count,
+            "percentage": percentage,
+            "voters": voters[letter],
+        })
 
     # 找出最高票
     max_count = max(counts.values()) if counts else 0
@@ -217,10 +248,12 @@ async def get_round2_result(
 
     return {
         "round": 2,
-        "total_votes": len(votes),
-        "results": results,
-        "counts": counts,
+        "total_votes": total,
+        "results": results,  # 保持向後相容
+        "counts": counts,    # 保持向後相容
+        "options": options,  # iOS 相容的陣列格式
         "winner": winner,
+        "winning_option": winner,  # iOS 使用的欄位名稱
         "is_complete": progress["is_complete"],
     }
 
