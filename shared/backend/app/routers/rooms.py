@@ -15,7 +15,6 @@ from app.schemas import (
     PlayerBrief,
 )
 from app.services import room_service, game_flow_service
-from app.websocket.handlers import notify_phase_change
 
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
@@ -150,24 +149,27 @@ async def change_phase(
 ) -> RoomResponse:
     """
     切換遊戲階段（僅主持人）
-    
+
+    使用 game_flow_service.advance_to_phase() 來切換階段，
+    這會正確設定計時器並執行階段特定邏輯（如事件觸發、投票初始化等）。
+
     Args:
         code: 6 位房間碼
         request: 切換階段請求
         player_id: 玩家 ID（需為主持人）
         db: 資料庫 session
-        
+
     Returns:
         更新後的房間資訊
     """
     room = await room_service.get_room_by_code(db, code)
-    
+
     if not room:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="找不到此房間",
         )
-    
+
     # 檢查是否為主持人
     host = next((p for p in room.players if p.id == player_id and p.is_host), None)
     if not host:
@@ -175,30 +177,23 @@ async def change_phase(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="只有主持人可以切換階段",
         )
-    
-    room = await room_service.change_phase(db, room, request.phase)
 
-    # 廣播 phase_change 事件通知所有客戶端
-    phase_names = {
-        1: "waiting",
-        2: "preparing",
-        3: "conspiracy",
-        4: "debate",
-        5: "event1",
-        6: "debate2",
-        7: "event2",
-        8: "vote_round1",
-        9: "final_debate",
-        10: "vote_round2",
-        11: "reveal",
-        12: "finished",
-    }
-    await notify_phase_change(
+    room_id = room.id
+
+    # 使用 game_flow_service 來切換階段，這會：
+    # 1. 更新資料庫中的階段和狀態
+    # 2. 設定計時器 (timer_end_at)
+    # 3. 廣播 phase_change 和 timer_sync 事件
+    # 4. 執行階段特定邏輯（事件觸發、投票初始化等）
+    # 5. 啟動自動推進計時器
+    await game_flow_service.advance_to_phase(
         room_code=code,
-        phase=room.phase,
-        phase_name=phase_names.get(room.phase, "unknown"),
-        status=room.status,
+        room_id=room_id,
+        phase=request.phase,
     )
+
+    # 重新取得更新後的房間資訊
+    room = await room_service.get_room_by_code(db, code)
 
     return RoomResponse(
         id=room.id,

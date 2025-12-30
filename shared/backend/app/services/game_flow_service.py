@@ -324,7 +324,7 @@ async def calculate_final_results(
                 "data": {
                     "round1": round1_result,
                     "round2": round2_result,
-                    "winning_choice": round2_result.get("winning_choice") if round2_result else None,
+                    "winning_option": round2_result.get("winning_option") if round2_result else None,
                 },
             },
         )
