@@ -71,7 +71,7 @@ class Room(Base):
         default=0,
     )
     timer_end_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
