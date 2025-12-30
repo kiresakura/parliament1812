@@ -1,6 +1,6 @@
 """私訊模型"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import String, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
@@ -55,8 +55,8 @@ class PrivateMessage(Base):
         default=False,
     )
     sent_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
     )
     
     # 關聯

@@ -1,6 +1,6 @@
 """玩家模型"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from sqlalchemy import String, DateTime, Integer, Boolean, ForeignKey
@@ -78,8 +78,8 @@ class Player(Base):
         default=False,
     )
     joined_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
     )
     
     # 關聯

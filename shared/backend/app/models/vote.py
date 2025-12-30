@@ -1,6 +1,6 @@
 """投票模型"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from sqlalchemy import String, DateTime, Integer, ForeignKey, UniqueConstraint
@@ -62,8 +62,8 @@ class Vote(Base):
         nullable=True,
     )
     voted_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
     )
     
     # 關聯

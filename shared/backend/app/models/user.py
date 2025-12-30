@@ -1,6 +1,6 @@
 """用戶模型"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
@@ -36,8 +36,8 @@ class User(Base):
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
     )
     
     # 關聯
