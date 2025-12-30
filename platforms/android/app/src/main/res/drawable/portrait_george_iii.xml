@@ -9,12 +9,11 @@
                 android:startColor="#FFD700"
                 android:centerColor="#DAA520"
                 android:endColor="#B8860B"/>
-            <size android:width="200dp" android:height="240dp"/>
         </shape>
     </item>
 
     <!-- Secondary frame layer for royal effect -->
-    <item android:left="4dp" android:top="4dp" android:right="4dp" android:bottom="4dp">
+    <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
         <shape android:shape="oval">
             <gradient
                 android:type="linear"
@@ -26,30 +25,21 @@
     </item>
 
     <!-- Inner dark background -->
-    <item android:left="10dp" android:top="10dp" android:right="10dp" android:bottom="10dp">
+    <item android:left="6dp" android:top="6dp" android:right="6dp" android:bottom="6dp">
         <shape android:shape="oval">
-            <gradient
-                android:type="radial"
-                android:gradientRadius="120dp"
-                android:startColor="#2D2040"
-                android:endColor="#1A1028"/>
+            <solid android:color="#2D2040"/>
         </shape>
     </item>
 
-    <!-- Character accent glow (King's royal gold/crimson) -->
-    <item android:left="18dp" android:top="18dp" android:right="18dp" android:bottom="18dp">
-        <shape android:shape="oval">
-            <gradient
-                android:type="radial"
-                android:gradientRadius="100dp"
-                android:startColor="#8B0000"
-                android:centerColor="#5C1A2A"
-                android:endColor="#3D1020"/>
-        </shape>
+    <!-- Character portrait image -->
+    <item android:left="8dp" android:top="8dp" android:right="8dp" android:bottom="8dp">
+        <bitmap
+            android:src="@drawable/img_portrait_george_iii"
+            android:gravity="fill"/>
     </item>
 
     <!-- Inner royal highlight rim -->
-    <item android:left="8dp" android:top="8dp" android:right="8dp" android:bottom="8dp">
+    <item android:left="6dp" android:top="6dp" android:right="6dp" android:bottom="6dp">
         <shape android:shape="oval">
             <stroke android:width="3dp" android:color="#FFD70080"/>
         </shape>

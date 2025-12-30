@@ -14,13 +14,13 @@ data class Role(
 ) {
     val emoji: String
         get() = when (id) {
-            "worker" -> "🔨"
-            "factory_owner" -> "🏭"
-            "luddite" -> "⚔️"
-            "reformer" -> "📜"
-            "mp" -> "🎩"
-            "george_iii" -> "👑"
-            else -> "❓"
+            "worker" -> "W"
+            "factory_owner" -> "F"
+            "luddite" -> "L"
+            "reformer" -> "R"
+            "mp" -> "M"
+            "george_iii" -> "G"
+            else -> "?"
         }
 }
 

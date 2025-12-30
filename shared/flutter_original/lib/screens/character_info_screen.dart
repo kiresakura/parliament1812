@@ -227,7 +227,7 @@ class _CharacterInfoScreenState extends State<CharacterInfoScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (character.isSpecial) ...[
-                  Icon(Icons.star, color: AppTheme.accentGold, size: 18),
+                  const Icon(Icons.star, color: AppTheme.accentGold, size: 18),
                   const SizedBox(width: 8),
                 ],
                 Column(
@@ -242,7 +242,7 @@ class _CharacterInfoScreenState extends State<CharacterInfoScreen>
                         letterSpacing: 2,
                       ),
                     ),
-                    Text(
+                    const Text(
                       'CHARACTER INFO',
                       style: TextStyle(
                         fontFamily: 'Georgia',
@@ -255,7 +255,7 @@ class _CharacterInfoScreenState extends State<CharacterInfoScreen>
                 ),
                 if (character.isSpecial) ...[
                   const SizedBox(width: 8),
-                  Icon(Icons.star, color: AppTheme.accentGold, size: 18),
+                  const Icon(Icons.star, color: AppTheme.accentGold, size: 18),
                 ],
               ],
             ),
@@ -430,7 +430,7 @@ class _CharacterInfoScreenState extends State<CharacterInfoScreen>
         // 英文名
         Text(
           character.nameEnglish.toUpperCase(),
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Georgia',
             fontSize: 14,
             color: AppTheme.textSecondary,
@@ -743,16 +743,16 @@ class _CharacterInfoScreenState extends State<CharacterInfoScreen>
             Navigator.pop(context, character);
           },
           borderRadius: BorderRadius.circular(12),
-          child: Row(
+          child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              Icon(
                 Icons.check_circle_outline,
                 color: Colors.white,
                 size: 22,
               ),
-              const SizedBox(width: 10),
-              const Text(
+              SizedBox(width: 10),
+              Text(
                 '選擇此角色',
                 style: TextStyle(
                   fontFamily: 'Georgia',

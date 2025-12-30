@@ -57,24 +57,30 @@ class ConnectionManager:
     async def _listen_messages(self) -> None:
         """監聽 Redis Pub/Sub 訊息"""
         if not self._pubsub:
+            print("[WS Manager] _listen_messages: No pubsub, returning", flush=True)
             return
-        
+
+        print("[WS Manager] _listen_messages: Started listening for Redis messages", flush=True)
+
         try:
             async for message in self._pubsub.listen():
+                print(f"[WS Manager] Redis message received: type={message.get('type')}", flush=True)
                 if message["type"] == "pmessage":
                     # 解析頻道名稱取得房間碼
                     channel = message["channel"]
                     if isinstance(channel, bytes):
                         channel = channel.decode("utf-8")
-                    
+
                     room_code = channel.replace("room:", "")
                     data = message["data"]
                     if isinstance(data, bytes):
                         data = data.decode("utf-8")
-                    
+
+                    print(f"[WS Manager] Broadcasting to room {room_code}, data length: {len(data)}", flush=True)
                     # 廣播給該房間的所有連線
                     await self._broadcast_local(room_code, data)
         except asyncio.CancelledError:
+            print("[WS Manager] _listen_messages: Cancelled", flush=True)
             pass
     
     async def connect(
@@ -85,20 +91,21 @@ class ConnectionManager:
     ) -> None:
         """
         建立 WebSocket 連線
-        
+
         Args:
             websocket: WebSocket 連線物件
             room_code: 房間碼
             player_id: 玩家 ID
         """
         await websocket.accept()
-        
+
         # 初始化房間連線字典
         if room_code not in self._connections:
             self._connections[room_code] = {}
-        
+
         # 儲存連線
         self._connections[room_code][player_id] = websocket
+        print(f"[WS Manager] connect: Player {player_id} connected to room {room_code}. Total connections in room: {len(self._connections[room_code])}", flush=True)
     
     def disconnect(
         self,
@@ -107,16 +114,19 @@ class ConnectionManager:
     ) -> None:
         """
         斷開 WebSocket 連線
-        
+
         Args:
             room_code: 房間碼
             player_id: 玩家 ID
         """
         if room_code in self._connections:
             self._connections[room_code].pop(player_id, None)
+            remaining = len(self._connections[room_code])
+            print(f"[WS Manager] disconnect: Player {player_id} disconnected from room {room_code}. Remaining: {remaining}", flush=True)
             # 如果房間沒有連線了，移除房間
             if not self._connections[room_code]:
                 del self._connections[room_code]
+                print(f"[WS Manager] disconnect: Room {room_code} removed (no more connections)", flush=True)
     
     async def _broadcast_local(
         self,
@@ -125,21 +135,25 @@ class ConnectionManager:
     ) -> None:
         """
         本地廣播（只廣播給此伺服器的連線）
-        
+
         Args:
             room_code: 房間碼
             message: JSON 訊息字串
         """
         if room_code not in self._connections:
+            print(f"[WS Manager] _broadcast_local: Room {room_code} not in connections. Available rooms: {list(self._connections.keys())}", flush=True)
             return
-        
+
         # 複製連線列表避免迭代時修改
         connections = list(self._connections[room_code].items())
-        
+        print(f"[WS Manager] _broadcast_local: Room {room_code} has {len(connections)} connections", flush=True)
+
         for player_id, websocket in connections:
             try:
                 await websocket.send_text(message)
-            except Exception:
+                print(f"[WS Manager] _broadcast_local: Sent to player {player_id}", flush=True)
+            except Exception as e:
+                print(f"[WS Manager] _broadcast_local: Failed to send to player {player_id}: {e}", flush=True)
                 # 連線已斷開，移除
                 self.disconnect(room_code, player_id)
     
@@ -152,24 +166,29 @@ class ConnectionManager:
     ) -> None:
         """
         廣播訊息到房間（透過 Redis Pub/Sub）
-        
+
         Args:
             room_code: 房間碼
             event_type: 事件類型
             data: 事件資料
             exclude_player: 要排除的玩家 ID（可選）
         """
+        event_type_str = event_type.value if isinstance(event_type, WSEventType) else event_type
+        print(f"[WS Manager] broadcast: room={room_code}, event_type={event_type_str}", flush=True)
+
         message = WSMessage(
-            type=event_type.value if isinstance(event_type, WSEventType) else event_type,
+            type=event_type_str,
             data=data,
             timestamp=datetime.utcnow(),
         )
-        
+
         # 序列化訊息
         message_json = message.model_dump_json()
-        
+        print(f"[WS Manager] broadcast: Publishing to Redis channel room:{room_code}", flush=True)
+
         # 發布到 Redis
         await redis_manager.publish(f"room:{room_code}", message_json)
+        print(f"[WS Manager] broadcast: Published successfully", flush=True)
     
     async def send_to_player(
         self,

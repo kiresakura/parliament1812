@@ -62,7 +62,7 @@ async def init_db() -> None:
 async def seed_missions() -> None:
     """
     種子資料：填充秘密任務表
-    如果表為空，則插入所有秘密任務資料
+    會檢查並補充所有缺少的秘密任務資料
     """
     from app.data.missions import SECRET_MISSIONS
     from app.models.secret_mission import SecretMission
@@ -70,17 +70,23 @@ async def seed_missions() -> None:
 
     async with async_session_maker() as session:
         try:
-            # 檢查是否已有資料
-            result = await session.execute(select(SecretMission).limit(1))
-            existing = result.scalar_one_or_none()
+            # 取得所有現有任務的 ID
+            result = await session.execute(select(SecretMission.id))
+            existing_ids = set(row[0] for row in result.fetchall())
 
-            if existing:
-                print("✅ 秘密任務資料已存在，跳過種子資料", flush=True)
+            # 找出缺少的任務
+            missing_missions = {
+                mid: mdata for mid, mdata in SECRET_MISSIONS.items()
+                if mdata["id"] not in existing_ids
+            }
+
+            if not missing_missions:
+                print(f"✅ 所有 {len(SECRET_MISSIONS)} 個秘密任務已存在", flush=True)
                 return
 
-            # 插入所有秘密任務
-            print(f"📝 正在填充 {len(SECRET_MISSIONS)} 個秘密任務...", flush=True)
-            for mission_id, mission_data in SECRET_MISSIONS.items():
+            # 插入缺少的秘密任務
+            print(f"📝 正在補充 {len(missing_missions)} 個缺少的秘密任務...", flush=True)
+            for mission_id, mission_data in missing_missions.items():
                 mission = SecretMission(
                     id=mission_data["id"],
                     role_type=mission_data["role_type"],
@@ -90,9 +96,10 @@ async def seed_missions() -> None:
                     points=mission_data.get("points", 50),
                 )
                 session.add(mission)
+                print(f"  + {mission_data['id']}: {mission_data['title']}", flush=True)
 
             await session.commit()
-            print(f"✅ 已成功填充 {len(SECRET_MISSIONS)} 個秘密任務", flush=True)
+            print(f"✅ 已成功補充 {len(missing_missions)} 個秘密任務", flush=True)
 
         except Exception as e:
             await session.rollback()

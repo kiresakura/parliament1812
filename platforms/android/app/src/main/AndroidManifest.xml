@@ -41,6 +41,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
+            <!-- NFC Tech Discovered (for reading NDEF) -->
+            <intent-filter>
+                <action android:name="android.nfc.action.TECH_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.nfc.action.TECH_DISCOVERED"
+                android:resource="@xml/nfc_tech_filter" />
+
             <!-- Deep Link -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -48,10 +58,6 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="parliament1812" />
             </intent-filter>
-
-            <meta-data
-                android:name="android.nfc.action.TECH_DISCOVERED"
-                android:resource="@xml/nfc_tech_filter" />
 
         </activity>
     </application>

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.parliament1812.R
+import com.parliament1812.data.models.*
 import com.parliament1812.data.remote.PlayerBrief
 import com.parliament1812.ui.components.*
 import com.parliament1812.ui.components.CharacterPortraitSmall
@@ -97,6 +98,7 @@ fun GameScreen(
     isHost: Boolean,
     onNavigateToMessages: () -> Unit,
     onNavigateToVote: (Int) -> Unit,
+    onNavigateToDebate: () -> Unit = {},
     onNavigateToHostPanel: () -> Unit,
     onNavigateToResult: () -> Unit,
     viewModel: GameViewModel = hiltViewModel()
@@ -172,6 +174,18 @@ fun GameScreen(
                 onHostPanelClick = onNavigateToHostPanel
             )
 
+            // Phase Progress Bar (shown during active game phases)
+            if (uiState.phase in 2..11) {
+                PhaseProgressBar(
+                    currentPhase = uiState.phase,
+                    timerEndAt = uiState.timerEndAt,
+                    timerDuration = uiState.timerDuration,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
             // Main Content
             LazyColumn(
                 modifier = Modifier
@@ -192,10 +206,7 @@ fun GameScreen(
                 // Current Event (if any)
                 uiState.currentEvent?.let { event ->
                     item {
-                        EventCard(
-                            title = event.title,
-                            description = event.description
-                        )
+                        EventCardFull(event = event)
                     }
                 }
 
@@ -241,6 +252,24 @@ fun GameScreen(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
         )
+
+        // Dice Roll Overlay for International Events (Phase 5 and 7)
+        DiceRollView(
+            value = uiState.diceRoll.value,
+            threshold = uiState.diceRoll.threshold,
+            triggered = uiState.diceRoll.triggered,
+            isVisible = uiState.diceRoll.isVisible,
+            onDismiss = { viewModel.dismissDiceRoll() },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Vote Progress Overlay
+        if (uiState.voteProgress.isActive) {
+            VoteProgressOverlay(
+                voteProgress = uiState.voteProgress,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -497,83 +526,6 @@ private fun MyRoleCompactCard(
 }
 
 @Composable
-private fun EventCard(
-    title: String,
-    description: String
-) {
-    val cardShape = CutCornerShape(topStart = 16.dp, bottomEnd = 16.dp)
-
-    // Pulsing animation for urgency
-    val infiniteTransition = rememberInfiniteTransition(label = "eventPulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.1f,
-        targetValue = 0.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 2.dp,
-                brush = Brush.linearGradient(listOf(Error, Error.copy(alpha = 0.5f), Error)),
-                shape = cardShape
-            ),
-        colors = CardDefaults.cardColors(containerColor = Error.copy(alpha = pulseAlpha)),
-        shape = cardShape
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "⚠", fontSize = 18.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "突發事件",
-                        color = Error,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-                    Text(
-                        text = "SUDDEN EVENT",
-                        color = Error.copy(alpha = 0.7f),
-                        fontSize = 9.sp,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            GoldDivider(modifier = Modifier.fillMaxWidth())
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = title,
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = description,
-                color = TextSecondary,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
-            )
-        }
-    }
-}
-
-@Composable
 private fun PhaseContentCard(
     phase: Int,
     onVoteClick: () -> Unit
@@ -786,7 +738,7 @@ private fun PlayerListItem(
                     }
                     if (player.isHost) {
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "👑", fontSize = 12.sp)
+                        Text(text = "◆", fontSize = 12.sp, color = Gold)
                     }
                 }
                 player.roleType?.let { roleType ->
@@ -902,4 +854,111 @@ private fun getRoleDisplayName(roleType: String): String = when (roleType) {
     "mp" -> "議員"
     "george" -> "喬治三世"
     else -> "未知"
+}
+
+/**
+ * Vote progress overlay showing real-time voting status
+ */
+@Composable
+private fun VoteProgressOverlay(
+    voteProgress: com.parliament1812.viewmodels.VoteProgressState,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .border(1.dp, Gold.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+            colors = CardDefaults.cardColors(containerColor = DarkBackground),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Title
+                Text(
+                    text = if (voteProgress.isAnonymous) "匿名投票中" else "記名投票中",
+                    color = Gold,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = if (voteProgress.round == 1) "ANONYMOUS VOTE" else "ROLL CALL VOTE",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    letterSpacing = 2.sp
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Progress ring animation
+                Box(
+                    modifier = Modifier.size(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        progress = { voteProgress.progress.toFloat() },
+                        modifier = Modifier.size(120.dp),
+                        color = Gold,
+                        strokeWidth = 8.dp,
+                        trackColor = CardBorder
+                    )
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${voteProgress.votedCount}/${voteProgress.totalPlayers}",
+                            color = TextPrimary,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "已投票",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Percentage
+                Text(
+                    text = "${(voteProgress.progress * 100).toInt()}%",
+                    color = Gold,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                // Winning result (when vote ended)
+                voteProgress.winningChoice?.let { winner ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    GoldDivider(modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "投票結果",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "選項 $winner 獲勝",
+                        color = Success,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
 }

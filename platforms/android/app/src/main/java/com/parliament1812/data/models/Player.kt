@@ -13,7 +13,7 @@ data class Player(
     @SerialName("is_ready") val isReady: Boolean = false,
     @SerialName("secret_mission_id") val secretMissionId: String? = null
 ) {
-    val hasRole: Boolean get() = roleType != null && roleIndex != null
+    val hasRole: Boolean get() = roleType != null
 
     val displayRoleName: String
         get() = when (roleType) {
@@ -28,12 +28,12 @@ data class Player(
 
     val roleEmoji: String
         get() = when (roleType) {
-            "worker" -> "🔨"
-            "factory_owner" -> "🏭"
-            "luddite" -> "⚔️"
-            "reformer" -> "📜"
-            "mp" -> "🎩"
-            "george_iii" -> "👑"
-            else -> "❓"
+            "worker" -> "W"
+            "factory_owner" -> "F"
+            "luddite" -> "L"
+            "reformer" -> "R"
+            "mp" -> "M"
+            "george_iii" -> "G"
+            else -> "?"
         }
 }

@@ -4,6 +4,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,8 +26,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.parliament1812.R
+import com.parliament1812.data.models.RoleDatabase
+import com.parliament1812.ui.components.AmbientParticles
 import com.parliament1812.ui.components.CharacterPortrait
 import com.parliament1812.ui.components.GoldDivider
+import com.parliament1812.ui.components.HexagonalPattern
+import com.parliament1812.ui.components.VignetteOverlay
 import com.parliament1812.ui.theme.*
 import com.parliament1812.viewmodels.PlayerViewModel
 
@@ -36,46 +43,20 @@ fun RoleCardScreen(
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
 
-    val roleColor = when (roleType) {
-        "worker" -> WorkerColor
-        "factory_owner" -> FactoryColor
-        "luddite" -> LudditeColor
-        "reformer" -> ReformerColor
-        "mp" -> MPColor
-        "george_iii" -> GeorgeIIIColor
-        else -> GoldMuted
-    }
+    // 從 RoleDatabase 獲取詳細角色資料
+    val roleData = RoleDatabase.getRoleByType(roleType)
+    val secretMission = RoleDatabase.getSecretMission(roleType, roleIndex - 1) // roleIndex 是 1-based
 
-    val roleName = when (roleType) {
-        "worker" -> "紡織工人"
-        "factory_owner" -> "工廠主"
-        "luddite" -> "盧德派"
-        "reformer" -> "改革者"
-        "mp" -> "議員"
-        "george_iii" -> "喬治三世"
-        else -> "未知角色"
-    }
-
-    val roleNameEn = when (roleType) {
-        "worker" -> "TEXTILE WORKER"
-        "factory_owner" -> "FACTORY OWNER"
-        "luddite" -> "LUDDITE"
-        "reformer" -> "REFORMER"
-        "mp" -> "MEMBER OF PARLIAMENT"
-        "george_iii" -> "KING GEORGE III"
-        else -> "UNKNOWN"
-    }
-
-    val roleDescription = when (roleType) {
-        "worker" -> "你是一名紡織工人，機器的出現威脅著你的生計。你需要為工人的權益發聲。"
-        "factory_owner" -> "你是一名工廠主，機器能為你帶來更多利潤。但你也需要考慮社會穩定。"
-        "luddite" -> "你是盧德運動的成員，堅信機器會毀滅工人的生活。你願意採取激進行動。"
-        "reformer" -> "你是一名改革者，相信透過立法可以在進步與保護之間找到平衡。"
-        "mp" -> "你是一名國會議員，需要在各方利益之間權衡，做出最終決定。"
-        "george_iii" -> "你是英國國王喬治三世，雖然精神狀態不穩定，但你的意見仍然舉足輕重。"
-        else -> "角色描述載入中..."
-    }
+    val roleColor = roleData?.color ?: GoldMuted
+    val roleName = roleData?.nameZh ?: "未知角色"
+    val roleNameEn = roleData?.nameEn ?: "UNKNOWN"
+    val characterName = roleData?.characterName ?: ""
+    val roleDescription = roleData?.description ?: "角色描述載入中..."
+    val roleQuote = roleData?.quote ?: ""
+    val roleBackground = roleData?.background ?: ""
+    val roleAbilities = roleData?.abilities ?: emptyList()
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Background Image
@@ -93,14 +74,34 @@ fun RoleCardScreen(
                 .background(DarkOverlay80)
         )
 
+        // Hexagonal Pattern
+        HexagonalPattern(
+            modifier = Modifier.fillMaxSize(),
+            hexSize = 45f,
+            color = roleColor.copy(alpha = 0.03f)
+        )
+
+        // Ambient Particles
+        AmbientParticles(
+            modifier = Modifier.fillMaxSize(),
+            particleCount = 15
+        )
+
+        // Vignette Effect
+        VignetteOverlay(
+            modifier = Modifier.fillMaxSize(),
+            intensity = 0.6f
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .systemBarsPadding()
+                .verticalScroll(scrollState)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Success Badge
             Row(
@@ -129,7 +130,7 @@ fun RoleCardScreen(
                 letterSpacing = 2.sp
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Role Card
             Card(
@@ -147,15 +148,13 @@ fun RoleCardScreen(
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Role Portrait - 文明6風格肖像
+                    // Role Portrait - 簡潔六邊形肖像框
                     CharacterPortrait(
                         roleType = roleType,
-                        size = 120.dp,
-                        showIcon = true,
-                        showGlow = true
+                        size = 120.dp
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Role Name
                     Text(
@@ -175,21 +174,31 @@ fun RoleCardScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Character Name with Age
+                    if (characterName.isNotEmpty()) {
+                        Text(
+                            text = "$characterName，${roleData?.age ?: 0}歲",
+                            fontSize = 14.sp,
+                            color = TextSecondary,
+                            fontFamily = FontFamily.Serif
+                        )
+                    }
+
                     Text(
                         text = "#${String.format("%02d", roleIndex)}",
-                        fontSize = 14.sp,
-                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        color = TextMuted,
                         fontFamily = FontFamily.Serif
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Decorative Divider
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Divider(
+                        HorizontalDivider(
                             modifier = Modifier.weight(1f),
                             color = roleColor.copy(alpha = 0.3f)
                         )
@@ -198,27 +207,96 @@ fun RoleCardScreen(
                             color = roleColor,
                             fontSize = 12.sp
                         )
-                        Divider(
+                        HorizontalDivider(
                             modifier = Modifier.weight(1f),
                             color = roleColor.copy(alpha = 0.3f)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Character Quote
+                    if (roleQuote.isNotEmpty()) {
+                        Text(
+                            text = "「$roleQuote」",
+                            fontSize = 14.sp,
+                            color = roleColor.copy(alpha = 0.9f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 22.sp,
+                            fontStyle = FontStyle.Italic,
+                            fontFamily = FontFamily.Serif
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
                     // Role Description
                     Text(
                         text = roleDescription,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         color = TextSecondary,
                         textAlign = TextAlign.Center,
-                        lineHeight = 24.sp,
-                        fontStyle = FontStyle.Italic
+                        lineHeight = 22.sp
                     )
 
-                    // Secret Mission (if loaded)
-                    uiState.secretMission?.let { mission ->
-                        Spacer(modifier = Modifier.height(24.dp))
+                    // Role Abilities Section
+                    if (roleAbilities.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Abilities Header
+                        Column {
+                            Text(
+                                text = "角色能力",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = roleColor
+                            )
+                            Text(
+                                text = "ABILITIES",
+                                fontSize = 9.sp,
+                                color = TextMuted,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Abilities List
+                        roleAbilities.forEachIndexed { index, ability ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                // 使用羅馬數字替代表情符號
+                                Text(
+                                    text = listOf("Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ").getOrElse(index) { "${index + 1}" },
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = roleColor,
+                                    modifier = Modifier.width(28.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = ability.name,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = ability.description,
+                                        fontSize = 12.sp,
+                                        color = TextMuted,
+                                        lineHeight = 18.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Secret Mission (from RoleDatabase if roleIndex matches)
+                    secretMission?.let { mission ->
+                        Spacer(modifier = Modifier.height(20.dp))
 
                         Card(
                             colors = CardDefaults.cardColors(
@@ -235,11 +313,6 @@ fun RoleCardScreen(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "🔒",
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
                                             text = "秘密任務",
@@ -254,6 +327,20 @@ fun RoleCardScreen(
                                             letterSpacing = 1.sp
                                         )
                                     }
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    // Mission Points Badge
+                                    Surface(
+                                        color = Gold.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(
+                                            text = "+${mission.points}分",
+                                            fontSize = 11.sp,
+                                            color = Gold,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
@@ -262,20 +349,104 @@ fun RoleCardScreen(
                                     fontWeight = FontWeight.Medium,
                                     color = TextPrimary
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = mission.description,
+                                    text = mission.description.trim(),
                                     fontSize = 13.sp,
                                     color = TextSecondary,
                                     lineHeight = 20.sp
                                 )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                // Success Condition
+                                Surface(
+                                    color = Success.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text(
+                                            text = "✓",
+                                            fontSize = 12.sp,
+                                            color = Success,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = "達成條件",
+                                                fontSize = 11.sp,
+                                                color = Success,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                text = mission.successCondition ?: "",
+                                                fontSize = 12.sp,
+                                                color = TextSecondary,
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Fallback: Server-loaded secret mission
+                    if (secretMission == null) {
+                        uiState.secretMission?.let { mission ->
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Gold.copy(alpha = 0.08f)
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, CardBorderGold, RoundedCornerShape(8.dp))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "秘密任務",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Gold
+                                        )
+                                        Text(
+                                            text = "SECRET MISSION",
+                                            fontSize = 9.sp,
+                                            color = TextMuted,
+                                            letterSpacing = 1.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = mission.title,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = TextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = mission.description,
+                                        fontSize = 13.sp,
+                                        color = TextSecondary,
+                                        lineHeight = 20.sp
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Bottom Quote
             Text(

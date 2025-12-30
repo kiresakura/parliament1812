@@ -73,7 +73,6 @@ actor APIService {
         request.httpMethod = "DELETE"
 
         let (_, response) = try await URLSession.shared.data(for: request)
-        // 204 No Content is expected, also accept 200-299
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             try validateResponse(response)
@@ -108,7 +107,7 @@ actor APIService {
         try validateResponse(response)
     }
 
-    /// 開始遊戲（僅房主）- 驗證所有玩家已準備
+    /// 開始遊戲（僅房主）
     func startGame(roomCode: String, playerId: String) async throws {
         var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/start")!
         components.queryItems = [URLQueryItem(name: "player_id", value: playerId)]
@@ -121,9 +120,66 @@ actor APIService {
         try validateResponse(response, data: data)
     }
 
+    // MARK: - Host Controls
+
+    /// 設定計時器（僅房主）
+    func setTimer(roomCode: String, minutes: Int, playerId: String) async throws -> String {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/timer")!
+        components.queryItems = [URLQueryItem(name: "player_id", value: playerId)]
+
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["duration_seconds": minutes * 60])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+
+        // Backend returns RoomResponse, extract timer_end_at from it
+        let result = try decoder.decode(Room.self, from: data)
+        return result.timerEndAt ?? ""
+    }
+
+    /// 取得可用的突發事件
+    func getAvailableEvents(roomCode: String) async throws -> [EventData] {
+        let url = URL(string: "\(baseURL)/api/events")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+        try validateResponse(response)
+        return try decoder.decode([EventData].self, from: data)
+    }
+
+    /// 觸發指定事件（僅房主）
+    func triggerEvent(roomCode: String, eventId: String, playerId: String) async throws -> EventData {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/event")!
+        components.queryItems = [URLQueryItem(name: "player_id", value: playerId)]
+
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["event_id": eventId])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+        return try decoder.decode(EventData.self, from: data)
+    }
+
+    /// 觸發隨機事件（僅房主）
+    func triggerRandomEvent(roomCode: String, playerId: String) async throws -> EventData {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/event/random")!
+        components.queryItems = [URLQueryItem(name: "player_id", value: playerId)]
+
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+        return try decoder.decode(EventData.self, from: data)
+    }
+
     // MARK: - NFC
 
-    /// NFC 掃卡驗證（UID 綁定防偽格式）
+    /// NFC 掃卡驗證
     func scanNFC(_ request: NFCScanRequest) async throws -> NFCScanResponse {
         var components = URLComponents(string: "\(baseURL)/api/rooms/\(request.roomCode)/scan-nfc")!
         components.queryItems = [URLQueryItem(name: "player_id", value: request.playerId)]
@@ -132,13 +188,11 @@ actor APIService {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        // UID 綁定防偽格式
         let body: [String: String] = [
             "card_id": request.cardId,
             "signature": request.signature,
             "uid": request.uid
         ]
-
         urlRequest.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
@@ -146,22 +200,14 @@ actor APIService {
         return try decoder.decode(NFCScanResponse.self, from: data)
     }
 
-    /// 手動角色分配（DEBUG/模擬器測試用）
-    /// - Parameters:
-    ///   - roomCode: 房間碼
-    ///   - playerId: 玩家 ID
-    ///   - roleCode: 角色代碼（如 W01, F02, L03, R04, M01）
-    /// - Returns: 角色分配結果
+    /// 手動角色分配（DEBUG用）
     func assignRoleManually(roomCode: String, playerId: String, roleCode: String) async throws -> NFCScanResponse {
         let url = URL(string: "\(baseURL)/api/rooms/\(roomCode)/assign-role-manual")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: String] = [
-            "player_id": playerId,
-            "role_code": roleCode
-        ]
+        let body: [String: String] = ["player_id": playerId, "role_code": roleCode]
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -187,6 +233,154 @@ actor APIService {
         return try decoder.decode(Role.self, from: data)
     }
 
+    // MARK: - Voting
+
+    /// 取得投票選項
+    func getVoteOptions(roomCode: String, includeHidden: Bool = false) async throws -> [VoteOption] {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/votes/options")!
+        components.queryItems = [URLQueryItem(name: "include_hidden", value: includeHidden ? "true" : "false")]
+        
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        try validateResponse(response)
+        return try decoder.decode([VoteOption].self, from: data)
+    }
+
+    /// 投票
+    func castVote(roomCode: String, playerId: String, round: Int, choice: String) async throws -> VoteResponse {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/votes")!
+        components.queryItems = [
+            URLQueryItem(name: "player_id", value: playerId),
+            URLQueryItem(name: "vote_round", value: String(round))
+        ]
+        
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["choice": choice])
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+        return try decoder.decode(VoteResponse.self, from: data)
+    }
+
+    /// 取得投票進度
+    func getVoteProgress(roomCode: String, round: Int) async throws -> VoteProgress {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/votes/progress")!
+        components.queryItems = [URLQueryItem(name: "vote_round", value: String(round))]
+        
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        try validateResponse(response)
+        return try decoder.decode(VoteProgress.self, from: data)
+    }
+
+    /// 取得投票結果
+    func getVoteResult(roomCode: String, round: Int) async throws -> VoteResult {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/votes/result")!
+        components.queryItems = [URLQueryItem(name: "vote_round", value: String(round))]
+        
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        try validateResponse(response)
+        return try decoder.decode(VoteResult.self, from: data)
+    }
+
+    /// 取得我的投票記錄
+    func getMyVote(roomCode: String, playerId: String, round: Int) async throws -> MyVoteResponse {
+        var components = URLComponents(string: "\(baseURL)/api/rooms/\(roomCode)/votes/my-vote")!
+        components.queryItems = [
+            URLQueryItem(name: "player_id", value: playerId),
+            URLQueryItem(name: "vote_round", value: String(round))
+        ]
+        
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        try validateResponse(response)
+        return try decoder.decode(MyVoteResponse.self, from: data)
+    }
+
+    // MARK: - Messages
+
+    /// 發送私訊
+    func sendMessage(roomCode: String, senderId: String, receiverId: String, content: String) async throws -> MessageResponse {
+        var components = URLComponents(string: "\(baseURL)/api/messages")!
+        components.queryItems = [
+            URLQueryItem(name: "sender_id", value: senderId),
+            URLQueryItem(name: "room_code", value: roomCode)
+        ]
+        
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: String] = ["receiver_id": receiverId, "content": content]
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+        return try decoder.decode(MessageResponse.self, from: data)
+    }
+
+    /// 取得私訊列表
+    func getMessages(roomCode: String, playerId: String, otherPlayerId: String? = nil) async throws -> MessageListResponse {
+        var components = URLComponents(string: "\(baseURL)/api/messages")!
+        var queryItems = [
+            URLQueryItem(name: "player_id", value: playerId),
+            URLQueryItem(name: "room_code", value: roomCode),
+            URLQueryItem(name: "limit", value: "50"),
+            URLQueryItem(name: "offset", value: "0")
+        ]
+        if let otherPlayerId = otherPlayerId {
+            queryItems.append(URLQueryItem(name: "other_player_id", value: otherPlayerId))
+        }
+        components.queryItems = queryItems
+        
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        try validateResponse(response)
+        return try decoder.decode(MessageListResponse.self, from: data)
+    }
+
+    /// 取得對話列表
+    func getConversations(roomCode: String, playerId: String) async throws -> ConversationsResponse {
+        var components = URLComponents(string: "\(baseURL)/api/messages/conversations")!
+        components.queryItems = [
+            URLQueryItem(name: "player_id", value: playerId),
+            URLQueryItem(name: "room_code", value: roomCode)
+        ]
+        
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        try validateResponse(response)
+        return try decoder.decode(ConversationsResponse.self, from: data)
+    }
+
+    /// 標記訊息為已讀
+    func markMessagesAsRead(playerId: String, senderId: String) async throws -> MarkReadResponse {
+        var components = URLComponents(string: "\(baseURL)/api/messages/read")!
+        components.queryItems = [
+            URLQueryItem(name: "player_id", value: playerId),
+            URLQueryItem(name: "sender_id", value: senderId)
+        ]
+        
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["message_ids": nil as [String]?])
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+        return try decoder.decode(MarkReadResponse.self, from: data)
+    }
+
+    /// 取得未讀訊息數量
+    func getUnreadCount(roomCode: String, playerId: String) async throws -> UnreadCountResponse {
+        var components = URLComponents(string: "\(baseURL)/api/messages/unread-count")!
+        components.queryItems = [
+            URLQueryItem(name: "player_id", value: playerId),
+            URLQueryItem(name: "room_code", value: roomCode)
+        ]
+        
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        try validateResponse(response)
+        return try decoder.decode(UnreadCountResponse.self, from: data)
+    }
+
     // MARK: - Helper
 
     private func validateResponse(_ response: URLResponse, data: Data? = nil) throws {
@@ -198,7 +392,6 @@ actor APIService {
         case 200...299:
             return
         case 400:
-            // Try to extract the actual error message from the response
             if let data = data,
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let detail = json["detail"] as? String {
@@ -228,20 +421,13 @@ enum APIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse:
-            return "無效的回應"
-        case .badRequest:
-            return "請求格式錯誤"
-        case .badRequestWithMessage(let message):
-            return message
-        case .unauthorized:
-            return "未授權"
-        case .notFound:
-            return "找不到資源"
-        case .serverError:
-            return "伺服器錯誤"
-        case .unknown(let code):
-            return "未知錯誤 (\(code))"
+        case .invalidResponse: return "無效的回應"
+        case .badRequest: return "請求格式錯誤"
+        case .badRequestWithMessage(let message): return message
+        case .unauthorized: return "未授權"
+        case .notFound: return "找不到資源"
+        case .serverError: return "伺服器錯誤"
+        case .unknown(let code): return "未知錯誤 (\(code))"
         }
     }
 }

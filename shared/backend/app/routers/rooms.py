@@ -14,7 +14,7 @@ from app.schemas import (
     TimerRequest,
     PlayerBrief,
 )
-from app.services import room_service
+from app.services import room_service, game_flow_service
 from app.websocket.handlers import notify_phase_change
 
 
@@ -306,22 +306,30 @@ async def start_game(
             detail="遊戲已經開始",
         )
 
-    try:
-        # 切換到準備階段（phase 2），內部會驗證所有玩家已準備
-        room = await room_service.change_phase(db, room, 2)
-    except ValueError as e:
+    # 驗證所有玩家已準備
+    all_ready = all(p.is_ready for p in room.players if not p.is_host)
+    if not all_ready and len(room.players) > 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="所有玩家必須準備就緒才能開始遊戲",
         )
 
-    # 廣播 phase_changed 事件通知所有客戶端
-    await notify_phase_change(
+    # 驗證所有玩家已分配角色
+    all_have_roles = all(p.role_type is not None for p in room.players)
+    if not all_have_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="所有玩家必須分配角色才能開始遊戲",
+        )
+
+    # 啟動自動遊戲流程（這會自動處理階段推進、計時器、事件觸發等）
+    await game_flow_service.start_game_flow(
         room_code=code,
-        phase=room.phase,
-        phase_name="preparing",
-        status=room.status,
+        room_id=room.id,
     )
+
+    # 重新取得更新後的房間資訊
+    room = await room_service.get_room_by_code(db, code)
 
     return RoomResponse(
         id=room.id,

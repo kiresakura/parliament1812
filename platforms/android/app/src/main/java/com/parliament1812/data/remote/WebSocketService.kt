@@ -35,6 +35,16 @@ sealed class WebSocketEvent {
 
     // Generic message event for handling various server messages
     data class GenericMessage(val type: String, val data: Map<String, String>?) : WebSocketEvent()
+
+    // Auto Game Flow Events
+    data class PhaseChanged(val phase: Int) : WebSocketEvent()
+    data class TimerSync(val endAt: Long, val duration: Int) : WebSocketEvent()
+    data class DiceRoll(val value: Int, val threshold: Int, val triggered: Boolean) : WebSocketEvent()
+    data class VoteStart(val round: Int, val isAnonymous: Boolean) : WebSocketEvent()
+    data class VoteUpdate(val round: Int, val votedCount: Int, val totalPlayers: Int, val progress: Double) : WebSocketEvent()
+    data class VoteResult(val round: Int, val percentages: Map<String, Double>, val winningChoice: String?) : WebSocketEvent()
+    data class EventTrigger(val eventId: String, val title: String, val description: String, val effectType: String?) : WebSocketEvent()
+    data class FinalResults(val data: Map<String, String>) : WebSocketEvent()
 }
 
 sealed class ConnectionState {
@@ -55,7 +65,10 @@ class WebSocketService @Inject constructor(
         isLenient = true
     }
 
-    private val _events = MutableSharedFlow<WebSocketEvent>()
+    private val _events = MutableSharedFlow<WebSocketEvent>(
+        replay = 1,
+        extraBufferCapacity = 10
+    )
     val events: SharedFlow<WebSocketEvent> = _events
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
@@ -130,19 +143,35 @@ class WebSocketService @Inject constructor(
         webSocket?.send(message)
     }
 
+    fun sendEventChoice(eventId: String, choiceId: String) {
+        sendMessage("event_choice", mapOf(
+            "event_id" to eventId,
+            "choice_id" to choiceId
+        ))
+    }
+
     private suspend fun handleMessage(text: String) {
         try {
             val jsonElement = json.parseToJsonElement(text)
             val type = jsonElement.jsonObject["type"]?.jsonPrimitive?.content
 
             when (type) {
-                "player_joined" -> {
+                "player_join", "player_joined" -> {
                     val data = jsonElement.jsonObject["data"]?.jsonObject
                     val playerId = data?.get("player_id")?.jsonPrimitive?.content
                     val nickname = data?.get("nickname")?.jsonPrimitive?.content
+                    val isHost = data?.get("is_host")?.jsonPrimitive?.content?.toBoolean() ?: false
+                    val isReady = data?.get("is_ready")?.jsonPrimitive?.content?.toBoolean() ?: false
+                    val roleType = data?.get("role_type")?.jsonPrimitive?.content
                     if (playerId != null && nickname != null) {
                         _events.emit(WebSocketEvent.PlayerJoined(
-                            Player(id = playerId, nickname = nickname)
+                            Player(
+                                id = playerId,
+                                nickname = nickname,
+                                isHost = isHost,
+                                isReady = isReady,
+                                roleType = roleType
+                            )
                         ))
                     }
                 }
@@ -180,9 +209,85 @@ class WebSocketService @Inject constructor(
                     Log.d(TAG, "Players updated event received")
                 }
 
-                // Handle game-related events as generic messages for GameViewModel
-                "phase_change", "timer_sync", "private_message", "event_trigger",
-                "vote_update", "vote_result" -> {
+                // Handle phase_change
+                "phase_change" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val phase = data?.get("phase")?.jsonPrimitive?.content?.toIntOrNull()
+                    phase?.let { _events.emit(WebSocketEvent.PhaseChanged(it)) }
+                }
+
+                // Handle timer_sync
+                "timer_sync" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val endAtStr = data?.get("end_at")?.jsonPrimitive?.content
+                    val duration = data?.get("duration")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    endAtStr?.let {
+                        try {
+                            val endAt = java.time.Instant.parse(it).toEpochMilli()
+                            _events.emit(WebSocketEvent.TimerSync(endAt, duration))
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to parse timer_sync end_at: $it", e)
+                        }
+                    }
+                }
+
+                // Handle dice_roll for international events
+                "dice_roll" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val value = data?.get("value")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    val threshold = data?.get("threshold")?.jsonPrimitive?.content?.toIntOrNull() ?: 4
+                    val triggered = data?.get("triggered")?.jsonPrimitive?.content?.toBoolean() ?: false
+                    _events.emit(WebSocketEvent.DiceRoll(value, threshold, triggered))
+                }
+
+                // Handle vote_start
+                "vote_start" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val round = data?.get("round")?.jsonPrimitive?.content?.toIntOrNull() ?: 1
+                    val isAnonymous = data?.get("is_anonymous")?.jsonPrimitive?.content?.toBoolean() ?: true
+                    _events.emit(WebSocketEvent.VoteStart(round, isAnonymous))
+                }
+
+                // Handle vote_update
+                "vote_update" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val round = data?.get("round")?.jsonPrimitive?.content?.toIntOrNull() ?: 1
+                    val votedCount = data?.get("voted_count")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    val totalPlayers = data?.get("total_players")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    val progress = data?.get("progress")?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0
+                    _events.emit(WebSocketEvent.VoteUpdate(round, votedCount, totalPlayers, progress))
+                }
+
+                // Handle vote_result
+                "vote_result" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val round = data?.get("round")?.jsonPrimitive?.content?.toIntOrNull() ?: 1
+                    val winningChoice = data?.get("winning_choice")?.jsonPrimitive?.content
+                    // Parse percentages (simplified - would need proper JSON parsing for nested objects)
+                    _events.emit(WebSocketEvent.VoteResult(round, emptyMap(), winningChoice))
+                }
+
+                // Handle event_trigger
+                "event_trigger" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val eventId = data?.get("event_id")?.jsonPrimitive?.content ?: ""
+                    val title = data?.get("event_title")?.jsonPrimitive?.content ?: ""
+                    val description = data?.get("event_description")?.jsonPrimitive?.content ?: ""
+                    val effectType = data?.get("effect_type")?.jsonPrimitive?.content
+                    _events.emit(WebSocketEvent.EventTrigger(eventId, title, description, effectType))
+                }
+
+                // Handle final_results
+                "final_results" -> {
+                    val data = jsonElement.jsonObject["data"]?.jsonObject
+                    val dataMap = data?.entries?.associate { entry ->
+                        entry.key to (entry.value.jsonPrimitive.content)
+                    } ?: emptyMap()
+                    _events.emit(WebSocketEvent.FinalResults(dataMap))
+                }
+
+                // Handle private_message as generic
+                "private_message" -> {
                     val data = jsonElement.jsonObject["data"]?.jsonObject
                     val dataMap = data?.entries?.associate { entry ->
                         entry.key to (entry.value.jsonPrimitive.content)

@@ -52,6 +52,11 @@ sealed class Screen(val route: String) {
     object Result : Screen("result/{roomCode}") {
         fun createRoute(roomCode: String) = "result/$roomCode"
     }
+
+    object Debate : Screen("debate/{roomCode}/{playerId}") {
+        fun createRoute(roomCode: String, playerId: String) =
+            "debate/$roomCode/$playerId"
+    }
 }
 
 @Composable
@@ -92,6 +97,7 @@ fun NavGraph(
             WaitingRoomScreen(
                 roomCode = roomCode,
                 isHost = isHost,
+                playerId = navigationState.playerId ?: "",
                 onNavigateToNFCScan = {
                     val playerId = navigationState.playerId ?: "temp-player-id"
                     navController.navigate(Screen.NFCScan.createRoute(roomCode, playerId))
@@ -179,6 +185,9 @@ fun NavGraph(
                 },
                 onNavigateToVote = { voteRound ->
                     navController.navigate(Screen.Vote.createRoute(roomCode, playerId, voteRound))
+                },
+                onNavigateToDebate = {
+                    navController.navigate(Screen.Debate.createRoute(roomCode, playerId))
                 },
                 onNavigateToHostPanel = {
                     navController.navigate(Screen.HostPanel.createRoute(roomCode, playerId))
@@ -275,6 +284,33 @@ fun NavGraph(
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
+                }
+            )
+        }
+
+        // Debate Screen
+        composable(
+            route = Screen.Debate.route,
+            arguments = listOf(
+                navArgument("roomCode") { type = NavType.StringType },
+                navArgument("playerId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val roomCode = backStackEntry.arguments?.getString("roomCode") ?: ""
+            val playerId = backStackEntry.arguments?.getString("playerId") ?: ""
+
+            DebateScreen(
+                roomCode = roomCode,
+                playerId = playerId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onVote = { approved ->
+                    // Handle vote submission
+                    navController.popBackStack()
+                },
+                onMenuClick = {
+                    // Show menu
                 }
             )
         }

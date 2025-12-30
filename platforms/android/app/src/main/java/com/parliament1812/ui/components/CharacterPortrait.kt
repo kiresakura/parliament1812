@@ -34,88 +34,57 @@ import com.parliament1812.R
 import com.parliament1812.ui.theme.*
 
 /**
- * CharacterPortrait - 文明6風格的角色肖像組件
+ * CharacterPortrait - 文明6風格的角色肖像組件（六邊形框架）
  *
- * 用於替代原本的 Emoji 顯示，提供更專業的視覺效果
+ * 用於顯示角色畫像，簡潔六邊形設計
  */
 @Composable
 fun CharacterPortrait(
     roleType: String,
     modifier: Modifier = Modifier,
-    size: Dp = 120.dp,
-    showIcon: Boolean = true,
-    showGlow: Boolean = true
+    size: Dp = 120.dp
 ) {
     val context = LocalContext.current
     val portraitRes = getPortraitResource(roleType)
-    val iconRes = getRoleIconResource(roleType)
-    val roleColor = getRoleColor(roleType)
 
     // Use rememberDrawablePainter for layer-list XML drawables
     val portraitDrawable = remember(portraitRes) {
         ContextCompat.getDrawable(context, portraitRes)
     }
-    val iconDrawable = remember(iconRes) {
-        ContextCompat.getDrawable(context, iconRes)
-    }
 
-    // Subtle pulsing glow animation
-    val infiniteTransition = rememberInfiniteTransition(label = "portraitGlow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowAlpha"
-    )
+    // Hexagonal shape for the portrait
+    val hexagonShape = remember { HexagonShape() }
 
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Outer glow effect
-        if (showGlow) {
-            Box(
-                modifier = Modifier
-                    .size(size * 1.1f)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                roleColor.copy(alpha = glowAlpha * 0.5f),
-                                roleColor.copy(alpha = glowAlpha * 0.2f),
-                                Color.Transparent
-                            )
+        // Simple gold border frame (hexagonal)
+        Box(
+            modifier = Modifier
+                .size(size)
+                .border(
+                    width = 3.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Gold,
+                            GoldDark,
+                            Gold
                         )
-                    )
-            )
-        }
-
-        // Portrait background with gold frame effect
-        portraitDrawable?.let { drawable ->
-            Image(
-                painter = rememberDrawablePainter(drawable = drawable),
-                contentDescription = "角色肖像背景",
-                modifier = Modifier
-                    .size(size)
-                    .shadow(8.dp, CircleShape)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        // Role icon overlay
-        if (showIcon) {
-            iconDrawable?.let { drawable ->
+                    ),
+                    shape = hexagonShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Portrait image clipped to hexagon
+            portraitDrawable?.let { drawable ->
                 Image(
                     painter = rememberDrawablePainter(drawable = drawable),
-                    contentDescription = "角色圖標",
+                    contentDescription = "角色肖像",
                     modifier = Modifier
-                        .size(size * 0.5f)
-                        .align(Alignment.Center),
-                    contentScale = ContentScale.Fit
+                        .size(size - 6.dp)
+                        .clip(hexagonShape),
+                    contentScale = ContentScale.Crop
                 )
             }
         }
@@ -123,7 +92,7 @@ fun CharacterPortrait(
 }
 
 /**
- * CharacterPortraitSmall - 小型版本用於列表和頭像
+ * CharacterPortraitSmall - 小型版本用於列表和頭像（六邊形版本）
  */
 @Composable
 fun CharacterPortraitSmall(
@@ -134,16 +103,14 @@ fun CharacterPortraitSmall(
 ) {
     val context = LocalContext.current
     val portraitRes = getPortraitResource(roleType)
-    val iconRes = getRoleIconResource(roleType)
-    val roleColor = getRoleColor(roleType)
 
     // Use rememberDrawablePainter for layer-list XML drawables
     val portraitDrawable = remember(portraitRes) {
         ContextCompat.getDrawable(context, portraitRes)
     }
-    val iconDrawable = remember(iconRes) {
-        ContextCompat.getDrawable(context, iconRes)
-    }
+
+    // Use hexagonal shape
+    val hexagonShape = remember { HexagonShape() }
 
     Box(
         modifier = modifier
@@ -155,38 +122,28 @@ fun CharacterPortraitSmall(
                         brush = Brush.linearGradient(
                             colors = listOf(Gold, GoldDark, Gold)
                         ),
-                        shape = CircleShape
+                        shape = hexagonShape
                     )
                 } else Modifier
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Background
+        // Portrait only - no icon overlay
         portraitDrawable?.let { drawable ->
             Image(
                 painter = rememberDrawablePainter(drawable = drawable),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(CircleShape),
+                    .clip(hexagonShape),
                 contentScale = ContentScale.Crop
-            )
-        }
-
-        // Icon
-        iconDrawable?.let { drawable ->
-            Image(
-                painter = rememberDrawablePainter(drawable = drawable),
-                contentDescription = null,
-                modifier = Modifier.size(size * 0.55f),
-                contentScale = ContentScale.Fit
             )
         }
     }
 }
 
 /**
- * CharacterPortraitCard - 角色卡片版本，帶有完整框架
+ * CharacterPortraitCard - 角色卡片版本（簡潔六邊形框架）
  */
 @Composable
 fun CharacterPortraitCard(
@@ -197,100 +154,43 @@ fun CharacterPortraitCard(
 ) {
     val context = LocalContext.current
     val portraitRes = getPortraitResource(roleType)
-    val iconRes = getRoleIconResource(roleType)
-    val roleColor = getRoleColor(roleType)
 
     // Use rememberDrawablePainter for layer-list XML drawables
     val portraitDrawable = remember(portraitRes) {
         ContextCompat.getDrawable(context, portraitRes)
     }
-    val iconDrawable = remember(iconRes) {
-        ContextCompat.getDrawable(context, iconRes)
-    }
+
+    // Use hexagonal shape
+    val hexagonShape = remember { HexagonShape() }
 
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Main portrait with decorative frame
+        // Main portrait with hexagonal frame
         Box(
-            modifier = Modifier.size(180.dp),
+            modifier = Modifier
+                .size(160.dp)
+                .border(
+                    width = 3.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(Gold, GoldDark, Gold)
+                    ),
+                    shape = hexagonShape
+                ),
             contentAlignment = Alignment.Center
         ) {
-            // Outer decorative frame
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .shadow(12.dp, CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFFFFD700),
-                                Color(0xFFB8860B),
-                                Color(0xFFDAA520),
-                                Color(0xFFB8860B),
-                                Color(0xFFFFD700)
-                            )
-                        ),
-                        CircleShape
-                    )
-            )
-
-            // Inner frame
-            Box(
-                modifier = Modifier
-                    .size(170.dp)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFF8B6914),
-                                Color(0xFFFFD700),
-                                Color(0xFF8B6914)
-                            )
-                        ),
-                        CircleShape
-                    )
-            )
-
-            // Portrait background
+            // Portrait only - no icon overlay
             portraitDrawable?.let { drawable ->
                 Image(
                     painter = rememberDrawablePainter(drawable = drawable),
                     contentDescription = "角色肖像",
                     modifier = Modifier
-                        .size(160.dp)
-                        .clip(CircleShape),
+                        .size(154.dp)
+                        .clip(hexagonShape),
                     contentScale = ContentScale.Crop
                 )
             }
-
-            // Role icon
-            iconDrawable?.let { drawable ->
-                Image(
-                    painter = rememberDrawablePainter(drawable = drawable),
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            // Corner ornaments
-            VictorianCornerOrnament(
-                modifier = Modifier
-                    .size(24.dp)
-                    .align(Alignment.TopStart)
-                    .offset(x = 10.dp, y = 10.dp),
-                corner = Corner.TopLeft,
-                color = Gold
-            )
-            VictorianCornerOrnament(
-                modifier = Modifier
-                    .size(24.dp)
-                    .align(Alignment.TopEnd)
-                    .offset(x = (-10).dp, y = 10.dp),
-                corner = Corner.TopRight,
-                color = Gold
-            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -331,18 +231,6 @@ private fun getPortraitResource(roleType: String): Int {
         "mp" -> R.drawable.portrait_mp
         "george_iii", "king" -> R.drawable.portrait_george_iii
         else -> R.drawable.portrait_default
-    }
-}
-
-private fun getRoleIconResource(roleType: String): Int {
-    return when (roleType.lowercase()) {
-        "worker" -> R.drawable.ic_role_worker
-        "factory_owner", "factory" -> R.drawable.ic_role_factory
-        "luddite" -> R.drawable.ic_role_luddite
-        "reformer" -> R.drawable.ic_role_reformer
-        "mp" -> R.drawable.ic_role_mp
-        "george_iii", "king" -> R.drawable.ic_role_george_iii
-        else -> R.drawable.ic_role_worker // default
     }
 }
 

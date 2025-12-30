@@ -4,10 +4,12 @@ package com.parliament1812.data.models
  * NFC 卡片數據
  * @property cardId 卡片 ID，如 "WORKER01", "GEORGEIII01"
  * @property signature HMAC-SHA256 簽名，16 字元
+ * @property uid 卡片 UID（防複製用）
  */
 data class NFCCardData(
     val cardId: String,
-    val signature: String
+    val signature: String,
+    val uid: String = ""
 ) {
     /**
      * 從 cardId 解析角色類型

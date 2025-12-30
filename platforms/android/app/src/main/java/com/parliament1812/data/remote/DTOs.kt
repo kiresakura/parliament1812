@@ -29,12 +29,26 @@ data class TimerRequest(
 
 // ========== NFC Request DTOs ==========
 
+/**
+ * Full NFC scan request with all parameters (used internally)
+ */
 @Serializable
 data class NFCScanRequest(
     @SerialName("room_code") val roomCode: String,
     @SerialName("player_id") val playerId: String,
     @SerialName("card_id") val cardId: String,
-    val signature: String
+    val signature: String,
+    val uid: String = ""  // NFC tag UID for anti-copy protection
+)
+
+/**
+ * NFC scan request body (room_code and player_id are sent via path/query)
+ */
+@Serializable
+data class NFCScanBodyRequest(
+    @SerialName("card_id") val cardId: String,
+    val signature: String,
+    val uid: String = ""
 )
 
 @Serializable
@@ -61,6 +75,13 @@ data class MarkReadRequest(
 @Serializable
 data class VoteRequest(
     val choice: String
+)
+
+// ========== Player Ready Request DTO ==========
+
+@Serializable
+data class SetReadyRequest(
+    @SerialName("is_ready") val isReady: Boolean
 )
 
 // ========== Event Request DTOs ==========
@@ -112,12 +133,17 @@ data class PlayerBrief(
 
 @Serializable
 data class NFCScanResponse(
-    val success: Boolean,
-    @SerialName("role_type") val roleType: String? = null,
-    @SerialName("role_index") val roleIndex: Int? = null,
-    @SerialName("secret_mission_id") val secretMissionId: String? = null,
-    val role: Role? = null,
-    val message: String? = null
+    val message: String,
+    @SerialName("player_id") val playerId: String,
+    @SerialName("role_type") val roleType: String,
+    @SerialName("role_index") val roleIndex: Int,
+    @SerialName("role_name") val roleName: String,
+    @SerialName("role_occupation") val roleOccupation: String,
+    @SerialName("role_description") val roleDescription: String,
+    @SerialName("role_background") val roleBackground: String,
+    @SerialName("role_public_stance") val rolePublicStance: String,
+    @SerialName("avatar_color") val avatarColor: String,
+    @SerialName("secret_mission_id") val secretMissionId: String? = null
 )
 
 @Serializable

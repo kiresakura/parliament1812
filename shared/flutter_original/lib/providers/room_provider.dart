@@ -212,6 +212,26 @@ class RoomProvider with ChangeNotifier {
     }
   }
 
+  /// 開始遊戲（僅主持人）
+  Future<bool> startGame(String playerId) async {
+    if (_room == null) return false;
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _api.startGame(_room!.code, playerId);
+      // 遊戲開始後，房間狀態會透過 WebSocket 更新
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(_formatError(e));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   /// 離開房間
   void leaveRoom() {
     disconnectWebSocket();

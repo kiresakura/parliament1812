@@ -1,6 +1,7 @@
 package com.parliament1812.ui.screens
 
 import android.app.Activity
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,7 +23,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +54,7 @@ fun NFCScanScreen(
 ) {
     val context = LocalContext.current
     val activity = context as Activity
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val nfcState by nfcManager.state.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -57,28 +62,60 @@ fun NFCScanScreen(
     var showManualInputDialog by remember { mutableStateOf(false) }
     var manualCode by remember { mutableStateOf("") }
 
-    val isNfcAvailable = remember { nfcManager.isNFCAvailable(activity) }
-    val isNfcEnabled = remember { nfcManager.isNFCEnabled() }
+    // Check NFC availability dynamically (not cached)
+    val isNfcAvailable by remember {
+        derivedStateOf { nfcManager.isNFCAvailable(activity) }
+    }
+    var isNfcEnabled by remember { mutableStateOf(false) }
 
-    // Enable NFC scanning when screen is active
+    // Update NFC enabled state when screen resumes
     LaunchedEffect(Unit) {
-        if (isNfcAvailable && isNfcEnabled) {
-            nfcManager.enableForegroundDispatch(activity)
-        }
+        isNfcEnabled = nfcManager.isNFCEnabled()
     }
 
-    // Disable NFC when leaving screen
-    DisposableEffect(Unit) {
+    // Lifecycle-aware NFC foreground dispatch
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    Log.d("NFCScanScreen", "ON_RESUME - Enabling NFC dispatch")
+                    // Re-check NFC enabled state
+                    isNfcEnabled = nfcManager.isNFCEnabled()
+                    if (nfcManager.isNFCAvailable(activity) && nfcManager.isNFCEnabled()) {
+                        nfcManager.enableForegroundDispatch(activity)
+                    }
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    Log.d("NFCScanScreen", "ON_PAUSE - Disabling NFC dispatch")
+                    nfcManager.disableForegroundDispatch(activity)
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        // Initial enable if already resumed
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            isNfcEnabled = nfcManager.isNFCEnabled()
+            if (nfcManager.isNFCAvailable(activity) && nfcManager.isNFCEnabled()) {
+                nfcManager.enableForegroundDispatch(activity)
+            }
+        }
+
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             nfcManager.disableForegroundDispatch(activity)
         }
     }
 
     // Handle NFC scan success
     LaunchedEffect(nfcState) {
+        Log.d("NFCScanScreen", "LaunchedEffect triggered with state: $nfcState")
         if (nfcState is NFCState.Success) {
             val cardData = (nfcState as NFCState.Success).data
+            Log.d("NFCScanScreen", "NFC Success detected! cardId=${cardData.cardId}, submitting to API...")
             viewModel.submitNFCScan(roomCode, playerId, cardData) { roleType, roleIndex ->
+                Log.d("NFCScanScreen", "Role assigned callback: $roleType/$roleIndex")
                 onRoleAssigned(roleType, roleIndex)
             }
             nfcManager.resetState()

@@ -28,6 +28,12 @@ interface ApiService {
     @GET("api/rooms/{code}/players")
     suspend fun getPlayers(@Path("code") code: String): List<Player>
 
+    @DELETE("api/rooms/{code}/leave")
+    suspend fun leaveRoom(
+        @Path("code") code: String,
+        @Query("player_id") playerId: String
+    )
+
     @POST("api/rooms/{code}/phase")
     suspend fun changePhase(
         @Path("code") code: String,
@@ -42,6 +48,12 @@ interface ApiService {
         @Body request: TimerRequest
     ): RoomDetailResponse
 
+    @POST("api/rooms/{code}/start")
+    suspend fun startGame(
+        @Path("code") code: String,
+        @Query("player_id") playerId: String
+    ): RoomDetailResponse
+
     @DELETE("api/rooms/{code}")
     suspend fun deleteRoom(
         @Path("code") code: String,
@@ -50,8 +62,12 @@ interface ApiService {
 
     // ========== NFC / Role Assignment ==========
 
-    @POST("api/nfc/scan")
-    suspend fun scanNFC(@Body request: NFCScanRequest): NFCScanResponse
+    @POST("api/rooms/{code}/scan-nfc")
+    suspend fun scanNFC(
+        @Path("code") code: String,
+        @Query("player_id") playerId: String,
+        @Body request: NFCScanBodyRequest
+    ): NFCScanResponse
 
     @POST("api/rooms/{code}/assign-role-manual")
     suspend fun assignRoleManually(
@@ -67,6 +83,12 @@ interface ApiService {
 
     @GET("api/players/{playerId}/secret-mission")
     suspend fun getSecretMission(@Path("playerId") playerId: String): SecretMission
+
+    @PUT("api/players/{playerId}/ready")
+    suspend fun setReady(
+        @Path("playerId") playerId: String,
+        @Body request: SetReadyRequest
+    ): Player
 
     // ========== Private Messages ==========
 

@@ -32,10 +32,10 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = TextSecondary,
 
-    error = Error,
-    onError = TextPrimary,
-    errorContainer = Error.copy(alpha = 0.2f),
-    onErrorContainer = Error,
+    error = VictorianRed,
+    onError = Parchment, // Text on red should be light
+    errorContainer = VictorianRed.copy(alpha = 0.2f),
+    onErrorContainer = VictorianRed,
 
     outline = CardBorder,
     outlineVariant = CardBorder.copy(alpha = 0.5f)

@@ -41,7 +41,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.primaryBackground,
+      backgroundColor: AppTheme.darkBrownBackground,
       body: Stack(
         children: [
           // 六角形紋理背景
@@ -186,10 +186,10 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
       margin: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 皇家通行證票券
+          // 皇家選舉令票券
           Container(
             decoration: BoxDecoration(
-              color: AppTheme.primaryBackground,
+              color: AppTheme.darkBrownBackground,
               border: Border.all(
                 color: AppTheme.accentGold,
                 width: 2,
@@ -228,7 +228,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                                 CrownIcon(size: 14, color: AppTheme.accentGold),
                                 SizedBox(width: 8),
                                 Text(
-                                  '皇家通行證',
+                                  '皇家選舉令',
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
                                     fontSize: 10,
@@ -315,7 +315,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                                     ),
                                     SizedBox(width: 6),
                                     Text(
-                                      '複製通行碼',
+                                      '複製選舉碼',
                                       style: TextStyle(
                                         fontFamily: 'Georgia',
                                         fontSize: 10,
@@ -372,7 +372,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryBackground,
+                        color: AppTheme.darkBrownBackground,
                         shape: BoxShape.circle,
                         border: Border.all(color: AppTheme.accentGold, width: 2),
                       ),
@@ -388,7 +388,7 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryBackground,
+                        color: AppTheme.darkBrownBackground,
                         shape: BoxShape.circle,
                         border: Border.all(color: AppTheme.accentGold, width: 2),
                       ),
@@ -611,22 +611,26 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
     RoomProvider roomProvider,
   ) {
     final hasRole = playerProvider.hasRole;
+    final isHost = playerProvider.currentPlayer?.isHost ?? false;
     final playerCount = roomProvider.players.length;
+    final readyCount = roomProvider.players.where((p) => p.hasRole).length;
+    final allReady = readyCount == playerCount && playerCount >= 5;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.cardBackground.withValues(alpha: 0.95),
+        color: AppTheme.panelBackground.withValues(alpha: 0.98),
         border: Border(
           top: BorderSide(
-            color: AppTheme.accentGold.withValues(alpha: 0.3),
+            color: AppTheme.accentGold.withValues(alpha: 0.4),
+            width: 1,
           ),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -635,6 +639,11 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 主持人開始遊戲按鈕（當所有玩家就緒）
+            if (isHost && allReady) ...[
+              _buildStartGameButton(context, roomProvider, playerProvider),
+              const SizedBox(height: 12),
+            ],
             // NFC 掃卡按鈕或已完成狀態
             SizedBox(
               width: double.infinity,
@@ -688,6 +697,77 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen>
         ),
       ),
     ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, end: 0);
+  }
+
+  Widget _buildStartGameButton(
+    BuildContext context,
+    RoomProvider roomProvider,
+    PlayerProvider playerProvider,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        final playerId = playerProvider.currentPlayer?.id;
+        if (playerId == null) return;
+
+        soundService.haptic(HapticType.heavy);
+        soundService.play(SoundEffect.notification);
+        roomProvider.startGame(playerId);
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFD4AF37),
+              Color(0xFFB8941F),
+              Color(0xFF8B6914),
+            ],
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.4),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.accentGold.withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CrownIcon(size: 20, color: AppTheme.darkBrownBackground),
+            SizedBox(width: 12),
+            Text(
+              '宣布開議',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 4,
+                color: AppTheme.darkBrownBackground,
+              ),
+            ),
+            SizedBox(width: 12),
+            CrownIcon(size: 20, color: AppTheme.darkBrownBackground),
+          ],
+        ),
+      ),
+    )
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .shimmer(duration: 2500.ms, color: Colors.white.withValues(alpha: 0.4))
+        .animate()
+        .scale(begin: const Offset(0.95, 0.95), duration: 300.ms, curve: Curves.easeOut);
   }
 
   Widget _buildScanButton(BuildContext context) {
@@ -1280,7 +1360,7 @@ class _PlayerCardState extends State<_PlayerCard>
                       ),
                     )
                   : Container(
-                      color: AppTheme.primaryBackground.withValues(alpha: 0.5),
+                      color: AppTheme.darkBrownBackground.withValues(alpha: 0.5),
                       child: Center(
                         child: Text(
                           widget.nickname.isNotEmpty ? widget.nickname[0].toUpperCase() : '?',

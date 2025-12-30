@@ -57,8 +57,8 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         Log.d(TAG, "onPause")
-        // Disable NFC dispatch when activity is paused
-        nfcManager.disableForegroundDispatch(this)
+        // Note: NFC dispatch is managed by individual screens (NFCScanScreen)
+        // to avoid conflicts with their lifecycle management
     }
 
     override fun onNewIntent(intent: Intent) {

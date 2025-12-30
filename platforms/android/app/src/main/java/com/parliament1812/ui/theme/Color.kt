@@ -6,10 +6,10 @@ import androidx.compose.ui.graphics.Color
 // 1812 國會風雲 - Regency Era Design System
 // ============================================
 
-// Primary Colors - Royal Gold
-val Gold = Color(0xFFD4AF37)
+// Primary Colors - Royal Gold (Refined for Metallic feel)
+val Gold = Color(0xFFC5A059)      // More Bronze/Antique than previous #D4AF37
 val GoldLight = Color(0xFFE5C76B)
-val GoldDark = Color(0xFFB8860B)
+val GoldDark = Color(0xFF9E7E38)
 val GoldMuted = Color(0xFF8B7753)
 val GoldAccent = Color(0xFFB8A07E)
 
@@ -46,10 +46,11 @@ val MPColor = Color(0xFF191970)          // Midnight Blue
 val GeorgeIIIColor = Color(0xFFD4AF37)   // Royal Gold
 
 // Card & Component Colors
-val CardBackground = Color(0xFF241B14)
-val CardBackgroundTranslucent = Color(0xF2241B14)
-val CardBorder = Color(0xFF3D3530)
-val CardBorderGold = Color(0x33D4AF37)   // 20% gold
+// Card & Component Colors
+val CardBackground = Color(0xFF2E241B)   // Warmer brown than #241B14
+val CardBackgroundTranslucent = Color(0xF22E241B)
+val CardBorder = Color(0xFF4A3C30)
+val CardBorderGold = Color(0x33C5A059)   // 20% refined gold
 
 // Input Field Colors
 val InputBackground = Color(0xFF1A1614)
@@ -65,3 +66,24 @@ val TabTextUnselected = Color(0xFFD4AF37)
 // Divider
 val Divider = Color(0xFF3D3530)
 val DividerGold = Color(0x4DD4AF37)  // 30% gold
+
+// ============================================
+// Victorian Era Specifics (New)
+// ============================================
+
+// Deep, rich tones for emphasis
+val VictorianRed = Color(0xFF722830)     // Burgundy / Wine
+val VictorianGreen = Color(0xFF264D33)   // British Racing Green
+val VictorianBlue = Color(0xFF002366)    // Royal Navy Blue
+
+// Texture bases
+val Parchment = Color(0xFFF5EDD9)        // Aged Paper
+val ParchmentDark = Color(0xFFE6DCC3)    // Aged Paper Shadow
+
+// Metallic Gradients helper colors
+val MetallicGoldStop1 = Color(0xFFBF953F)
+val MetallicGoldStop2 = Color(0xFFFCF6BA)
+val MetallicGoldStop3 = Color(0xFFB38728)
+val MetallicGoldStop4 = Color(0xFFFBF5B7)
+val MetallicGoldStop5 = Color(0xFFAA771C)
+

@@ -9,7 +9,7 @@ import com.parliament1812.data.models.Role
 import com.parliament1812.data.models.SecretMission
 import com.parliament1812.data.remote.ApiService
 import com.parliament1812.data.remote.ManualRoleRequest
-import com.parliament1812.data.remote.NFCScanRequest
+import com.parliament1812.data.remote.NFCScanBodyRequest
 import com.parliament1812.nfc.NFCManager
 import com.parliament1812.nfc.NFCState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -62,43 +62,44 @@ class PlayerViewModel @Inject constructor(
                 Log.d(TAG, "Submitting NFC scan: cardId=${cardData.cardId}")
 
                 val response = apiService.scanNFC(
-                    NFCScanRequest(
-                        roomCode = roomCode,
-                        playerId = playerId,
+                    code = roomCode,
+                    playerId = playerId,
+                    request = NFCScanBodyRequest(
                         cardId = cardData.cardId,
-                        signature = cardData.signature
+                        signature = cardData.signature,
+                        uid = cardData.uid
                     )
                 )
 
-                if (response.success && response.roleType != null && response.roleIndex != null) {
-                    Log.d(TAG, "Role assigned: ${response.roleType}/${response.roleIndex}")
+                Log.d(TAG, "Role assigned: ${response.roleType}/${response.roleIndex}")
 
-                    // Update current player
-                    _uiState.update { state ->
-                        state.copy(
-                            isLoading = false,
-                            currentPlayer = state.currentPlayer?.copy(
-                                roleType = response.roleType,
-                                roleIndex = response.roleIndex,
-                                secretMissionId = response.secretMissionId
-                            ),
-                            role = response.role,
-                            roleAssigned = true
-                        )
-                    }
+                // Create role from response
+                val role = Role(
+                    id = response.roleType,
+                    nameZh = response.roleName,
+                    nameEn = response.roleOccupation,
+                    faction = response.roleType,
+                    description = "${response.roleDescription}\n\n背景：${response.roleBackground}\n\n公開立場：${response.rolePublicStance}"
+                )
 
-                    // Load secret mission
-                    loadSecretMission(playerId)
-
-                    onSuccess(response.roleType, response.roleIndex)
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = response.message ?: "角色分配失敗"
-                        )
-                    }
+                // Update current player
+                _uiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        currentPlayer = state.currentPlayer?.copy(
+                            roleType = response.roleType,
+                            roleIndex = response.roleIndex,
+                            secretMissionId = response.secretMissionId
+                        ),
+                        role = role,
+                        roleAssigned = true
+                    )
                 }
+
+                // Load secret mission
+                loadSecretMission(playerId)
+
+                onSuccess(response.roleType, response.roleIndex)
             } catch (e: Exception) {
                 Log.e(TAG, "NFC scan failed", e)
                 _uiState.update {

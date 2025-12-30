@@ -17,7 +17,7 @@ from app.schemas import (
 )
 from app.services import room_service, player_service
 from app.data.roles import ROLES, get_role_info
-from app.websocket import notify_player_join, notify_player_ready
+from app.websocket import notify_player_join, notify_player_leave, notify_player_ready
 
 
 router = APIRouter(tags=["players"])
@@ -97,8 +97,9 @@ async def scan_nfc(
         nickname=player.nickname,
         role_type=result["role_type"],
         is_host=player.is_host,
+        is_ready=player.is_ready,
     )
-    
+
     return {
         "message": f"角色分配成功！你是 {result['role_name']}",
         **result,
@@ -188,6 +189,7 @@ async def assign_role_manual(
         nickname=player.nickname,
         role_type=result["role_type"],
         is_host=player.is_host,
+        is_ready=player.is_ready,
     )
 
     return {
@@ -238,6 +240,69 @@ async def get_room_players(
         )
         for p in players
     ]
+
+
+@router.delete(
+    "/api/rooms/{code}/leave",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="離開房間",
+)
+async def leave_room(
+    code: str,
+    player_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    玩家離開房間
+
+    Args:
+        code: 房間碼
+        player_id: 玩家 ID
+        db: 資料庫 session
+    """
+    # 取得房間
+    room = await room_service.get_room_by_code(db, code)
+    if not room:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到此房間",
+        )
+
+    # 取得玩家
+    player = await player_service.get_player_by_id(db, player_id)
+    if not player:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到此玩家",
+        )
+
+    # 檢查玩家是否在此房間
+    if player.room_id != room.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="你不在這個房間中",
+        )
+
+    # 如果是主持人，不能離開（需要先關閉房間）
+    if player.is_host:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="主持人不能離開房間，請使用關閉房間功能",
+        )
+
+    # 儲存玩家資訊用於通知
+    player_nickname = player.nickname
+
+    # 刪除玩家
+    await player_service.delete_player(db, player)
+    await db.commit()
+
+    # 通知其他玩家
+    await notify_player_leave(
+        room_code=code,
+        player_id=str(player_id),
+        nickname=player_nickname,
+    )
 
 
 @router.get(

@@ -15,7 +15,7 @@ from app.schemas import (
     VOTE_OPTIONS,
 )
 from app.services import room_service, player_service
-from app.services import vote_service
+from app.services import vote_service, game_flow_service
 from app.websocket import manager
 from app.schemas.websocket import WSEventType
 
@@ -84,7 +84,7 @@ async def cast_vote(
         progress,
     )
 
-    # 如果投票完成，廣播結果
+    # 如果投票完成，廣播結果並觸發自動階段推進
     if progress["is_complete"]:
         if vote_round == 1:
             result = await vote_service.get_round1_result(db, room.id)
@@ -96,6 +96,9 @@ async def cast_vote(
             WSEventType.VOTE_RESULT,
             result,
         )
+
+        # 觸發自動階段推進（當所有玩家投票完成時提前結束投票階段）
+        await game_flow_service.check_vote_completion(code, room.id)
 
     return VoteResponse(
         id=vote.id,

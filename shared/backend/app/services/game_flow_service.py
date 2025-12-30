@@ -18,12 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session_maker
 from app.models import Room, Player
 from app.services import event_service, vote_service
-from app.websocket.handlers import (
-    notify_phase_change,
-    notify_timer_sync,
-    notify_event_trigger,
-    notify_vote_result,
-)
+
+# 注意：handlers 的導入移到函數內部以避免循環導入
 
 
 # 各階段時長配置（秒）- 可根據需要調整
@@ -113,7 +109,9 @@ async def advance_to_phase(room_code: str, room_id: UUID, phase: int) -> None:
 
         await db.commit()
 
-        # 廣播階段變更
+        # 廣播階段變更（延遲導入避免循環）
+        from app.websocket.handlers import notify_phase_change, notify_timer_sync
+
         phase_name = PHASE_NAMES.get(phase, "unknown")
         await notify_phase_change(
             room_code=room_code,
@@ -194,6 +192,7 @@ async def trigger_domestic_event(
         )
 
         if event:
+            from app.websocket.handlers import notify_event_trigger
             await notify_event_trigger(
                 room_code=room_code,
                 event_id=event.get("id", ""),
@@ -247,6 +246,7 @@ async def trigger_international_event(
 
             if event:
                 await asyncio.sleep(2)  # 等待骰子動畫
+                from app.websocket.handlers import notify_event_trigger
                 await notify_event_trigger(
                     room_code=room_code,
                     event_id=event.get("id", ""),

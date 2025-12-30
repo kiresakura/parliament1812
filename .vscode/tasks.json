@@ -1,0 +1,39 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "🔨 Build Android Debug APK",
+            "type": "shell",
+            "command": "./gradlew",
+            "args": ["assembleDebug"],
+            "options": {
+                "cwd": "${workspaceFolder}/platforms/android"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "🧹 Clean Android Build",
+            "type": "shell",
+            "command": "./gradlew",
+            "args": ["clean"],
+            "options": {
+                "cwd": "${workspaceFolder}/platforms/android"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "📦 Build Release APK",
+            "type": "shell",
+            "command": "./gradlew",
+            "args": ["assembleRelease"],
+            "options": {
+                "cwd": "${workspaceFolder}/platforms/android"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

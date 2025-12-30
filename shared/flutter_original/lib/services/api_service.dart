@@ -338,6 +338,15 @@ class ApiService {
 
   // ==================== 遊戲流程 API ====================
 
+  /// 開始遊戲（僅主持人）
+  Future<void> startGame(String roomCode, String playerId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/rooms/$roomCode/start?player_id=$playerId'),
+      headers: _headers,
+    );
+    _handleResponse(response, (data) => null);
+  }
+
   /// 切換遊戲階段（僅主持人）
   Future<Room> changePhase({
     required String roomCode,

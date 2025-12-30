@@ -346,6 +346,21 @@ async def assign_role_manually(
     }
 
 
+async def delete_player(
+    db: AsyncSession,
+    player: Player,
+) -> None:
+    """
+    刪除玩家（離開房間）
+
+    Args:
+        db: 資料庫 session
+        player: 玩家物件
+    """
+    await db.delete(player)
+    await db.flush()
+
+
 def generate_nfc_hash(card_id: str) -> str:
     """
     為卡片生成驗證 hash（用於製作 NFC 卡片）

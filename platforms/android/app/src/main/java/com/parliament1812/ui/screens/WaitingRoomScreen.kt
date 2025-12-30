@@ -12,6 +12,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
@@ -28,8 +31,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -51,6 +57,7 @@ import com.parliament1812.viewmodels.RoomViewModel
 fun WaitingRoomScreen(
     roomCode: String,
     isHost: Boolean,
+    playerId: String = "",
     onNavigateToNFCScan: () -> Unit,
     onNavigateToGame: () -> Unit,
     onNavigateBack: () -> Unit,
@@ -59,44 +66,22 @@ fun WaitingRoomScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // Refresh players when screen loads
+    // Refresh players when screen loads and periodically
     LaunchedEffect(roomCode) {
         viewModel.refreshPlayers(roomCode)
+        // Periodic refresh every 3 seconds as backup for WebSocket
+        while (true) {
+            kotlinx.coroutines.delay(3000)
+            viewModel.refreshPlayers(roomCode)
+        }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Background Image
-        Image(
-            painter = painterResource(id = R.drawable.bg_parliament),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
-        // Dark Overlay
+    FogOfWarOverlay(modifier = Modifier.fillMaxSize()) {
+        // Base muted background (darker for atmosphere)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(DarkOverlay80)
-        )
-
-        // Hexagonal Pattern
-        HexagonalPattern(
-            modifier = Modifier.fillMaxSize(),
-            hexSize = 45f,
-            color = Gold.copy(alpha = 0.02f)
-        )
-
-        // Ambient Particles
-        AmbientParticles(
-            modifier = Modifier.fillMaxSize(),
-            particleCount = 12
-        )
-
-        // Vignette Effect
-        VignetteOverlay(
-            modifier = Modifier.fillMaxSize(),
-            intensity = 0.5f
+                .background(Color(0xFF15100B)) // Very dark brown/black
         )
 
         Column(
@@ -104,36 +89,39 @@ fun WaitingRoomScreen(
                 .fillMaxSize()
                 .systemBarsPadding()
         ) {
-            // Top Header Bar
+            // Top Header Bar - styled with Victorian logic
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(DarkOverlay95)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onNavigateBack) {
+                // Back button
+                TextButton(
+                    onClick = {
+                        if (!isHost) {
+                            viewModel.leaveRoom { onNavigateBack() }
+                        } else {
+                            viewModel.disconnect()
+                            onNavigateBack()
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = GoldMuted)
+                ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
-                        tint = Gold
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "退出議事廳",
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "等候大廳",
-                        color = TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "WAITING HALL",
-                        color = TextMuted,
-                        fontSize = 10.sp,
-                        letterSpacing = 2.sp
-                    )
-                }
+                Spacer(modifier = Modifier.weight(1f))
 
                 if (isHost) {
                     IconButton(onClick = { /* TODO: Host settings */ }) {
@@ -150,145 +138,64 @@ fun WaitingRoomScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp),
+                    .paperSurface(alpha = 0.08f) // Apply paper texture to the scrollable content area
+                    .padding(horizontal = 24.dp), // Increased padding for clearer layout
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Room Code Section
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "◇", color = Gold, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "皇家通行證",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            text = "Royal Pass Code",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Room Code Card
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = DarkOverlay95
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, CardBorderGold, RoundedCornerShape(8.dp))
-                        .clickable { copyToClipboard(context, roomCode) }
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = roomCode,
-                            fontSize = 40.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif,
-                            color = Gold,
-                            letterSpacing = 12.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                TextButton(
-                    onClick = { copyToClipboard(context, roomCode) }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        tint = GoldAccent,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "複製通行碼",
-                        color = GoldAccent,
-                        fontSize = 12.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Decorative Divider
-                GoldDivider(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    withDiamond = true
+                // Victorian Room Code Display
+                VictorianRoomCodeDisplay(
+                    roomCode = roomCode,
+                    onCopyClick = { copyToClipboard(context, roomCode) }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Stats Row
+                // Stats Row with Gold Dividers
+                GoldDivider(withDiamond = true)
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    StatItem(
-                        label = "在席成員",
-                        subLabel = "Present",
+                    VictorianStatDisplay(
+                        label = "在席議員",
                         value = "${uiState.players.size}",
-                        subValue = "/ 20"
+                        subConfig = "/ 20"
                     )
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .height(60.dp)
-                            .background(DividerGold)
-                    )
-                    StatItem(
-                        label = "準備就緒",
-                        subLabel = "Ready",
-                        value = "${uiState.players.count { it.hasRole }}",
-                        subValue = "/ ${uiState.players.size}"
+                    VictorianStatDisplay(
+                        label = "準備進度",
+                        value = "${uiState.players.count { it.isReady }}",
+                        subConfig = "/ ${uiState.players.size}"
                     )
                 }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                GoldDivider(withDiamond = true)
 
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Members Section Title
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "◇", color = Gold, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "國會議員名單",
-                            color = TextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "MEMBERS OF PARLIAMENT",
-                            color = TextMuted,
-                            fontSize = 10.sp,
-                            letterSpacing = 2.sp
-                        )
-                    }
-                }
+                VictorianSectionHeader(
+                    title = "國會議員名單",
+                    subtitle = "MEMBERS OF PARLIAMENT",
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Calculate effective player ID early so it can be used for both
+                // player card highlighting and action buttons
+                val effectivePlayerId = if (playerId.isNotEmpty()) playerId else uiState.currentPlayer?.id
 
                 // Player List
                 if (uiState.players.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp),
+                            .height(150.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
@@ -298,15 +205,31 @@ fun WaitingRoomScreen(
                         )
                     }
                 } else {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    // 2-column grid using VictorianOvalPlayerCard
+                    // Note: Nested scrolling with LazyVerticalGrid inside Column + verticalScroll is tricky.
+                    // For a limited number of items (max 20), FlowRow or a simple Column of Rows is better/safer,
+                    // but since we want grid style, we can calculate height or use a non-lazy grid approach.
+                    // However, let's stick to LazyVerticalGrid with fixed height for now as per original code.
+                    
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 600.dp) // Cap height
                     ) {
-                        items(uiState.players) { player ->
-                            PlayerCard(
-                                player = player,
-                                isCurrentUser = player.id == uiState.currentPlayer?.id
+                        items(
+                            items = uiState.players,
+                            key = { it.id }
+                        ) { player ->
+                            VictorianOvalPlayerCard(
+                                nickname = player.nickname,
+                                roleType = player.roleType,
+                                isHost = player.isHost,
+                                isReady = player.isReady,
+                                isCurrentUser = player.id == effectivePlayerId
                             )
                         }
                     }
@@ -314,107 +237,248 @@ fun WaitingRoomScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
+                // Action Buttons Area
+                // Use playerId parameter directly to find current player from list
+                // This works even when ViewModel state is not synced after navigation
+                val currentPlayerFromList = effectivePlayerId?.let { id ->
+                    uiState.players.find { it.id == id }
+                }
+                val currentPlayerHasRole = currentPlayerFromList?.hasRole == true
+                val currentPlayerIsReady = currentPlayerFromList?.isReady == true
+
                 // Claim Identity Button
-                Button(
-                    onClick = onNavigateToNFCScan,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Gold,
-                        contentColor = DarkBackground
-                    ),
-                    shape = CutCornerShape(bottomEnd = 16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(text = "☆", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "領取身份令牌",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp
-                        )
-                    }
+                if (!currentPlayerHasRole) {
+                    RegencyStyledButton(
+                        text = "領取身份令牌",
+                        onClick = onNavigateToNFCScan,
+                        icon = "⚜",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // Ready Button
+                if (currentPlayerHasRole && !isHost) {
+                    RegencyStyledButton(
+                        text = if (currentPlayerIsReady) "已簽署與準備" else "簽署就緒",
+                        onClick = {
+                            currentPlayerFromList?.let { player ->
+                                viewModel.setReady(player.id, !currentPlayerIsReady)
+                            }
+                        },
+                        isPrimary = !currentPlayerIsReady, // If ready, show as secondary/pressed state visually? Or just keep primary. Let's keep primary but maybe change text.
+                        // Actually RegencyStyledButton logic: isPrimary -> Gold bg. !isPrimary -> Transparent with border.
+                        // If ready, we might want it to look "Activated" (Green?). 
+                        // The component doesn't support green easily. Let's stick to Gold logic or create a custom one.
+                        // For now, let's use isPrimary=true for action "Set Ready", and maybe isPrimary=false (outlined) if already ready?
+                        // "Click to unready" -> isPrimary = false.
+                        isLoading = uiState.isSettingReady,
+                        icon = if (currentPlayerIsReady) "✓" else "✎",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-                // Start Game Button (Host Only)
+                // Host Actions
+                val allPlayersReady = uiState.players.isNotEmpty() &&
+                    uiState.players.all { it.hasRole && it.isReady }
+
+                // Debug logging
+                android.util.Log.d("WaitingRoom", "=== WaitingRoomScreen Debug ===")
+                android.util.Log.d("WaitingRoom", "isHost=$isHost, roomCode=$roomCode, playerId=$playerId")
+                android.util.Log.d("WaitingRoom", "Players: ${uiState.players.size}, allPlayersReady: $allPlayersReady")
+                android.util.Log.d("WaitingRoom", "currentPlayerHasRole=$currentPlayerHasRole, currentPlayerIsReady=$currentPlayerIsReady")
+                uiState.players.forEach { p ->
+                    android.util.Log.d("WaitingRoom", "  Player ${p.nickname}: hasRole=${p.hasRole}, roleType=${p.roleType}, isReady=${p.isReady}, id=${p.id}")
+                }
+                android.util.Log.d("WaitingRoom", "================================")
+
                 if (isHost) {
-                    val allPlayersReady = uiState.players.isNotEmpty() &&
-                        uiState.players.all { it.hasRole }
-
-                    OutlinedButton(
-                        onClick = onNavigateToGame,
-                        enabled = allPlayersReady,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = if (allPlayersReady) Gold else TextMuted
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (allPlayersReady) Gold else GoldMuted.copy(alpha = 0.5f)
-                        ),
-                        shape = CutCornerShape(topStart = 8.dp, bottomEnd = 8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                    ) {
-                        Text(
-                            text = if (allPlayersReady) "開始遊戲" else "等待所有玩家就緒...",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
+                    android.util.Log.d("WaitingRoom", ">>> Rendering HOST controls <<<")
+                } else {
+                    android.util.Log.d("WaitingRoom", ">>> Rendering NON-HOST view <<<")
                 }
 
-                // Status Text
-                Text(
-                    text = "已有 ${uiState.players.size} 位議員就座",
-                    color = TextMuted,
-                    fontSize = 12.sp
-                )
+                if (isHost) {
+                    // Host Ready (as a player)
+                    if (currentPlayerHasRole) {
+                        RegencyStyledButton(
+                            text = if (currentPlayerIsReady) "議長已就緒" else "議長簽署",
+                            onClick = {
+                                currentPlayerFromList?.let { player ->
+                                    viewModel.setReady(player.id, !currentPlayerIsReady)
+                                }
+                            },
+                            isPrimary = !currentPlayerIsReady,
+                            isLoading = uiState.isSettingReady,
+                            icon = "♔",
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    // Start Game - 調用 API 開始遊戲，成功後導航
+                    android.util.Log.d("WaitingRoom", "Button state: enabled=${allPlayersReady && !uiState.isLoading}, allPlayersReady=$allPlayersReady, isLoading=${uiState.isLoading}")
+                    RegencyStyledButton(
+                        text = "開啟國會議程",
+                        onClick = {
+                            android.util.Log.d("WaitingRoom", "Start Game button clicked!")
+                            viewModel.startGame { onNavigateToGame() }
+                        },
+                        enabled = allPlayersReady && !uiState.isLoading,
+                        isLoading = uiState.isLoading,
+                        icon = "⚔",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (!allPlayersReady) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "等待所有成員簽署就緒...",
+                            color = GoldMuted,
+                            fontSize = 12.sp,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    }
+                } else {
+                    // Non-host waiting message
+                    if (currentPlayerIsReady) {
+                        Text(
+                            text = "等待議長宣佈開議...",
+                            color = Gold,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
             }
         }
     }
 }
 
+/**
+ * Victorian Room Code Display - Styled like a royal decree header
+ */
 @Composable
-private fun StatItem(
+private fun VictorianRoomCodeDisplay(
+    roomCode: String,
+    onCopyClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Decorative background (like a wax sealed letter header)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+            val path = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(width, 0f)
+                lineTo(width, height * 0.8f)
+                quadraticBezierTo(width / 2, height, 0f, height * 0.8f)
+                close()
+            }
+            
+            drawPath(
+                path = path,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        DarkSurfaceVariant,
+                        DarkSurface
+                    )
+                )
+            )
+            
+            drawPath(
+                path = path,
+                brush = Brush.linearGradient(
+                    colors = listOf(GoldMuted, Gold, GoldMuted)
+                ),
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
+        
+        // Content
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            Text(
+                text = "ROYAL DECREE",
+                fontSize = 10.sp,
+                color = GoldMuted,
+                letterSpacing = 4.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = android.R.drawable.ic_menu_compass), // Placeholder if custom not avail, or use vector
+                    contentDescription = null,
+                    tint = Gold,
+                    modifier = Modifier.size(16.dp) // Temporary placeholder
+                )
+                Text(
+                    text = " 議事廳代碼 ",
+                    fontSize = 14.sp,
+                    color = TextSecondary,
+                    fontFamily = FontFamily.Serif
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Room Code with Copy interaction
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clickable { onCopyClick() }
+                    .background(Gold.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = roomCode,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Serif,
+                    color = Gold,
+                    letterSpacing = 6.sp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "複製",
+                    tint = Gold.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Victorian Stat Display - Text-based stat with serif fonts
+ */
+@Composable
+private fun VictorianStatDisplay(
     label: String,
-    subLabel: String,
     value: String,
-    subValue: String
+    subConfig: String
 ) {
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(horizontal = 16.dp)
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = label,
-            color = TextSecondary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 1.sp
+            color = GoldMuted,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Serif
         )
-        Text(
-            text = subLabel,
-            color = TextMuted,
-            fontSize = 10.sp,
-            letterSpacing = 2.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            verticalAlignment = Alignment.Bottom
-        ) {
+        Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = value,
                 color = Gold,
@@ -423,122 +487,39 @@ private fun StatItem(
                 fontFamily = FontFamily.Serif
             )
             Text(
-                text = subValue,
+                text = subConfig,
                 color = TextMuted,
-                fontSize = 16.sp,
-                modifier = Modifier.padding(bottom = 6.dp, start = 2.dp)
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
             )
         }
     }
 }
 
-@Composable
-private fun PlayerCard(
-    player: Player,
-    isCurrentUser: Boolean
-) {
-    val cardShape = CutCornerShape(topEnd = 12.dp, bottomStart = 12.dp)
 
-    // Pulsing animation for current user
-    val infiniteTransition = rememberInfiniteTransition(label = "playerPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isCurrentUser) 1.02f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
+// Helper function to get role display name (Chinese)
+private fun getRoleDisplayName(roleType: String): String {
+    return when (roleType.lowercase()) {
+        "worker" -> "紡織工人"
+        "factory_owner", "factory" -> "工廠主"
+        "luddite" -> "盧德派"
+        "reformer" -> "改革者"
+        "mp" -> "議員"
+        "george_iii", "king" -> "喬治三世"
+        else -> roleType
+    }
+}
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (isCurrentUser) Gold.copy(alpha = 0.15f) else DarkOverlay95
-        ),
-        shape = cardShape,
-        modifier = Modifier
-            .width(115.dp)
-            .scale(pulseScale)
-            .border(
-                width = if (isCurrentUser) 2.dp else 1.dp,
-                brush = if (isCurrentUser) {
-                    Brush.linearGradient(listOf(Gold, Gold.copy(alpha = 0.5f), Gold))
-                } else {
-                    Brush.linearGradient(listOf(CardBorderGold, CardBorderGold))
-                },
-                shape = cardShape
-            )
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Avatar with role portrait
-            if (player.hasRole && player.roleType != null) {
-                CharacterPortraitSmall(
-                    roleType = player.roleType ?: "",
-                    size = 48.dp,
-                    showBorder = true
-                )
-            } else {
-                // Default avatar for players without role
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(GoldMuted.copy(alpha = 0.5f), GoldMuted.copy(alpha = 0.3f))
-                            )
-                        )
-                        .border(2.dp, CardBorderGold, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = player.nickname.take(1).uppercase(),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Host badge with crown
-            if (player.isHost) {
-                Text(
-                    text = "👑 HOST",
-                    fontSize = 9.sp,
-                    letterSpacing = 1.sp,
-                    color = Gold
-                )
-            }
-
-            Text(
-                text = player.nickname,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary,
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
-
-            if (player.hasRole) {
-                Text(
-                    text = player.displayRoleName,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = GoldAccent
-                )
-            } else {
-                Text(
-                    text = "⏳ 待認證",
-                    fontSize = 10.sp,
-                    color = TextMuted
-                )
-            }
-        }
+// Helper function to get role English name
+private fun getRoleEnglishName(roleType: String): String? {
+    return when (roleType.lowercase()) {
+        "worker" -> "Textile Worker"
+        "factory_owner", "factory" -> "Factory Owner"
+        "luddite" -> "Luddite"
+        "reformer" -> "Reformer"
+        "mp" -> "Member of Parliament"
+        "george_iii", "king" -> "King George III"
+        else -> null
     }
 }
 

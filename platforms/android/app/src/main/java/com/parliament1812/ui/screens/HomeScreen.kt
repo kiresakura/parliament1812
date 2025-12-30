@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -111,7 +113,8 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .systemBarsPadding(),
+                .systemBarsPadding()
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Top Header Bar
@@ -185,8 +188,9 @@ private fun TopHeaderBar() {
     ) {
         // Crown Icon placeholder
         Text(
-            text = "👑",
-            fontSize = 20.sp
+            text = "◆",
+            fontSize = 20.sp,
+            color = Gold
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column {

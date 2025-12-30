@@ -1,161 +1,125 @@
-# Parliament 1812 - iOS Platform
+# Parliament1812 - iOS App
 
-> iOS 版本 - 採用 Apple 原生配置的 Flutter 應用程式
+A modern iOS application using a **workspace + SPM package** architecture for clean separation between app shell and feature code.
 
-## 📁 專案結構
+## AI Assistant Rules Files
+
+This template includes **opinionated rules files** for popular AI coding assistants. These files establish coding standards, architectural patterns, and best practices for modern iOS development using the latest APIs and Swift features.
+
+### Included Rules Files
+- **Claude Code**: `CLAUDE.md` - Claude Code rules
+- **Cursor**: `.cursor/*.mdc` - Cursor-specific rules
+- **GitHub Copilot**: `.github/copilot-instructions.md` - GitHub Copilot rules
+
+### Customization Options
+These rules files are **starting points** - feel free to:
+- ✅ **Edit them** to match your team's coding standards
+- ✅ **Delete them** if you prefer different approaches
+- ✅ **Add your own** rules for other AI tools
+- ✅ **Update them** as new iOS APIs become available
+
+### What Makes These Rules Opinionated
+- **No ViewModels**: Embraces pure SwiftUI state management patterns
+- **Swift 6+ Concurrency**: Enforces modern async/await over legacy patterns
+- **Latest APIs**: Recommends iOS 18+ features with optional iOS 26 guidelines
+- **Testing First**: Promotes Swift Testing framework over XCTest
+- **Performance Focus**: Emphasizes @Observable over @Published for better performance
+
+**Note for AI assistants**: You MUST read the relevant rules files before making changes to ensure consistency with project standards.
+
+## Project Architecture
 
 ```
-platforms/ios/
-├── flutter_ios/                 # Flutter iOS 專案
-│   ├── Runner/                  # 主應用程式
-│   │   ├── AppDelegate.swift    # 應用程式生命週期 + Deep Link
-│   │   ├── Info.plist           # Apple 原生配置
-│   │   ├── Runner.entitlements  # 功能權限
-│   │   └── Assets.xcassets/     # App 圖示和資源
-│   │
-│   ├── Podfile                  # CocoaPods 依賴配置
-│   ├── ExportOptions.plist      # 打包發布配置
-│   ├── PrivacyInfo.xcprivacy    # iOS 17+ 隱私清單
-│   └── Runner.xcworkspace       # Xcode 工作區
-│
-├── lib/                         # Dart 原始碼
-├── assets/                      # 資源檔案
-└── pubspec.yaml                 # Flutter 依賴
+Parliament1812/
+├── Parliament1812.xcworkspace/              # Open this file in Xcode
+├── Parliament1812.xcodeproj/                # App shell project
+├── Parliament1812/                          # App target (minimal)
+│   ├── Assets.xcassets/                # App-level assets (icons, colors)
+│   ├── Parliament1812App.swift              # App entry point
+│   └── Parliament1812.xctestplan            # Test configuration
+├── Parliament1812Package/                   # 🚀 Primary development area
+│   ├── Package.swift                   # Package configuration
+│   ├── Sources/Parliament1812Feature/       # Your feature code
+│   └── Tests/Parliament1812FeatureTests/    # Unit tests
+└── Parliament1812UITests/                   # UI automation tests
 ```
 
-## 🛠️ 環境需求
+## Key Architecture Points
 
-- **macOS**: 14.0 (Sonoma) 或更高
-- **Xcode**: 15.0 或更高
-- **iOS**: 13.0 或更高（NFC 需求）
-- **Flutter**: 3.x
-- **CocoaPods**: 1.14.0 或更高
+### Workspace + SPM Structure
+- **App Shell**: `Parliament1812/` contains minimal app lifecycle code
+- **Feature Code**: `Parliament1812Package/Sources/Parliament1812Feature/` is where most development happens
+- **Separation**: Business logic lives in the SPM package, app target just imports and displays it
 
-## 🚀 快速開始
+### Buildable Folders (Xcode 16)
+- Files added to the filesystem automatically appear in Xcode
+- No need to manually add files to project targets
+- Reduces project file conflicts in teams
 
-### 1. 安裝依賴
+## Development Notes
 
-```bash
-cd platforms/ios
-flutter pub get
-cd flutter_ios
-pod install
+### Code Organization
+Most development happens in `Parliament1812Package/Sources/Parliament1812Feature/` - organize your code as you prefer.
+
+### Public API Requirements
+Types exposed to the app target need `public` access:
+```swift
+public struct NewView: View {
+    public init() {}
+    
+    public var body: some View {
+        // Your view code
+    }
+}
 ```
 
-### 2. 開啟專案
-
-```bash
-open flutter_ios/Runner.xcworkspace
+### Adding Dependencies
+Edit `Parliament1812Package/Package.swift` to add SPM dependencies:
+```swift
+dependencies: [
+    .package(url: "https://github.com/example/SomePackage", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "Parliament1812Feature",
+        dependencies: ["SomePackage"]
+    ),
+]
 ```
 
-### 3. 執行
+### Test Structure
+- **Unit Tests**: `Parliament1812Package/Tests/Parliament1812FeatureTests/` (Swift Testing framework)
+- **UI Tests**: `Parliament1812UITests/` (XCUITest framework)
+- **Test Plan**: `Parliament1812.xctestplan` coordinates all tests
 
-```bash
-# 模擬器
-flutter run -d ios
+## Configuration
 
-# 真機（需要開發者帳號）
-flutter run -d <device-id>
+### XCConfig Build Settings
+Build settings are managed through **XCConfig files** in `Config/`:
+- `Config/Shared.xcconfig` - Common settings (bundle ID, versions, deployment target)
+- `Config/Debug.xcconfig` - Debug-specific settings  
+- `Config/Release.xcconfig` - Release-specific settings
+- `Config/Tests.xcconfig` - Test-specific settings
+
+### Entitlements Management
+App capabilities are managed through a **declarative entitlements file**:
+- `Config/Parliament1812.entitlements` - All app entitlements and capabilities
+- AI agents can safely edit this XML file to add HealthKit, CloudKit, Push Notifications, etc.
+- No need to modify complex Xcode project files
+
+### Asset Management
+- **App-Level Assets**: `Parliament1812/Assets.xcassets/` (app icon, accent color)
+- **Feature Assets**: Add `Resources/` folder to SPM package if needed
+
+### SPM Package Resources
+To include assets in your feature package:
+```swift
+.target(
+    name: "Parliament1812Feature",
+    dependencies: [],
+    resources: [.process("Resources")]
+)
 ```
 
-## 📱 功能配置
-
-### NFC 掃描
-- 需要 iPhone 7 或更新機型
-- iOS 13.0 或更高版本
-- 已在 `Info.plist` 和 `Runner.entitlements` 中配置
-
-### Deep Link
-- URL Scheme: `parliament1812://`
-- 範例: `parliament1812://role?id=WORKER01&secret=abc123`
-
-### Universal Links
-- Domain: `1812-production.up.railway.app`
-- 需要在 Apple Developer Portal 配置 Associated Domains
-
-## 🔐 權限說明
-
-| 權限 | 用途 |
-|------|------|
-| NFC | 掃描角色卡片 |
-| 網路 | 連接遊戲伺服器 |
-| 推播通知 | 遊戲通知（可選） |
-
-## 📦 打包發布
-
-### Development (Ad-hoc)
-
-```bash
-flutter build ios --release
-cd flutter_ios
-xcodebuild -workspace Runner.xcworkspace \
-  -scheme Runner \
-  -sdk iphoneos \
-  -configuration Release \
-  archive -archivePath build/Runner.xcarchive
-
-xcodebuild -exportArchive \
-  -archivePath build/Runner.xcarchive \
-  -exportOptionsPlist ExportOptions.plist \
-  -exportPath build/ipa
-```
-
-### App Store
-
-1. 修改 `ExportOptions.plist`:
-   ```xml
-   <key>method</key>
-   <string>app-store</string>
-   ```
-
-2. 使用 Xcode 的 Archive 功能
-3. 透過 App Store Connect 上傳
-
-## ⚙️ 配置說明
-
-### Info.plist 重點配置
-
-- `CFBundleDisplayName`: App 顯示名稱
-- `CFBundleURLTypes`: Deep Link URL Scheme
-- `NSAppTransportSecurity`: 網路安全設定
-- `UIRequiredDeviceCapabilities`: 必要設備功能
-
-### Entitlements 權限
-
-- `com.apple.developer.nfc.readersession.formats`: NFC 讀取格式
-- `com.apple.developer.associated-domains`: Universal Links
-- `aps-environment`: 推播通知環境
-
-## 🐛 常見問題
-
-### CocoaPods 安裝失敗
-```bash
-sudo gem install cocoapods
-pod repo update
-pod install --repo-update
-```
-
-### 簽名問題
-1. 確認已登入 Apple Developer 帳號
-2. Xcode → Signing & Capabilities → 選擇正確的 Team
-3. 確認 Bundle Identifier 正確
-
-### NFC 無法使用
-1. 確認設備支援 NFC（iPhone 7+）
-2. 確認 iOS 版本 ≥ 13.0
-3. 確認 `Runner.entitlements` 已正確配置
-
-## 📄 相關文件
-
-- [Flutter iOS 部署指南](https://docs.flutter.dev/deployment/ios)
-- [Apple Developer 文件](https://developer.apple.com/documentation/)
-- [Core NFC 文件](https://developer.apple.com/documentation/corenfc)
-
-## 🔗 後端 API
-
-- **生產環境**: https://1812-production.up.railway.app
-- **API 文檔**: https://1812-production.up.railway.app/docs
-
----
-
-*Parliament 1812 © 2024*
+### Generated with XcodeBuildMCP
+This project was scaffolded using [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP), which provides tools for AI-assisted iOS development workflows.

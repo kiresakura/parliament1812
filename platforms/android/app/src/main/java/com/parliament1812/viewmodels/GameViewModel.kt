@@ -2,6 +2,7 @@ package com.parliament1812.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.parliament1812.data.models.*
 import com.parliament1812.data.remote.WebSocketEvent
 import com.parliament1812.data.remote.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,11 +13,23 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class CurrentEvent(
-    val id: String,
-    val title: String,
-    val description: String,
-    val effectType: String
+// Dice roll state for international events
+data class DiceRollState(
+    val value: Int = 0,
+    val threshold: Int = 4,
+    val triggered: Boolean = false,
+    val isVisible: Boolean = false
+)
+
+// Vote progress state
+data class VoteProgressState(
+    val round: Int = 0,
+    val votedCount: Int = 0,
+    val totalPlayers: Int = 0,
+    val progress: Double = 0.0,
+    val isAnonymous: Boolean = true,
+    val isActive: Boolean = false,
+    val winningChoice: String? = null
 )
 
 data class GameUiState(
@@ -27,14 +40,20 @@ data class GameUiState(
     val phase: Int = 1,
     val currentRound: Int = 0,
     val timerEndAt: Long? = null,
+    val timerDuration: Int = 0,
     val players: List<PlayerBrief> = emptyList(),
     val myRoleType: String? = null,
     val myRoleName: String? = null,
     val myRoleOccupation: String? = null,
     val unreadCount: Int = 0,
-    val currentEvent: CurrentEvent? = null,
+    val currentEvent: GameEventData? = null,
+    val selectedEventChoice: EventChoice? = null,
     val hasVotedRound1: Boolean = false,
-    val hasVotedRound2: Boolean = false
+    val hasVotedRound2: Boolean = false,
+    // Auto Game Flow States
+    val diceRoll: DiceRollState = DiceRollState(),
+    val voteProgress: VoteProgressState = VoteProgressState(),
+    val showFinalResults: Boolean = false
 )
 
 @HiltViewModel
@@ -129,16 +148,21 @@ class GameViewModel @Inject constructor(
         try {
             val events = apiService.getEventHistory(roomCode)
             events.lastOrNull()?.let { event ->
-                _uiState.update {
-                    it.copy(
-                        currentEvent = CurrentEvent(
-                            id = event.event.id,
-                            title = event.event.title,
-                            description = event.event.description,
-                            effectType = event.event.effectType
-                        )
+                // Try to find a predefined event first, otherwise create from server data
+                val gameEvent = EventRepository.allEvents.find { it.id == event.event.id }
+                    ?: GameEventData(
+                        id = event.event.id,
+                        title = event.event.title,
+                        englishTitle = event.event.title,
+                        description = event.event.description,
+                        category = EventCategory.DOMESTIC,
+                        type = EventType.fromString(event.event.effectType),
+                        severity = 2,
+                        effects = emptyList(),
+                        choices = null
                     )
-                }
+
+                _uiState.update { it.copy(currentEvent = gameEvent) }
             }
         } catch (e: Exception) {
             // Non-critical
@@ -173,50 +197,107 @@ class GameViewModel @Inject constructor(
 
     private fun handleWebSocketEvent(event: WebSocketEvent) {
         when (event) {
+            // Auto Game Flow Events
+            is WebSocketEvent.PhaseChanged -> {
+                _uiState.update { state ->
+                    state.copy(
+                        phase = event.phase,
+                        // Reset dice roll when phase changes (except event2)
+                        diceRoll = if (event.phase != 7) DiceRollState() else state.diceRoll
+                    )
+                }
+            }
+
+            is WebSocketEvent.TimerSync -> {
+                _uiState.update {
+                    it.copy(timerEndAt = event.endAt, timerDuration = event.duration)
+                }
+            }
+
+            is WebSocketEvent.DiceRoll -> {
+                _uiState.update {
+                    it.copy(
+                        diceRoll = DiceRollState(
+                            value = event.value,
+                            threshold = event.threshold,
+                            triggered = event.triggered,
+                            isVisible = true
+                        )
+                    )
+                }
+            }
+
+            is WebSocketEvent.VoteStart -> {
+                _uiState.update {
+                    it.copy(
+                        voteProgress = VoteProgressState(
+                            round = event.round,
+                            isAnonymous = event.isAnonymous,
+                            isActive = true,
+                            totalPlayers = it.players.size
+                        )
+                    )
+                }
+            }
+
+            is WebSocketEvent.VoteUpdate -> {
+                _uiState.update { state ->
+                    state.copy(
+                        voteProgress = state.voteProgress.copy(
+                            votedCount = event.votedCount,
+                            totalPlayers = event.totalPlayers,
+                            progress = event.progress
+                        )
+                    )
+                }
+            }
+
+            is WebSocketEvent.VoteResult -> {
+                _uiState.update { state ->
+                    state.copy(
+                        voteProgress = state.voteProgress.copy(
+                            isActive = false,
+                            winningChoice = event.winningChoice
+                        )
+                    )
+                }
+            }
+
+            is WebSocketEvent.EventTrigger -> {
+                // Try to find a predefined event first
+                val gameEvent = EventRepository.allEvents.find { it.id == event.eventId }
+                    ?: GameEventData(
+                        id = event.eventId,
+                        title = event.title,
+                        englishTitle = event.title,
+                        description = event.description,
+                        category = EventCategory.DOMESTIC,
+                        type = EventType.fromString(event.effectType ?: ""),
+                        severity = 2,
+                        effects = emptyList(),
+                        choices = null
+                    )
+
+                _uiState.update {
+                    it.copy(currentEvent = gameEvent, selectedEventChoice = null)
+                }
+            }
+
+            is WebSocketEvent.FinalResults -> {
+                _uiState.update {
+                    it.copy(showFinalResults = true)
+                }
+            }
+
             is WebSocketEvent.GenericMessage -> {
                 when (event.type) {
-                    "phase_change" -> {
-                        event.data?.get("phase")?.toIntOrNull()?.let { phase ->
-                            _uiState.update { it.copy(phase = phase) }
-                        }
-                    }
-                    "timer_sync" -> {
-                        event.data?.get("end_at")?.let { endAt ->
-                            try {
-                                val millis = java.time.Instant.parse(endAt).toEpochMilli()
-                                _uiState.update { it.copy(timerEndAt = millis) }
-                            } catch (e: Exception) {
-                                // Ignore parse errors
-                            }
-                        }
-                    }
                     "private_message" -> {
                         // Increment unread count
                         _uiState.update { it.copy(unreadCount = it.unreadCount + 1) }
                     }
-                    "event_trigger" -> {
-                        // Update current event
-                        val title = event.data?.get("title") ?: ""
-                        val description = event.data?.get("description") ?: ""
-                        val eventId = event.data?.get("event_id") ?: ""
-                        val effectType = event.data?.get("effect_type") ?: ""
-
-                        _uiState.update {
-                            it.copy(
-                                currentEvent = CurrentEvent(
-                                    id = eventId,
-                                    title = title,
-                                    description = description,
-                                    effectType = effectType
-                                )
-                            )
-                        }
-                    }
-                    "vote_update", "vote_result" -> {
-                        // Could refresh vote status here
-                    }
                 }
             }
+
             is WebSocketEvent.PlayerJoined, is WebSocketEvent.PlayerLeft -> {
                 // Reload players list
                 viewModelScope.launch {
@@ -228,9 +309,11 @@ class GameViewModel @Inject constructor(
                     }
                 }
             }
+
             is WebSocketEvent.Error -> {
                 _uiState.update { it.copy(error = event.message) }
             }
+
             else -> { /* Ignore other events */ }
         }
     }
@@ -245,6 +328,42 @@ class GameViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun selectEventChoice(choice: EventChoice) {
+        _uiState.update { it.copy(selectedEventChoice = choice) }
+    }
+
+    fun submitEventChoice() {
+        val currentEvent = _uiState.value.currentEvent ?: return
+        val selectedChoice = _uiState.value.selectedEventChoice ?: return
+        val roomCode = _uiState.value.roomCode
+
+        viewModelScope.launch {
+            try {
+                // Send event choice via WebSocket
+                webSocketService.sendEventChoice(
+                    eventId = currentEvent.id,
+                    choiceId = selectedChoice.id
+                )
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "提交選擇失敗：${e.message}") }
+            }
+        }
+    }
+
+    fun clearCurrentEvent() {
+        _uiState.update { it.copy(currentEvent = null, selectedEventChoice = null) }
+    }
+
+    fun dismissDiceRoll() {
+        _uiState.update { it.copy(diceRoll = DiceRollState()) }
+    }
+
+    fun dismissVoteProgress() {
+        _uiState.update {
+            it.copy(voteProgress = VoteProgressState())
+        }
     }
 
     override fun onCleared() {

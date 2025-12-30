@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "android",
+            "request": "launch",
+            "name": "🏛️ 1812國會風雲 (Debug)",
+            "appSrcRoot": "${workspaceFolder}/platforms/android/app/src/main",
+            "apkFile": "${workspaceFolder}/platforms/android/app/build/outputs/apk/debug/app-debug.apk",
+            "manifestFile": "${workspaceFolder}/platforms/android/app/src/main/AndroidManifest.xml",
+            "adbSocket": "localhost:5037",
+            "launchActivity": ".MainActivity",
+            "postLaunchPause": 2000,
+            "trace": false
+        },
+        {
+            "type": "android",
+            "request": "attach",
+            "name": "🔗 Attach to Running App",
+            "appSrcRoot": "${workspaceFolder}/platforms/android/app/src/main",
+            "adbSocket": "localhost:5037",
+            "processId": "${command:PickAndroidProcess}"
+        },
+        {
+            "type": "android",
+            "request": "launch",
+            "name": "📱 Launch on Selected Device",
+            "appSrcRoot": "${workspaceFolder}/platforms/android/app/src/main",
+            "apkFile": "${workspaceFolder}/platforms/android/app/build/outputs/apk/debug/app-debug.apk",
+            "manifestFile": "${workspaceFolder}/platforms/android/app/src/main/AndroidManifest.xml",
+            "targetDevice": "${command:PickAndroidDevice}",
+            "launchActivity": ".MainActivity"
+        }
+    ]
+}

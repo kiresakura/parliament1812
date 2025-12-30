@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
-import com.parliament1812.nfc.NFCManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,11 +17,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-    @Provides
-    @Singleton
-    fun provideNFCManager(): NFCManager {
-        return NFCManager()
-    }
+    // NFCManager is now provided directly by Hilt via @Inject constructor()
+    // No need for explicit @Provides method - removed to fix duplicate provider conflict
 
     @Provides
     @Singleton

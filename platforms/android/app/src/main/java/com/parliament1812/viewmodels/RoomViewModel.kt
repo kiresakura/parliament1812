@@ -7,6 +7,7 @@ import com.parliament1812.data.models.Player
 import com.parliament1812.data.remote.ApiService
 import com.parliament1812.data.remote.CreateRoomRequest
 import com.parliament1812.data.remote.JoinRoomRequest
+import com.parliament1812.data.remote.SetReadyRequest
 import com.parliament1812.data.remote.WebSocketEvent
 import com.parliament1812.data.remote.WebSocketService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +24,8 @@ data class RoomUiState(
     val currentPlayer: Player? = null,
     val players: List<Player> = emptyList(),
     val error: String? = null,
-    val isHost: Boolean = false
+    val isHost: Boolean = false,
+    val isSettingReady: Boolean = false
 )
 
 @HiltViewModel
@@ -83,6 +85,25 @@ class RoomViewModel @Inject constructor(
                                     roleType = event.roleType,
                                     roleIndex = event.roleIndex
                                 )
+                            } else state.currentPlayer
+
+                            state.copy(
+                                players = updatedPlayers,
+                                currentPlayer = updatedCurrentPlayer
+                            )
+                        }
+                    }
+
+                    is WebSocketEvent.PlayerReady -> {
+                        Log.d(TAG, "Player ready: ${event.playerId} -> ${event.isReady}")
+                        _uiState.update { state ->
+                            val updatedPlayers = state.players.map { player ->
+                                if (player.id == event.playerId) {
+                                    player.copy(isReady = event.isReady)
+                                } else player
+                            }
+                            val updatedCurrentPlayer = if (state.currentPlayer?.id == event.playerId) {
+                                state.currentPlayer.copy(isReady = event.isReady)
                             } else state.currentPlayer
 
                             state.copy(
@@ -198,15 +219,112 @@ class RoomViewModel @Inject constructor(
             try {
                 val players = apiService.getPlayers(roomCode)
                 Log.d(TAG, "Fetched ${players.size} players")
-                _uiState.update { it.copy(players = players) }
+
+                _uiState.update { state ->
+                    // Also update currentPlayer with the latest data from server
+                    val updatedCurrentPlayer = state.currentPlayer?.let { current ->
+                        players.find { it.id == current.id } ?: current
+                    }
+
+                    state.copy(
+                        players = players,
+                        currentPlayer = updatedCurrentPlayer
+                    )
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch players", e)
             }
         }
     }
 
+    fun setReady(playerId: String, isReady: Boolean) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSettingReady = true, error = null) }
+            try {
+                val updatedPlayer = apiService.setReady(playerId, SetReadyRequest(isReady))
+                Log.d(TAG, "Player ready status updated: ${updatedPlayer.isReady}")
+
+                _uiState.update { state ->
+                    val updatedPlayers = state.players.map { player ->
+                        if (player.id == playerId) updatedPlayer else player
+                    }
+                    val updatedCurrentPlayer = if (state.currentPlayer?.id == playerId) {
+                        updatedPlayer
+                    } else state.currentPlayer
+
+                    state.copy(
+                        isSettingReady = false,
+                        players = updatedPlayers,
+                        currentPlayer = updatedCurrentPlayer
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to set ready status", e)
+                _uiState.update {
+                    it.copy(
+                        isSettingReady = false,
+                        error = "設定準備狀態失敗: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun startGame(onSuccess: () -> Unit) {
+        Log.d(TAG, "startGame() called")
+        val roomCode = _uiState.value.roomCode
+        val playerId = _uiState.value.currentPlayer?.id
+        Log.d(TAG, "startGame: roomCode=$roomCode, playerId=$playerId")
+
+        if (roomCode == null) {
+            Log.e(TAG, "startGame: roomCode is null, returning")
+            return
+        }
+        if (playerId == null) {
+            Log.e(TAG, "startGame: playerId is null, returning")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                Log.d(TAG, "startGame: calling API...")
+                val response = apiService.startGame(roomCode, playerId)
+                Log.d(TAG, "Game started successfully, phase: ${response.phase}")
+                _uiState.update { it.copy(isLoading = false) }
+                onSuccess()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start game", e)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "開始遊戲失敗: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun leaveRoom(onComplete: () -> Unit = {}) {
+        val roomCode = _uiState.value.roomCode ?: return
+        val playerId = _uiState.value.currentPlayer?.id ?: return
+
+        viewModelScope.launch {
+            try {
+                apiService.leaveRoom(roomCode, playerId)
+                Log.d(TAG, "Successfully left room: $roomCode")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to leave room", e)
+                // Still disconnect even if API call fails
+            } finally {
+                disconnect()
+                onComplete()
+            }
+        }
     }
 
     fun disconnect() {
