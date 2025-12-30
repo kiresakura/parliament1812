@@ -136,6 +136,14 @@ async def get_round1_result(
     Returns:
         第一輪投票結果（百分比）
     """
+    # 投票選項定義
+    VOTE_OPTIONS = {
+        "A": {"title": "禁止機器", "description": "立法禁止工廠使用省力機器"},
+        "B": {"title": "保護財產", "description": "嚴厲打擊破壞機器的暴民"},
+        "C": {"title": "折衷改革", "description": "允許機器但立法保障工人權益"},
+        "D": {"title": "皇家調查", "description": "由皇室調查委員會處理"},
+    }
+
     # 取得所有第一輪投票
     result = await db.execute(
         select(Vote).where(
@@ -160,6 +168,21 @@ async def get_round1_result(
     for key, count in counts.items():
         percentages[key] = round(count / total * 100, 1) if total > 0 else 0
 
+    # 建立 iOS 相容的選項陣列格式
+    options = []
+    for letter in ["A", "B", "C", "D"]:
+        count = counts[letter]
+        percentage = round(count / total * 100, 1) if total > 0 else 0.0
+        options.append({
+            "option_id": letter,
+            "letter": letter,
+            "title": VOTE_OPTIONS[letter]["title"],
+            "description": VOTE_OPTIONS[letter]["description"],
+            "count": count,
+            "percentage": percentage,
+            # Round 1 is anonymous, no voters info
+        })
+
     # 檢查是否完成
     progress = await get_vote_progress(db, room_id, 1)
 
@@ -167,6 +190,7 @@ async def get_round1_result(
         "round": 1,
         "total_votes": total,
         "percentages": percentages,
+        "options": options,  # iOS 相容的陣列格式
         "is_complete": progress["is_complete"],
     }
 
