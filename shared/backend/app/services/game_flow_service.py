@@ -363,9 +363,8 @@ async def start_auto_advance_timer(
         except Exception as e:
             print(f"[GameFlow] Timer error for room {room_code}: {e}")
         finally:
-            # 清理計時器引用
-            if room_code in _room_timers:
-                del _room_timers[room_code]
+            # 清理計時器引用（使用 pop 避免 race condition）
+            _room_timers.pop(room_code, None)
 
     # 創建並儲存計時器任務
     task = asyncio.create_task(timer_task())
@@ -379,15 +378,13 @@ async def cancel_room_timer(room_code: str) -> None:
     Args:
         room_code: 房間碼
     """
-    if room_code in _room_timers:
-        task = _room_timers[room_code]
-        if not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        del _room_timers[room_code]
+    task = _room_timers.pop(room_code, None)
+    if task is not None and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 async def check_vote_completion(room_code: str, room_id: UUID) -> None:
