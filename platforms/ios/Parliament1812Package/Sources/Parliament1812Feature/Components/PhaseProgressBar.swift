@@ -127,8 +127,22 @@ struct CountdownTimerView: View {
     let endTime: Date?
     let phaseName: String
 
-    @State private var remainingSeconds: Int = 0
-    @State private var isUrgent: Bool = false
+    @State private var remainingSeconds: Int
+    @State private var isUrgent: Bool
+
+    init(endTime: Date?, phaseName: String) {
+        self.endTime = endTime
+        self.phaseName = phaseName
+        // Initialize with calculated values to prevent flicker
+        if let endTime = endTime {
+            let remaining = endTime.timeIntervalSinceNow
+            _remainingSeconds = State(initialValue: max(0, Int(remaining)))
+            _isUrgent = State(initialValue: remaining > 0 && remaining < 60)
+        } else {
+            _remainingSeconds = State(initialValue: 0)
+            _isUrgent = State(initialValue: false)
+        }
+    }
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -233,7 +247,7 @@ struct CountdownTimerView: View {
     }
 
     private var progressRatio: CGFloat {
-        guard let endTime = endTime else { return 0 }
+        guard endTime != nil else { return 0 }
 
         // Assume max duration is the phase's default duration
         let totalDuration = GamePhase.debatePhases.first?.defaultDuration ?? 600
@@ -272,10 +286,23 @@ struct CountdownTimerView: View {
 struct CompactCountdownTimer: View {
     let endTime: Date?
 
-    @State private var remainingSeconds: Int = 0
-    @State private var isUrgent: Bool = false
+    @State private var remainingSeconds: Int
+    @State private var isUrgent: Bool
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    init(endTime: Date?) {
+        self.endTime = endTime
+        // Initialize with calculated values to prevent flicker
+        if let endTime = endTime {
+            let remaining = endTime.timeIntervalSinceNow
+            _remainingSeconds = State(initialValue: max(0, Int(remaining)))
+            _isUrgent = State(initialValue: remaining > 0 && remaining < 60)
+        } else {
+            _remainingSeconds = State(initialValue: 0)
+            _isUrgent = State(initialValue: false)
+        }
+    }
 
     var body: some View {
         HStack(spacing: ParliamentSpacing.xs) {
@@ -342,9 +369,9 @@ struct CompactCountdownTimer: View {
         VStack(spacing: 24) {
             PhaseProgressBar(currentPhase: .debate)
 
-            PhaseProgressBar(currentPhase: .voteRound1)
+            PhaseProgressBar(currentPhase: .voting)
 
-            PhaseProgressBar(currentPhase: .reveal)
+            PhaseProgressBar(currentPhase: .gameEnd)
         }
         .padding()
     }

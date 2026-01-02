@@ -15,7 +15,7 @@ from app.schemas import (
     RoleInfo,
     PlayerReadyRequest,
 )
-from app.services import room_service, player_service
+from app.services import room_service, player_service, game_flow_service
 from app.data.roles import ROLES, get_role_info
 from app.websocket import notify_player_join, notify_player_leave, notify_player_ready
 
@@ -379,14 +379,7 @@ async def set_player_ready(
             detail="找不到此玩家",
         )
 
-    # 檢查玩家是否已分配角色
-    if not player.role_type:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="請先掃描 NFC 卡片分配角色",
-        )
-
-    # 更新準備狀態
+    # 更新準備狀態（不再需要先分配角色）
     player = await player_service.set_player_ready(db, player, request.is_ready)
 
     # 取得房間代碼並通知其他玩家
@@ -397,6 +390,10 @@ async def set_player_ready(
             player_id=str(player.id),
             is_ready=player.is_ready,
         )
+
+        # 自動開始遊戲檢查：當所有玩家都準備就緒且都有角色時
+        if request.is_ready and room.phase == 1:
+            await _check_and_auto_start_game(db, room)
 
     return PlayerResponse(
         id=player.id,
@@ -519,4 +516,60 @@ async def get_role(role_type: str) -> RoleInfo:
         description=role["description"],
         background=role["background"],
         public_stance=role["public_stance"],
+    )
+
+
+# ============== 私有輔助函數 ==============
+
+async def _check_and_auto_start_game(db: AsyncSession, room) -> None:
+    """
+    檢查是否滿足自動開始遊戲的條件，若滿足則自動開始
+
+    條件：
+    1. 房間狀態為 waiting (phase == 1)
+    2. 至少有 2 名玩家
+    3. 所有玩家都已準備就緒
+
+    注意：角色分配現在在所有玩家準備就緒後進行
+
+    Args:
+        db: 資料庫 session
+        room: 房間物件
+    """
+    from app.websocket.manager import manager
+
+    players = room.players
+
+    # 條件 1: 至少 2 名玩家
+    if len(players) < 2:
+        return
+
+    # 條件 2: 所有玩家都準備就緒（不再需要先分配角色）
+    all_ready = all(p.is_ready for p in players)
+    if not all_ready:
+        return
+
+    # 所有條件滿足，自動開始遊戲！
+    print(f"[AutoStart] 房間 {room.code} 所有玩家就緒，自動開始遊戲")
+
+    # 廣播即將開始的通知
+    await manager.broadcast(
+        room_code=room.code,
+        message={
+            "type": "game_auto_starting",
+            "data": {
+                "message": "所有玩家已就緒，遊戲即將開始！",
+                "countdown": 3,
+            },
+        },
+    )
+
+    # 短暫延遲讓玩家看到通知
+    import asyncio
+    await asyncio.sleep(3)
+
+    # 啟動遊戲流程
+    await game_flow_service.start_game_flow(
+        room_code=room.code,
+        room_id=room.id,
     )

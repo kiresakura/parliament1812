@@ -23,12 +23,17 @@ struct WaitingRoomView: View {
     // Computed property for all players ready check
     private var allPlayersReady: Bool {
         guard !players.isEmpty else { return false }
-        return players.allSatisfy { $0.hasRole && $0.isReady }
+        return players.allSatisfy { $0.isReady }
     }
 
     // Computed property for ready count
     private var readyCount: Int {
         players.filter { $0.isReady }.count
+    }
+
+    // Computed property to check if current player has a role assigned
+    private var currentPlayerHasRole: Bool {
+        myRole != nil || players.first(where: { $0.id == currentPlayer.id })?.roleType != nil
     }
 
     var body: some View {
@@ -250,80 +255,42 @@ struct WaitingRoomView: View {
         return path
     }
 
-    // MARK: - Royal Pass Header (皇家通行證 - Victorian Style)
+    // MARK: - Royal Pass Header (皇家通行證 - Victorian Style - Compact)
     private var royalPassHeader: some View {
-        VStack(spacing: ParliamentSpacing.md) {
-            // Header with Wax Seal aesthetic look
-            HStack {
-                // Left decorative element
-                Image(systemName: "ornament.fill")
-                    .foregroundColor(.parliamentGold.opacity(0.6))
-                    .font(.caption)
+        HStack(spacing: ParliamentSpacing.md) {
+            // Room Code (compact)
+            Text(roomCode)
+                .font(.custom("Georgia", size: 28).weight(.bold))
+                .foregroundColor(.parliamentGoldDark)
+                .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
 
-                Text("ROYAL DECREE")
-                    .font(.system(size: 10, weight: .bold, design: .serif))
-                    .foregroundColor(.parliamentTextMuted)
-                    .tracking(4)
+            Spacer()
 
-                Image(systemName: "ornament.fill")
-                    .foregroundColor(.parliamentGold.opacity(0.6))
-                    .font(.caption)
-            }
-
-            // Room Code as Centerpiece
-            VStack(spacing: 8) {
-                Text(roomCode)
-                    .font(.custom("Georgia", size: 48).weight(.bold))  // Serif font for document feel
-                    .foregroundColor(.parliamentGoldDark)
-                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
-
-                // Copy Button (Styled as a stamp/action)
-                Button {
-                    UIPasteboard.general.string = roomCode
-                    withAnimation(.easeInOut(duration: 0.3)) { showCopiedToast = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation { showCopiedToast = false }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "doc.on.doc.fill")
-                        Text("複製通行碼")
-                    }
-                    .font(.custom("Songti TC", size: 12).weight(.medium))
-                    .foregroundColor(.parliamentTextSecondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .stroke(Color.parliamentTextSecondary.opacity(0.3), lineWidth: 1)
-                    )
+            // Copy Button (compact)
+            Button {
+                UIPasteboard.general.string = roomCode
+                withAnimation(.easeInOut(duration: 0.3)) { showCopiedToast = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation { showCopiedToast = false }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, ParliamentSpacing.lg)
-            .background(
-                ZStack {
-                    // Inner faint border
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.parliamentGold.opacity(0.15), lineWidth: 1)
-                        .padding(4)
-
-                    // Corner decorations
-                    VictorianCorner(
-                        position: .topLeading, size: 16, color: .parliamentGold.opacity(0.4)
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(4)
-                    VictorianCorner(
-                        position: .bottomTrailing, size: 16, color: .parliamentGold.opacity(0.4)
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(4)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.on.doc.fill")
+                    Text("複製")
                 }
-            )
+                .font(.custom("Songti TC", size: 12).weight(.medium))
+                .foregroundColor(.parliamentTextSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .stroke(Color.parliamentTextSecondary.opacity(0.3), lineWidth: 1)
+                )
+            }
         }
-        .padding(ParliamentSpacing.md)
-        .paperSurface(withBorder: true)  // Use new modifier
+        .padding(.horizontal, ParliamentSpacing.md)
+        .padding(.vertical, ParliamentSpacing.sm)
+        .paperSurface(withBorder: true)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
     }
@@ -467,111 +434,57 @@ struct WaitingRoomView: View {
     // MARK: - Bottom Action Section (固定底部按鈕樣式)
     @ViewBuilder
     private var bottomActionSection: some View {
-        if myRole == nil {
-            // 尚未分配角色 - 顯示 NFC 掃描按鈕
-            nfcScanButton
-        } else if !isReady {
-            // 已分配角色但尚未準備 - 顯示準備按鈕
-            readyConfirmSection
-        } else if isHost && allPlayersReady {
+        if isHost && allPlayersReady {
             // 房主且所有人準備完成 - 顯示開始遊戲按鈕
             startGameSection
         } else {
-            // 已準備 - 顯示等待狀態
-            waitingForGameSection
+            // 顯示準備/取消準備按鈕
+            readyToggleSection
         }
     }
 
-    // 準備確認區塊 (已分配角色，等待確認)
-    private var readyConfirmSection: some View {
-        VStack(spacing: 0) {
-            VictorianDivider()
-                .padding(.bottom, ParliamentSpacing.sm)
-
-            HStack(spacing: ParliamentSpacing.md) {
-                // 角色頭像
-                if let roleTypeString = myRole?.type,
-                   let roleType = RoleType(rawValue: roleTypeString) {
-                    Image(roleType.imageName, bundle: .main)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 50, height: 60)
-                        .clipShape(PointyHexagonShape())
-                        .overlay(VictorianOvalFrame(size: CGSize(width: 50, height: 60)))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("角色已分配")
-                        .font(.custom("Songti TC", size: 11))
-                        .foregroundColor(.parliamentTextMuted)
-
-                    if let roleTypeString = myRole?.type,
-                       let roleType = RoleType(rawValue: roleTypeString) {
-                        Text(roleType.characterName)
-                            .font(.custom("Songti TC", size: 16).weight(.bold))
-                            .foregroundColor(.parliamentGold)
-                    }
-                }
-
-                Spacer()
-
-                // 準備按鈕
-                Button {
-                    Task {
-                        await setReadyStatus(ready: true)
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        if isSettingReady {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "checkmark.circle.fill")
-                        }
-                        Text("準備就緒")
-                            .font(.custom("Songti TC", size: 14).weight(.bold))
-                    }
-                }
-                .buttonStyle(Civ6ButtonStyle(style: .primary))
-                .disabled(isSettingReady)
-                .frame(width: 120)
-            }
-            .padding(ParliamentSpacing.md)
-        }
-    }
-
-    // NFC 掃描按鈕 (Victorian Style)
-    private var nfcScanButton: some View {
+    // 準備狀態切換區塊
+    private var readyToggleSection: some View {
         VStack(spacing: 0) {
             VictorianDivider()
                 .padding(.bottom, ParliamentSpacing.sm)
 
             Button {
-                showNFCScan = true
+                Task {
+                    await setReadyStatus(ready: !isReady)
+                }
             } label: {
                 HStack(spacing: ParliamentSpacing.md) {
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .font(.system(size: 24))
-                    
+                    if isSettingReady {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: isReady ? .parliamentGold : .white))
+                    } else {
+                        Image(systemName: isReady ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 24))
+                            .foregroundColor(isReady ? .green : .white)
+                    }
+
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("掃描角色卡")
-                            .font(.custom("Songti TC", size: 16).weight(.bold))
-                        Text("請將 NFC 卡片靠近手機背面")
+                        Text(isReady ? "準備就緒" : "準備中")
+                            .font(.custom("Songti TC", size: 18).weight(.bold))
+                        Text(isReady ? "點擊取消準備" : "點擊確認準備")
                             .font(.custom("Songti TC", size: 11))
                             .opacity(0.8)
                     }
-                    
+
                     Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
+
+                    if isReady {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.green)
+                    }
                 }
                 .padding(.horizontal, 4)
             }
-            .buttonStyle(Civ6ButtonStyle(style: .primary))
+            .buttonStyle(Civ6ButtonStyle(style: isReady ? .secondary : .primary))
+            .disabled(isSettingReady)
         }
-
     }
 
     // 開始遊戲區塊（房主專用）
@@ -614,86 +527,6 @@ struct WaitingRoomView: View {
             }
             .buttonStyle(Civ6ButtonStyle(style: .primary))
             .disabled(isStartingGame)
-        }
-    }
-
-    // 等待遊戲開始區塊
-    private var waitingForGameSection: some View {
-        VStack(spacing: 0) {
-            VictorianDivider()
-                .padding(.bottom, ParliamentSpacing.sm)
-
-            HStack(spacing: ParliamentSpacing.md) {
-                // 角色頭像
-                if let roleTypeString = myRole?.type,
-                   let roleType = RoleType(rawValue: roleTypeString) {
-                    Image(roleType.imageName, bundle: .main)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 50, height: 60)
-                        .clipShape(PointyHexagonShape())
-                        .overlay(VictorianOvalFrame(size: CGSize(width: 50, height: 60)))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(.green)
-                        Text("準備完成")
-                            .font(.custom("Songti TC", size: 11).weight(.bold))
-                            .foregroundColor(.green)
-                    }
-
-                    if let roleTypeString = myRole?.type,
-                       let roleType = RoleType(rawValue: roleTypeString) {
-                        Text(roleType.characterName)
-                            .font(.custom("Songti TC", size: 14).weight(.semibold))
-                            .foregroundColor(.parliamentGold)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer()
-
-                // 取消準備按鈕 + 等待指示
-                VStack(spacing: 6) {
-                    // 取消準備按鈕
-                    Button {
-                        Task {
-                            await setReadyStatus(ready: false)
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if isSettingReady {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .parliamentTextMuted))
-                                    .scaleEffect(0.7)
-                            } else {
-                                Image(systemName: "xmark.circle")
-                            }
-                            Text("取消準備")
-                                .font(.custom("Songti TC", size: 12))
-                        }
-                    }
-                    .buttonStyle(Civ6ButtonStyle(style: .secondary))
-                    .disabled(isSettingReady)
-                    .frame(width: 110)
-
-                    // 等待指示
-                    if allPlayersReady {
-                        Text("等待房主開始")
-                            .font(.custom("Songti TC", size: 10))
-                            .foregroundColor(.parliamentTextMuted)
-                    } else {
-                        let readyCount = players.filter { $0.isReady }.count
-                        Text("\(readyCount)/\(players.count) 已準備")
-                            .font(.custom("Songti TC", size: 10))
-                            .foregroundColor(.parliamentTextMuted)
-                    }
-                }
-            }
-            .padding(ParliamentSpacing.md)
         }
     }
 
@@ -806,8 +639,8 @@ struct WaitingRoomView: View {
 
         webSocketService.onPhaseChanged = { phase in
             Task { @MainActor in
-                // 遊戲開始時轉場到議事廳 (phase 2 = preparing)
-                if phase == .preparing {
+                // 遊戲開始時轉場到議事廳 (phase 1 = characterSelection)
+                if phase == .characterSelection {
                     print("Game started! Navigating to game flow...")
                     navigateToGame = true
                 }
