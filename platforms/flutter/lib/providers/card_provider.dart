@@ -107,8 +107,14 @@ class CardProvider with ChangeNotifier {
   String? get error => _error;
   CardAnimationData? get lastCardAnimation => _lastCardAnimation;
 
+  /// 可用手牌（未使用的）
+  List<HandCard> get availableCards => _hand.where((c) => !c.isUsed).toList();
+
   /// 可用手牌數量（未使用的）
-  int get availableCardCount => _hand.where((c) => !c.isUsed).length;
+  int get availableCardCount => availableCards.length;
+
+  /// 已使用卡牌數量
+  int get usedCount => _hand.where((c) => c.isUsed).length;
 
   /// 是否有選中卡牌
   bool get hasSelectedCard => _selectedCard != null;
@@ -315,6 +321,42 @@ class CardProvider with ChangeNotifier {
   }
 
   // ==================== 卡牌使用 ====================
+
+  /// 檢查是否可以使用指定卡牌
+  /// 根據 Task 1.4 規格要求
+  bool canUseCard(String cardId, PlayerResources resources) {
+    // 找到卡牌
+    final handCard = _hand.firstWhere(
+      (c) => c.card.id == cardId || c.instanceId == cardId,
+      orElse: () => const HandCard(
+        instanceId: '',
+        card: GameCard(
+          id: '',
+          name: '',
+          type: CardType.attack,
+          rarity: CardRarity.n,
+          category: CardCategory.universal,
+          targetType: CardTargetType.singleEnemy,
+          effect: CardEffect(effectType: '', description: ''),
+        ),
+      ),
+    );
+
+    // 卡牌不存在
+    if (handCard.instanceId.isEmpty) return false;
+
+    // 卡牌已使用
+    if (handCard.isUsed) return false;
+
+    // 玩家已政治死亡
+    if (resources.isPoliticallyDead) return false;
+
+    // 檢查資源是否足夠
+    return resources.canUseCard(
+      influenceCost: handCard.card.influenceCost,
+      goldCost: handCard.card.goldCost,
+    );
+  }
 
   /// 使用卡牌
   Future<CardUseResult> useCard({
