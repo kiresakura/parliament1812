@@ -18,6 +18,8 @@ struct WaitingRoomView: View {
     @State private var navigateToGame = false
     @State private var refreshTimer: Timer?
     @State private var isLeavingRoom = false
+    @State private var showRoleSelection = false
+    @State private var pendingRoleSelection: RoleType?
     @Environment(\.dismiss) private var dismiss
 
     // Computed property for all players ready check
@@ -134,6 +136,16 @@ struct WaitingRoomView: View {
                     players[index].roleIndex = roleIndex
                 }
             }
+        }
+        .sheet(isPresented: $showRoleSelection) {
+            RoleSelectionSheet(
+                selectedRole: $pendingRoleSelection,
+                onConfirm: { selectedRole in
+                    Task {
+                        await assignRoleManually(roleType: selectedRole)
+                    }
+                }
+            )
         }
         .navigationDestination(isPresented: $navigateToGame) {
             GameFlowView(
@@ -376,14 +388,43 @@ struct WaitingRoomView: View {
                     spacing: ParliamentSpacing.md
                 ) {
                     ForEach(players) { player in
+                        let isCurrentUser = player.id == currentPlayer.id
                         VictorianOvalPlayerCard(
                             // Use currentPlayer.nickname for current user to ensure correct display
-                            nickname: player.id == currentPlayer.id ? currentPlayer.nickname : player.nickname,
+                            nickname: isCurrentUser ? currentPlayer.nickname : player.nickname,
                             roleType: player.roleType?.imageName,
                             isHost: player.isHost,
                             isReady: player.isReady,
-                            isCurrentUser: player.id == currentPlayer.id
+                            isCurrentUser: isCurrentUser
                         )
+                        .overlay(
+                            // Show tap hint for current player when not ready
+                            Group {
+                                if isCurrentUser && !isReady {
+                                    VStack {
+                                        Spacer()
+                                        Text("點擊選角")
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundColor(.parliamentGold)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(
+                                                Capsule()
+                                                    .fill(Color.black.opacity(0.7))
+                                            )
+                                            .offset(y: 4)
+                                    }
+                                }
+                            }
+                        )
+                        .onTapGesture {
+                            // Only allow current player to tap their own avatar when not ready
+                            if isCurrentUser && !isReady {
+                                pendingRoleSelection = myRole.flatMap { RoleType(rawValue: $0.type) }
+                                showRoleSelection = true
+                                HapticManager.shared.playSelection()
+                            }
+                        }
                     }
                 }
                 .padding(ParliamentSpacing.md)
@@ -639,8 +680,8 @@ struct WaitingRoomView: View {
 
         webSocketService.onPhaseChanged = { phase in
             Task { @MainActor in
-                // 遊戲開始時轉場到議事廳 (phase 1 = characterSelection)
-                if phase == .characterSelection {
+                // 遊戲開始時轉場到議事廳 (phase 1 = preparing)
+                if phase == .preparing {
                     print("Game started! Navigating to game flow...")
                     navigateToGame = true
                 }
@@ -725,6 +766,28 @@ struct WaitingRoomView: View {
     }
 
     // MARK: - Actions
+
+    /// 手動選擇角色並發送到後端
+    private func assignRoleManually(roleType: RoleType) async {
+        do {
+            let response = try await APIService.shared.assignRoleManually(
+                roomCode: roomCode,
+                playerId: currentPlayer.id,
+                roleCode: roleType.backendRoleCode
+            )
+            // Update local state with the assigned role
+            myRole = (roleType.rawValue, response.roleIndex ?? 1)
+            // Update the player in the players array
+            if let index = players.firstIndex(where: { $0.id == currentPlayer.id }) {
+                players[index].roleType = roleType
+                players[index].roleIndex = response.roleIndex
+            }
+            print("Role assigned successfully: \(roleType.displayName)")
+        } catch {
+            errorMessage = "角色選擇失敗：\(error.localizedDescription)"
+            print("Failed to assign role: \(error)")
+        }
+    }
 
     private func setReadyStatus(ready: Bool) async {
         isSettingReady = true

@@ -369,9 +369,9 @@ struct CompactCountdownTimer: View {
         VStack(spacing: 24) {
             PhaseProgressBar(currentPhase: .debate)
 
-            PhaseProgressBar(currentPhase: .voting)
+            PhaseProgressBar(currentPhase: .voteRound1)
 
-            PhaseProgressBar(currentPhase: .gameEnd)
+            PhaseProgressBar(currentPhase: .finished)
         }
         .padding()
     }

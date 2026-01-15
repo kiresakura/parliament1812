@@ -90,4 +90,16 @@ enum RoleType: String, Codable, CaseIterable, Sendable {
         case .georgeiii: return "character_george_iii"
         }
     }
+
+    /// 後端角色代碼（用於 API 請求，格式如 W01, F01, L01 等）
+    var backendRoleCode: String {
+        switch self {
+        case .worker: return "W01"
+        case .factory: return "F01"
+        case .luddite: return "L01"
+        case .reformer: return "R01"
+        case .mp: return "M01"
+        case .georgeiii: return "G01"
+        }
+    }
 }

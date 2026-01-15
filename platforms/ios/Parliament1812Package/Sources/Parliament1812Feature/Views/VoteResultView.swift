@@ -449,11 +449,11 @@ struct VoterInfo: Identifiable {
             VoteResultItem(optionId: "C", letter: "C", title: "折衷改革", count: 10, percentage: 50)
         ],
         voters: [
-            VoterInfo(id: "1", nickname: "威廉", roleType: "議員", votedFor: "C"),
-            VoterInfo(id: "2", nickname: "湯瑪斯", roleType: "工人", votedFor: "A"),
-            VoterInfo(id: "3", nickname: "理查", roleType: "工廠主", votedFor: "B"),
-            VoterInfo(id: "4", nickname: "喬治", roleType: "盧德派", votedFor: "A"),
-            VoterInfo(id: "5", nickname: "羅伯特", roleType: "改革者", votedFor: "C")
+            VoterInfo(playerId: "1", nickname: "威廉", roleType: "議員", votedFor: "C"),
+            VoterInfo(playerId: "2", nickname: "湯瑪斯", roleType: "工人", votedFor: "A"),
+            VoterInfo(playerId: "3", nickname: "理查", roleType: "工廠主", votedFor: "B"),
+            VoterInfo(playerId: "4", nickname: "喬治", roleType: "盧德派", votedFor: "A"),
+            VoterInfo(playerId: "5", nickname: "羅伯特", roleType: "改革者", votedFor: "C")
         ],
         winningOption: "C"
     )
