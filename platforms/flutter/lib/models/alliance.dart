@@ -2,6 +2,58 @@
 /// 1812 國會風雲 - 同盟系統
 library alliance;
 
+/// 同盟類型枚舉
+enum AllianceType {
+  political,  // 政治同盟
+  economic,   // 經濟同盟
+  secret,     // 秘密同盟
+  temporary,  // 暫時同盟
+}
+
+/// 同盟類型顯示
+extension AllianceTypeExtension on AllianceType {
+  String get displayName {
+    switch (this) {
+      case AllianceType.political:
+        return '政治同盟';
+      case AllianceType.economic:
+        return '經濟同盟';
+      case AllianceType.secret:
+        return '秘密同盟';
+      case AllianceType.temporary:
+        return '暫時同盟';
+    }
+  }
+
+  String get icon {
+    switch (this) {
+      case AllianceType.political:
+        return '🏛️';
+      case AllianceType.economic:
+        return '💰';
+      case AllianceType.secret:
+        return '🤫';
+      case AllianceType.temporary:
+        return '⏳';
+    }
+  }
+
+  static AllianceType fromString(String value) {
+    switch (value.toLowerCase()) {
+      case 'political':
+        return AllianceType.political;
+      case 'economic':
+        return AllianceType.economic;
+      case 'secret':
+        return AllianceType.secret;
+      case 'temporary':
+        return AllianceType.temporary;
+      default:
+        return AllianceType.political;
+    }
+  }
+}
+
 /// 同盟狀態枚舉
 enum AllianceStatus {
   pending,  // 待確認
@@ -53,6 +105,7 @@ class Alliance {
   final String roomId;
   final String player1Id;
   final String player2Id;
+  final AllianceType type;
   final AllianceStatus status;
   final DateTime formedAt;
   final DateTime? brokenAt;
@@ -69,6 +122,7 @@ class Alliance {
     required this.roomId,
     required this.player1Id,
     required this.player2Id,
+    this.type = AllianceType.political,
     required this.status,
     required this.formedAt,
     this.brokenAt,
@@ -119,6 +173,8 @@ class Alliance {
       roomId: json['room_id'] ?? json['roomId'] ?? '',
       player1Id: json['player1_id'] ?? json['player1Id'] ?? '',
       player2Id: json['player2_id'] ?? json['player2Id'] ?? '',
+      type: AllianceTypeExtension.fromString(
+          json['type'] ?? 'political'),
       status: AllianceStatusExtension.fromString(
           json['status'] ?? 'pending'),
       formedAt: json['formed_at'] != null
@@ -141,6 +197,7 @@ class Alliance {
       'room_id': roomId,
       'player1_id': player1Id,
       'player2_id': player2Id,
+      'type': type.name,
       'status': status.name,
       'formed_at': formedAt.toIso8601String(),
       'broken_at': brokenAt?.toIso8601String(),
@@ -153,6 +210,7 @@ class Alliance {
     String? roomId,
     String? player1Id,
     String? player2Id,
+    AllianceType? type,
     AllianceStatus? status,
     DateTime? formedAt,
     DateTime? brokenAt,
@@ -163,6 +221,7 @@ class Alliance {
       roomId: roomId ?? this.roomId,
       player1Id: player1Id ?? this.player1Id,
       player2Id: player2Id ?? this.player2Id,
+      type: type ?? this.type,
       status: status ?? this.status,
       formedAt: formedAt ?? this.formedAt,
       brokenAt: brokenAt ?? this.brokenAt,
@@ -189,7 +248,7 @@ class Alliance {
 
   @override
   String toString() =>
-      'Alliance(id: $id, ${status.icon} $player1Id ↔ $player2Id, status: ${status.displayName})';
+      'Alliance(id: $id, ${type.icon} ${status.icon} $player1Id ↔ $player2Id, type: ${type.displayName}, status: ${status.displayName})';
 
   @override
   bool operator ==(Object other) =>
