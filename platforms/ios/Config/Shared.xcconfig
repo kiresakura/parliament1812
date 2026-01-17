@@ -48,3 +48,31 @@ DEVELOPMENT_TEAM = 4C9SZLG9NW
 // ==========================================
 // AI agents can modify Config/Parliament1812.entitlements to add capabilities
 CODE_SIGN_ENTITLEMENTS = Config/Parliament1812.entitlements
+
+// ==========================================
+// Swift Settings
+// ==========================================
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+
+// ==========================================
+// Privacy Usage Descriptions (Required for App Store)
+// ==========================================
+// NFC Reader Usage (already defined above)
+// Camera usage (if needed in future)
+INFOPLIST_KEY_NSCameraUsageDescription = Parliament 1812 需要使用相機來掃描 QR 碼
+// Local Network (for multiplayer discovery)
+INFOPLIST_KEY_NSLocalNetworkUsageDescription = Parliament 1812 需要使用本地網路來連接遊戲伺服器
+
+// ==========================================
+// App Store Metadata
+// ==========================================
+INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES
+INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent
+INFOPLIST_KEY_UIRequiresFullScreen = NO
+
+// ==========================================
+// Background Modes
+// ==========================================
+// Enable background fetch for game state updates
+INFOPLIST_KEY_UIBackgroundModes = fetch remote-notification
