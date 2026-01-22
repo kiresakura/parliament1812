@@ -58,6 +58,8 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       methods: ['GET', 'POST'],
       credentials: true,
     },
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000,
   });
