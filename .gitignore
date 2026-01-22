@@ -1,7 +1,26 @@
 
 # IDE and tool files
 .idea/
+.vscode/
 .playwright-mcp/
+*.swp
+*.swo
+.DS_Store
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.keystore
+!*.example
+
+# Prompt files (do not commit)
+*PROMPT*.md
+*prompt*.md
+CLAUDE_CODE_STEPS.md
 
 # Large binary files
 *.apk
@@ -10,4 +29,33 @@ platforms/android/releases/
 
 # Build directories
 build/
+dist/
 *.xcuserstate
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Flutter
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+*.flutter-plugins
+*.flutter-plugins-dependencies
+
+# iOS
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+Pods/
+
+# Android
+*.iml
+.gradle/
+local.properties
+*.hprof
+
+# 文檔
+docs/

@@ -1,298 +1,311 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../models/room.dart';
-import '../models/player.dart';
-import '../services/api_service.dart';
-import '../services/websocket_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/services/game_service.dart';
+import 'socket_provider.dart';
+import 'game_provider.dart';
 
-/// 房間狀態管理
-class RoomProvider with ChangeNotifier {
-  final _api = ApiService();
-  final _ws = WebSocketService();
+/// 房間狀態
+class RoomInfo {
+  final String roomId;
+  final String roomCode;
+  final String hostId;
+  final String localPlayerId;
+  final List<PlayerState> players;
+  final bool isGameStarted;
 
-  Room? _room;
-  List<Player> _players = [];
-  bool _isLoading = false;
-  String? _error;
-  
-  // 儲存建立房間時的玩家 ID
-  String? _hostPlayerId;
+  const RoomInfo({
+    required this.roomId,
+    required this.roomCode,
+    required this.hostId,
+    required this.localPlayerId,
+    this.players = const [],
+    this.isGameStarted = false,
+  });
 
-  Room? get room => _room;
-  List<Player> get players => _players;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-  String? get hostPlayerId => _hostPlayerId;
+  RoomInfo copyWith({
+    String? roomId,
+    String? roomCode,
+    String? hostId,
+    String? localPlayerId,
+    List<PlayerState>? players,
+    bool? isGameStarted,
+  }) {
+    return RoomInfo(
+      roomId: roomId ?? this.roomId,
+      roomCode: roomCode ?? this.roomCode,
+      hostId: hostId ?? this.hostId,
+      localPlayerId: localPlayerId ?? this.localPlayerId,
+      players: players ?? this.players,
+      isGameStarted: isGameStarted ?? this.isGameStarted,
+    );
+  }
 
-  bool get isInRoom => _room != null;
-  String? get roomCode => _room?.code;
+  bool get isHost => localPlayerId == hostId;
 
-  /// 建立房間
-  Future<CreateRoomResult?> createRoom(String hostNickname) async {
-    _setLoading(true);
-    _clearError();
-
+  PlayerState? get localPlayer {
     try {
-      final result = await _api.createRoom(hostNickname: hostNickname);
-
-      // 儲存主持人玩家 ID
-      _hostPlayerId = result.playerId;
-
-      // 取得完整房間資訊
-      _room = await _api.getRoom(result.code);
-
-      // 靜默載入玩家列表，不設置錯誤（避免顯示警告訊息）
-      await _loadPlayersSilently();
-
-      notifyListeners();
-      return result;
-    } catch (e) {
-      _setError(_formatError(e));
+      return players.firstWhere((p) => p.id == localPlayerId);
+    } catch (_) {
       return null;
-    } finally {
-      _setLoading(false);
     }
+  }
+}
+
+/// 房間 Notifier
+class RoomNotifier extends StateNotifier<RoomInfo?> {
+  final GameService _gameService;
+  final Ref _ref;
+  final List<StreamSubscription> _subscriptions = [];
+
+  RoomNotifier(this._gameService, this._ref) : super(null) {
+    _setupListeners();
+  }
+
+  void _setupListeners() {
+    // 監聽玩家加入
+    _subscriptions.add(_gameService.onPlayerJoined.listen((data) {
+      debugPrint('RoomNotifier: Player joined $data');
+      if (state == null) return;
+
+      final playerData = data['player'] as Map<String, dynamic>?;
+      if (playerData != null) {
+        final newPlayer = _parsePlayer(playerData);
+        if (!state!.players.any((p) => p.id == newPlayer.id)) {
+          state = state!.copyWith(
+            players: [...state!.players, newPlayer],
+          );
+        }
+      }
+    }));
+
+    // 監聽玩家離開
+    _subscriptions.add(_gameService.onPlayerLeft.listen((data) {
+      debugPrint('RoomNotifier: Player left $data');
+      if (state == null) return;
+
+      final playerId = data['playerId'] as String?;
+      final newHostId = data['newHostId'] as String?;
+
+      if (playerId != null) {
+        state = state!.copyWith(
+          players: state!.players.where((p) => p.id != playerId).toList(),
+          hostId: newHostId ?? state!.hostId,
+        );
+      }
+    }));
+
+    // 監聽玩家準備狀態變化
+    _subscriptions.add(_gameService.onPlayerReadyChanged.listen((data) {
+      debugPrint('RoomNotifier: Player ready changed $data');
+      if (state == null) return;
+
+      final playerId = data['playerId'] as String?;
+      final ready = data['ready'] as bool? ?? false;
+
+      if (playerId != null) {
+        state = state!.copyWith(
+          players: state!.players.map((p) {
+            if (p.id == playerId) {
+              return p.copyWith(isReady: ready);
+            }
+            return p;
+          }).toList(),
+        );
+      }
+    }));
+
+    // 監聽遊戲開始
+    _subscriptions.add(_gameService.onGameStarted.listen((data) {
+      debugPrint('RoomNotifier: Game started $data');
+      if (state == null) return;
+
+      state = state!.copyWith(isGameStarted: true);
+
+      // 更新遊戲狀態
+      _updateGameState(data);
+    }));
+  }
+
+  void _updateGameState(Map<String, dynamic> data) {
+    // 更新本地玩家角色
+    final playerData = data['player'] as Map<String, dynamic>?;
+    // final roleData = data['role'] as Map<String, dynamic>?; // 角色資料已包含在 playerData 中
+    final gameStateData = data['gameState'] as Map<String, dynamic>?;
+
+    if (playerData != null && state != null) {
+      final localPlayerId = state!.localPlayerId;
+      state = state!.copyWith(
+        players: state!.players.map((p) {
+          if (p.id == localPlayerId) {
+            return _parsePlayer(playerData);
+          }
+          return p;
+        }).toList(),
+      );
+    }
+
+    // 更新遊戲 Provider
+    final gameNotifier = _ref.read(gameProvider.notifier);
+    if (gameStateData != null) {
+      final phase = _parsePhase(gameStateData['phase'] as String?);
+      final timeRemaining = gameStateData['timeRemaining'] as int? ?? 0;
+      gameNotifier.setPhase(phase, timeRemaining);
+    }
+
+    // 更新本地玩家 Provider
+    if (playerData != null) {
+      final localPlayerNotifier = _ref.read(localPlayerProvider.notifier);
+      localPlayerNotifier.setPlayer(_parsePlayer(playerData));
+    }
+  }
+
+  /// 創建房間
+  Future<bool> createRoom(String roomId, String roomCode, String playerId, PlayerState host) async {
+    state = RoomInfo(
+      roomId: roomId,
+      roomCode: roomCode,
+      hostId: playerId,
+      localPlayerId: playerId,
+      players: [host.copyWith(isHost: true, id: playerId)],
+    );
+
+    // 同步到 gameProvider
+    _ref.read(gameProvider.notifier).createRoom(roomId, roomCode, host.copyWith(isHost: true, id: playerId));
+
+    return true;
   }
 
   /// 加入房間
-  Future<Player?> joinRoom(String roomCode, String nickname) async {
-    _setLoading(true);
-    _clearError();
+  Future<bool> joinRoom(Map<String, dynamic> data) async {
+    final roomId = data['roomId'] as String? ?? '';
+    final roomCode = data['roomCode'] as String? ?? '';
+    final playerData = data['player'] as Map<String, dynamic>?;
+    final playersData = data['players'] as List<dynamic>? ?? [];
 
-    try {
-      final player = await _api.joinRoom(
-        roomCode: roomCode,
-        nickname: nickname,
-      );
+    if (playerData == null) return false;
 
-      _room = await _api.getRoom(roomCode);
+    final localPlayerId = playerData['id'] as String? ?? '';
+    final players = playersData
+        .map((p) => _parsePlayer(p as Map<String, dynamic>))
+        .toList();
 
-      // 靜默載入玩家列表，不設置錯誤（避免顯示警告訊息）
-      await _loadPlayersSilently();
+    // 找出房主
+    final hostId = players.firstWhere((p) => p.isHost, orElse: () => players.first).id;
 
-      notifyListeners();
-      return player;
-    } catch (e) {
-      _setError(_formatError(e));
-      return null;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 靜默載入玩家列表（不設置錯誤）
-  Future<void> _loadPlayersSilently() async {
-    if (_room == null) return;
-
-    try {
-      _players = await _api.getRoomPlayers(_room!.code);
-    } catch (e) {
-      // 靜默失敗，不設置錯誤訊息
-      debugPrint('載入玩家列表失敗: $e');
-    }
-  }
-
-  /// 取得房間資訊
-  Future<void> loadRoom(String roomCode) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      _room = await _api.getRoom(roomCode);
-      notifyListeners();
-    } catch (e) {
-      _setError(_formatError(e));
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 載入玩家列表
-  Future<void> loadPlayers() async {
-    if (_room == null) return;
-
-    try {
-      _players = await _api.getRoomPlayers(_room!.code);
-      notifyListeners();
-    } catch (e) {
-      _setError(_formatError(e));
-    }
-  }
-
-  /// 連接 WebSocket
-  Future<void> connectWebSocket(String playerId) async {
-    if (_room == null) return;
-
-    await _ws.connect(
-      roomCode: _room!.code,
-      playerId: playerId,
+    state = RoomInfo(
+      roomId: roomId,
+      roomCode: roomCode,
+      hostId: hostId,
+      localPlayerId: localPlayerId,
+      players: players,
     );
 
-    // 監聽 WebSocket 事件
-    _ws.eventStream.listen(_handleWSEvent);
-  }
+    // 同步到 gameProvider
+    _ref.read(gameProvider.notifier).joinRoom(RoomState(
+      roomId: roomId,
+      roomCode: roomCode,
+      players: players,
+    ));
 
-  /// 斷開 WebSocket
-  void disconnectWebSocket() {
-    _ws.disconnect();
-  }
+    // 設置本地玩家
+    _ref.read(localPlayerProvider.notifier).setPlayer(_parsePlayer(playerData));
 
-  /// 處理 WebSocket 事件
-  void _handleWSEvent(WSEvent event) {
-    switch (event.type) {
-      case WSEventType.playerJoin:
-        _onPlayerJoin(event.data);
-        break;
-      case WSEventType.playerLeave:
-        _onPlayerLeave(event.data);
-        break;
-      case WSEventType.phaseChange:
-        _onPhaseChange(event.data);
-        break;
-      case WSEventType.timerSync:
-        _onTimerSync(event.data);
-        break;
-      default:
-        break;
-    }
-  }
-
-  void _onPlayerJoin(Map<String, dynamic> data) {
-    // 確保 player 資料存在且為有效的 Map
-    final playerData = data['player'];
-    if (playerData == null || playerData is! Map<String, dynamic>) {
-      return;
-    }
-
-    final player = Player.fromJson(playerData);
-    if (!_players.any((p) => p.id == player.id)) {
-      _players.add(player);
-      notifyListeners();
-    }
-  }
-
-  void _onPlayerLeave(Map<String, dynamic> data) {
-    final playerId = data['player_id'] as String?;
-    if (playerId == null) return;
-
-    _players.removeWhere((p) => p.id == playerId);
-    notifyListeners();
-  }
-
-  void _onPhaseChange(Map<String, dynamic> data) {
-    if (_room != null) {
-      _room = Room(
-        id: _room!.id,
-        code: _room!.code,
-        status: _room!.status,
-        phase: data['phase'] as int,
-        phaseName: data['phase_name'] as String,
-        currentRound: _room!.currentRound,
-        timerEndAt: _room!.timerEndAt,
-        playerCount: _room!.playerCount,
-        createdAt: _room!.createdAt,
-      );
-      notifyListeners();
-    }
-  }
-
-  void _onTimerSync(Map<String, dynamic> data) {
-    if (_room != null && data['end_at'] != null) {
-      _room = Room(
-        id: _room!.id,
-        code: _room!.code,
-        status: _room!.status,
-        phase: _room!.phase,
-        phaseName: _room!.phaseName,
-        currentRound: _room!.currentRound,
-        timerEndAt: DateTime.parse(data['end_at']),
-        playerCount: _room!.playerCount,
-        createdAt: _room!.createdAt,
-      );
-      notifyListeners();
-    }
-  }
-
-  /// 開始遊戲（僅主持人）
-  Future<bool> startGame(String playerId) async {
-    if (_room == null) return false;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _api.startGame(_room!.code, playerId);
-      // 遊戲開始後，房間狀態會透過 WebSocket 更新
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(_formatError(e));
-      return false;
-    } finally {
-      _setLoading(false);
-    }
+    return true;
   }
 
   /// 離開房間
   void leaveRoom() {
-    disconnectWebSocket();
-    _room = null;
-    _players = [];
-    _hostPlayerId = null;
-    _clearError();
-    notifyListeners();
+    state = null;
+    _ref.read(gameProvider.notifier).leaveRoom();
+    _ref.read(localPlayerProvider.notifier).clear();
   }
 
-  /// 關閉房間（僅主持人）
-  Future<bool> closeRoom() async {
-    if (_room == null) return false;
+  /// 更新玩家準備狀態
+  void setPlayerReady(String playerId, bool ready) {
+    if (state == null) return;
 
-    _setLoading(true);
-    _clearError();
+    state = state!.copyWith(
+      players: state!.players.map((p) {
+        if (p.id == playerId) {
+          return p.copyWith(isReady: ready);
+        }
+        return p;
+      }).toList(),
+    );
 
-    try {
-      await _api.closeRoom(_room!.code);
-      disconnectWebSocket();
-      _room = null;
-      _players = [];
-      _hostPlayerId = null;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(_formatError(e));
-      return false;
-    } finally {
-      _setLoading(false);
+    // 同步到 gameProvider
+    _ref.read(gameProvider.notifier).setPlayerReady(playerId, ready);
+  }
+
+  PlayerState _parsePlayer(Map<String, dynamic> data) {
+    return PlayerState(
+      id: data['id'] as String? ?? '',
+      name: data['name'] as String? ?? '',
+      roleId: data['roleId'] as String?,
+      reputation: data['reputation'] as int? ?? 50,
+      gold: data['gold'] as int? ?? 0,
+      isAlive: data['isAlive'] as bool? ?? true,
+      isReady: data['isReady'] as bool? ?? false,
+      isHost: data['isHost'] as bool? ?? false,
+    );
+  }
+
+  GamePhase _parsePhase(String? phase) {
+    switch (phase) {
+      case 'waiting':
+        return GamePhase.waiting;
+      case 'conspiracy':
+        return GamePhase.conspiracy;
+      case 'debate':
+        return GamePhase.debate;
+      case 'event':
+        return GamePhase.event;
+      case 'voting':
+        return GamePhase.voting;
+      case 'result':
+        return GamePhase.result;
+      default:
+        return GamePhase.waiting;
     }
   }
 
-  void _setLoading(bool value) {
-    _isLoading = value;
-    notifyListeners();
-  }
-
-  void _setError(String message) {
-    _error = message;
-    notifyListeners();
-  }
-
-  void _clearError() {
-    _error = null;
-  }
-  
-  /// 格式化錯誤訊息
-  String _formatError(dynamic e) {
-    if (e is ApiException) {
-      return e.message;
+  @override
+  void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
     }
-    final str = e.toString();
-    // 移除 "Instance of 'XXX'" 格式
-    if (str.startsWith("Instance of '")) {
-      return '發生未知錯誤，請重試';
-    }
-    // 移除 "ApiException: [xxx]" 前綴
-    if (str.contains('ApiException:')) {
-      return str.replaceFirst(RegExp(r'ApiException: \[\d+\] '), '');
-    }
-    return str;
+    super.dispose();
   }
 }
+
+/// 房間狀態 Provider
+final roomProvider = StateNotifierProvider<RoomNotifier, RoomInfo?>((ref) {
+  final gameService = ref.watch(gameServiceProvider);
+  return RoomNotifier(gameService, ref);
+});
+
+/// 是否在房間中 Provider
+final isInRoomProvider2 = Provider<bool>((ref) {
+  return ref.watch(roomProvider) != null;
+});
+
+/// 是否是房主 Provider
+final isHostProvider = Provider<bool>((ref) {
+  return ref.watch(roomProvider)?.isHost ?? false;
+});
+
+/// 房間代碼 Provider
+final roomCodeProvider = Provider<String?>((ref) {
+  return ref.watch(roomProvider)?.roomCode;
+});
+
+/// 是否可以開始遊戲 Provider
+final canStartGameProvider2 = Provider<bool>((ref) {
+  final room = ref.watch(roomProvider);
+  if (room == null) return false;
+  if (room.players.length < 4) return false;
+
+  // 所有非房主玩家都準備好了
+  return room.players.every((p) => p.isReady || p.isHost);
+});

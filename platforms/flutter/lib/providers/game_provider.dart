@@ -1,504 +1,274 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
-import '../models/vote.dart';
-import '../models/event.dart';
-import '../services/api_service.dart';
-import '../services/websocket_service.dart';
-import '../utils/constants.dart' hide VoteOption;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/constants/game_constants.dart';
 
-/// 遊戲狀態管理
-class GameProvider with ChangeNotifier {
-  final _api = ApiService();
-  final _ws = WebSocketService();
+/// 遊戲階段
+enum GamePhase {
+  waiting,     // 等待玩家加入
+  preparing,   // 準備階段
+  conspiracy,  // 密謀階段
+  debate,      // 辯論階段
+  event,       // 突發事件
+  voting,      // 投票階段
+  result,      // 結算階段
+}
 
-  // 遊戲階段相關
-  int _currentPhase = 1;
-  String _phaseName = '等待中';
+/// 玩家狀態
+class PlayerState {
+  final String id;
+  final String name;
+  final String? roleId;
+  final int reputation;
+  final int gold;
+  final bool isAlive;
+  final bool isReady;
+  final bool isHost;
 
-  // 投票相關
-  List<VoteOption> _voteOptions = [];
-  Vote? _myVote;
-  Round1Result? _round1Result;
-  Round2Result? _round2Result;
-  double _voteProgress = 0;
-  Map<String, int> _voteResults = {};
+  const PlayerState({
+    required this.id,
+    required this.name,
+    this.roleId,
+    this.reputation = 50,
+    this.gold = 0,
+    this.isAlive = true,
+    this.isReady = false,
+    this.isHost = false,
+  });
 
-  // 事件相關
-  List<GameEvent> _availableEvents = [];
-  List<TriggeredEvent> _eventHistory = [];
-  TriggeredEvent? _currentEvent;
-
-  // 計時器
-  DateTime? _timerEndAt;
-  Timer? _timerUpdateTimer;
-
-  // 載入狀態
-  bool _isLoading = false;
-  String? _error;
-
-  // 房間與玩家資訊（用於 API 調用）
-  String? _roomCode;
-  String? _playerId;
-  bool _isHost = false;
-
-  // Getter for isHost
-  bool get isHost => _isHost;
-
-  // Getters
-  int get currentPhase => _currentPhase;
-  String get phaseName => _phaseName;
-
-  List<VoteOption> get voteOptions => _voteOptions;
-  Vote? get myVote => _myVote;
-  Round1Result? get round1Result => _round1Result;
-  Round2Result? get round2Result => _round2Result;
-  double get voteProgress => _voteProgress;
-  Map<String, int> get voteResults => _voteResults;
-
-  List<GameEvent> get availableEvents => _availableEvents;
-  List<TriggeredEvent> get eventHistory => _eventHistory;
-  TriggeredEvent? get currentEvent => _currentEvent;
-
-  DateTime? get timerEndAt => _timerEndAt;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-
-  /// 取得剩餘時間（秒）
-  int get remainingSeconds {
-    if (_timerEndAt == null) return 0;
-    final diff = _timerEndAt!.difference(DateTime.now()).inSeconds;
-    return diff > 0 ? diff : 0;
-  }
-
-  /// 初始化遊戲監聽
-  void initGameListeners() {
-    _ws.eventStream.listen(_handleWSEvent);
-  }
-
-  /// 處理 WebSocket 事件
-  void _handleWSEvent(WSEvent event) {
-    switch (event.type) {
-      case WSEventType.voteUpdate:
-        _onVoteUpdate(event.data);
-        break;
-      case WSEventType.voteResult:
-        _onVoteResult(event.data);
-        break;
-      case WSEventType.eventTrigger:
-        _onEventTrigger(event.data);
-        break;
-      case WSEventType.timerSync:
-      case WSEventType.timerStart:
-        _onTimerSync(event.data);
-        break;
-      case WSEventType.timerStop:
-        _onTimerStop();
-        break;
-      default:
-        break;
-    }
-  }
-
-  // ==================== 投票功能 ====================
-
-  /// 載入投票選項
-  Future<void> loadVoteOptions(String roomCode) async {
-    try {
-      _voteOptions = await _api.getVoteOptions(roomCode);
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-    }
-  }
-
-  /// 投票
-  Future<bool> castVote({
-    required String roomCode,
-    required String playerId,
-    required int round,
-    required String choice,
-  }) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      _myVote = await _api.castVote(
-        roomCode: roomCode,
-        playerId: playerId,
-        round: round,
-        choice: choice,
-      );
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 載入投票進度
-  Future<void> loadVoteProgress({
-    required String roomCode,
-    required int round,
-  }) async {
-    try {
-      final progress = await _api.getVoteProgress(
-        roomCode: roomCode,
-        round: round,
-      );
-      _voteProgress = (progress['progress'] as num).toDouble();
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-    }
-  }
-
-  /// 載入投票結果
-  Future<void> loadVoteResult({
-    required String roomCode,
-    required int round,
-  }) async {
-    try {
-      final result = await _api.getVoteResult(
-        roomCode: roomCode,
-        round: round,
-      );
-
-      if (round == 1) {
-        _round1Result = result as Round1Result;
-      } else {
-        _round2Result = result as Round2Result;
-      }
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-    }
-  }
-
-  void _onVoteUpdate(Map<String, dynamic> data) {
-    _voteProgress = (data['progress'] as num).toDouble();
-    notifyListeners();
-  }
-
-  void _onVoteResult(Map<String, dynamic> data) {
-    final round = data['round'] as int;
-    if (round == 1) {
-      _round1Result = Round1Result.fromJson(data);
-    } else {
-      _round2Result = Round2Result.fromJson(data);
-    }
-    notifyListeners();
-  }
-
-  // ==================== 事件功能 ====================
-
-  /// 載入可用事件（僅主持人）
-  Future<void> loadAvailableEvents({
-    required String roomCode,
-    required String hostId,
-  }) async {
-    try {
-      _availableEvents = await _api.getAvailableEvents(
-        roomCode: roomCode,
-        hostId: hostId,
-      );
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-    }
-  }
-
-  /// 觸發事件（僅主持人）
-  Future<bool> triggerEvent({
-    required String roomCode,
-    required String hostId,
-    required String eventId,
-  }) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final triggered = await _api.triggerEvent(
-        roomCode: roomCode,
-        hostId: hostId,
-        eventId: eventId,
-      );
-      _currentEvent = triggered;
-      _eventHistory.add(triggered);
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 隨機觸發事件（僅主持人）
-  Future<bool> randomTriggerEvent({
-    required String roomCode,
-    required String hostId,
-    int? minSeverity,
-    int? maxSeverity,
-  }) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final triggered = await _api.randomTriggerEvent(
-        roomCode: roomCode,
-        hostId: hostId,
-        minSeverity: minSeverity,
-        maxSeverity: maxSeverity,
-      );
-      _currentEvent = triggered;
-      _eventHistory.add(triggered);
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 載入事件歷史
-  Future<void> loadEventHistory(String roomCode) async {
-    try {
-      _eventHistory = await _api.getEventHistory(roomCode);
-      notifyListeners();
-    } catch (e) {
-      _setError(e.toString());
-    }
-  }
-
-  void _onEventTrigger(Map<String, dynamic> data) {
-    _currentEvent = TriggeredEvent.fromJson(data);
-    notifyListeners();
-  }
-
-  /// 清除當前事件
-  void clearCurrentEvent() {
-    _currentEvent = null;
-    notifyListeners();
-  }
-
-  // ==================== 主持人控制功能 ====================
-
-  /// 設置房間資訊
-  void setRoomInfo({
-    required String roomCode,
-    required String playerId,
-    required bool isHost,
+  PlayerState copyWith({
+    String? id,
+    String? name,
+    String? roleId,
+    int? reputation,
+    int? gold,
+    bool? isAlive,
+    bool? isReady,
+    bool? isHost,
   }) {
-    _roomCode = roomCode;
-    _playerId = playerId;
-    _isHost = isHost;
-  }
-
-  /// 切換遊戲階段（僅主持人）
-  Future<bool> changePhase(int phase) async {
-    if (_roomCode == null || _playerId == null) return false;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _api.changePhase(
-        roomCode: _roomCode!,
-        hostId: _playerId!,
-        phase: phase,
-      );
-      _currentPhase = phase;
-      _phaseName = _getPhaseName(phase);
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 開始計時器（僅主持人）
-  Future<bool> startTimer(int minutes) async {
-    if (_roomCode == null || _playerId == null) return false;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final endAt = await _api.startTimer(
-        roomCode: _roomCode!,
-        hostId: _playerId!,
-        minutes: minutes,
-      );
-      _timerEndAt = endAt;
-      _startTimerUpdate();
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 停止計時器（僅主持人）
-  Future<bool> stopTimer() async {
-    if (_roomCode == null || _playerId == null) return false;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _api.stopTimer(
-        roomCode: _roomCode!,
-        hostId: _playerId!,
-      );
-      _timerEndAt = null;
-      _stopTimerUpdate();
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 隨機觸發事件（僅主持人）- 快捷方法
-  Future<bool> triggerRandomEvent() async {
-    if (_roomCode == null || _playerId == null) return false;
-
-    return randomTriggerEvent(
-      roomCode: _roomCode!,
-      hostId: _playerId!,
+    return PlayerState(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      roleId: roleId ?? this.roleId,
+      reputation: reputation ?? this.reputation,
+      gold: gold ?? this.gold,
+      isAlive: isAlive ?? this.isAlive,
+      isReady: isReady ?? this.isReady,
+      isHost: isHost ?? this.isHost,
     );
-  }
-
-  /// 開始投票（僅主持人）
-  Future<bool> startVoting(int round) async {
-    if (_roomCode == null || _playerId == null) return false;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _api.startVoting(
-        roomCode: _roomCode!,
-        hostId: _playerId!,
-        round: round,
-      );
-      // 切換到對應的投票階段
-      if (round == 1) {
-        _currentPhase = 8;
-        _phaseName = '第一輪投票';
-      } else {
-        _currentPhase = 10;
-        _phaseName = '第二輪投票';
-      }
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError(e.toString());
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 更新階段資訊（來自 WebSocket）
-  void updatePhase(int phase, String phaseName) {
-    _currentPhase = phase;
-    _phaseName = phaseName;
-    notifyListeners();
-  }
-
-  /// 獲取階段名稱
-  String _getPhaseName(int phase) {
-    if (phase < 0 || phase >= GamePhase.values.length) {
-      return '未知';
-    }
-    return GamePhase.values[phase].name;
-  }
-
-  // ==================== 計時器功能 ====================
-
-  void _onTimerSync(Map<String, dynamic> data) {
-    if (data['end_at'] != null) {
-      _timerEndAt = DateTime.parse(data['end_at']);
-      _startTimerUpdate();
-      notifyListeners();
-    }
-  }
-
-  void _onTimerStop() {
-    _timerEndAt = null;
-    _stopTimerUpdate();
-    notifyListeners();
-  }
-
-  void _startTimerUpdate() {
-    _stopTimerUpdate();
-    _timerUpdateTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => notifyListeners(),
-    );
-  }
-
-  void _stopTimerUpdate() {
-    _timerUpdateTimer?.cancel();
-    _timerUpdateTimer = null;
-  }
-
-  // ==================== 通用功能 ====================
-
-  void _setLoading(bool value) {
-    _isLoading = value;
-    notifyListeners();
-  }
-
-  void _setError(String message) {
-    _error = message;
-    notifyListeners();
-  }
-
-  void _clearError() {
-    _error = null;
-  }
-
-  /// 重置遊戲狀態
-  void resetGame() {
-    _currentPhase = 1;
-    _phaseName = '等待中';
-    _voteOptions = [];
-    _myVote = null;
-    _round1Result = null;
-    _round2Result = null;
-    _voteProgress = 0;
-    _voteResults = {};
-    _availableEvents = [];
-    _eventHistory = [];
-    _currentEvent = null;
-    _timerEndAt = null;
-    _roomCode = null;
-    _playerId = null;
-    _isHost = false;
-    _stopTimerUpdate();
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _stopTimerUpdate();
-    super.dispose();
   }
 }
+
+/// 房間狀態
+class RoomState {
+  final String roomId;
+  final String roomCode;
+  final List<PlayerState> players;
+  final GamePhase phase;
+  final int timeRemaining;
+  final Map<String, String> votes;  // playerId -> option (A/B/C)
+  final String? currentBillId;
+
+  const RoomState({
+    required this.roomId,
+    required this.roomCode,
+    this.players = const [],
+    this.phase = GamePhase.waiting,
+    this.timeRemaining = 0,
+    this.votes = const {},
+    this.currentBillId,
+  });
+
+  RoomState copyWith({
+    String? roomId,
+    String? roomCode,
+    List<PlayerState>? players,
+    GamePhase? phase,
+    int? timeRemaining,
+    Map<String, String>? votes,
+    String? currentBillId,
+  }) {
+    return RoomState(
+      roomId: roomId ?? this.roomId,
+      roomCode: roomCode ?? this.roomCode,
+      players: players ?? this.players,
+      phase: phase ?? this.phase,
+      timeRemaining: timeRemaining ?? this.timeRemaining,
+      votes: votes ?? this.votes,
+      currentBillId: currentBillId ?? this.currentBillId,
+    );
+  }
+
+  /// 是否可以開始遊戲
+  bool get canStart {
+    if (players.length < GameConstants.minPlayers) return false;
+    return players.every((p) => p.isReady || p.isHost);
+  }
+}
+
+/// 遊戲狀態 Notifier
+class GameNotifier extends StateNotifier<RoomState?> {
+  GameNotifier() : super(null);
+
+  /// 創建房間
+  void createRoom(String roomId, String roomCode, PlayerState host) {
+    state = RoomState(
+      roomId: roomId,
+      roomCode: roomCode,
+      players: [host.copyWith(isHost: true)],
+    );
+  }
+
+  /// 加入房間
+  void joinRoom(RoomState room) {
+    state = room;
+  }
+
+  /// 離開房間
+  void leaveRoom() {
+    state = null;
+  }
+
+  /// 新增玩家
+  void addPlayer(PlayerState player) {
+    if (state == null) return;
+    state = state!.copyWith(
+      players: [...state!.players, player],
+    );
+  }
+
+  /// 移除玩家
+  void removePlayer(String playerId) {
+    if (state == null) return;
+    state = state!.copyWith(
+      players: state!.players.where((p) => p.id != playerId).toList(),
+    );
+  }
+
+  /// 更新玩家準備狀態
+  void setPlayerReady(String playerId, bool isReady) {
+    if (state == null) return;
+    state = state!.copyWith(
+      players: state!.players.map((p) {
+        if (p.id == playerId) {
+          return p.copyWith(isReady: isReady);
+        }
+        return p;
+      }).toList(),
+    );
+  }
+
+  /// 更新遊戲階段
+  void setPhase(GamePhase phase, int timeRemaining) {
+    if (state == null) return;
+    state = state!.copyWith(
+      phase: phase,
+      timeRemaining: timeRemaining,
+    );
+  }
+
+  /// 更新倒數時間
+  void setTimeRemaining(int seconds) {
+    if (state == null) return;
+    state = state!.copyWith(timeRemaining: seconds);
+  }
+
+  /// 更新玩家聲望
+  void updateReputation(String playerId, int change) {
+    if (state == null) return;
+    state = state!.copyWith(
+      players: state!.players.map((p) {
+        if (p.id == playerId) {
+          final newReputation = (p.reputation + change).clamp(0, 100);
+          return p.copyWith(
+            reputation: newReputation,
+            isAlive: newReputation > 0,
+          );
+        }
+        return p;
+      }).toList(),
+    );
+  }
+
+  /// 記錄投票
+  void recordVote(String playerId, String option) {
+    if (state == null) return;
+    state = state!.copyWith(
+      votes: {...state!.votes, playerId: option},
+    );
+  }
+
+  /// 分配角色
+  void assignRole(String playerId, String roleId) {
+    if (state == null) return;
+    final role = RoleDatabase.getRoleById(roleId);
+    if (role == null) return;
+
+    state = state!.copyWith(
+      players: state!.players.map((p) {
+        if (p.id == playerId) {
+          return p.copyWith(
+            roleId: roleId,
+            reputation: role.initialReputation,
+            gold: role.initialGold,
+          );
+        }
+        return p;
+      }).toList(),
+    );
+  }
+}
+
+/// 本地玩家狀態
+class LocalPlayerNotifier extends StateNotifier<PlayerState?> {
+  LocalPlayerNotifier() : super(null);
+
+  void setPlayer(PlayerState player) {
+    state = player;
+  }
+
+  void updateName(String name) {
+    if (state != null) {
+      state = state!.copyWith(name: name);
+    }
+  }
+
+  void clear() {
+    state = null;
+  }
+}
+
+// ===== Providers =====
+
+/// 遊戲房間狀態 Provider
+final gameProvider = StateNotifierProvider<GameNotifier, RoomState?>((ref) {
+  return GameNotifier();
+});
+
+/// 本地玩家狀態 Provider
+final localPlayerProvider = StateNotifierProvider<LocalPlayerNotifier, PlayerState?>((ref) {
+  return LocalPlayerNotifier();
+});
+
+/// 是否已連接房間
+final isInRoomProvider = Provider<bool>((ref) {
+  return ref.watch(gameProvider) != null;
+});
+
+/// 當前階段
+final currentPhaseProvider = Provider<GamePhase?>((ref) {
+  return ref.watch(gameProvider)?.phase;
+});
+
+/// 剩餘時間
+final timeRemainingProvider = Provider<int>((ref) {
+  return ref.watch(gameProvider)?.timeRemaining ?? 0;
+});
+
+/// 玩家列表
+final playersProvider = Provider<List<PlayerState>>((ref) {
+  return ref.watch(gameProvider)?.players ?? [];
+});
+
+/// 是否可以開始遊戲
+final canStartGameProvider = Provider<bool>((ref) {
+  return ref.watch(gameProvider)?.canStart ?? false;
+});
