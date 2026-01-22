@@ -1,24 +1,11 @@
-# Railway 配置檔案 - Parliament 1812
+# Railway 配置檔案 - Parliament 1812 Backend (Node.js)
 [build]
-# 使用 Dockerfile 建置
-builder = "dockerfile"
-dockerfilePath = "shared/backend/Dockerfile"
+builder = "nixpacks"
+buildCommand = "cd backend && npm install && npm run build"
 
 [deploy]
-# 健康檢查
+startCommand = "cd backend && npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
-
-# 啟動伺服器
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
-
-# 重啟策略
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-# 資源限制
-numReplicas = 1
-
-[env]
-# 環境變數（實際值在 Railway 控制台設定）
-PORT = "8000"
