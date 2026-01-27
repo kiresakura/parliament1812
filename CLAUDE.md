@@ -9,9 +9,11 @@
 
 - **前端**：Flutter（跨平台：iOS、Android、Web）
 - **狀態管理**：Riverpod
-- **後端**：Node.js + WebSocket（部署於 Railway）
-- **資料庫**：PostgreSQL（Railway 內建）
-- **即時通訊**：Socket.IO
+- **後端**：Rust (Axum + Tokio)
+- **部署**：Fly.io
+- **資料庫**：PostgreSQL (Fly Postgres)
+- **快取**：Redis (Fly Redis)
+- **即時通訊**：Tokio-Tungstenite (WebSocket)
 
 ## 核心設計（詳見 docs/GAME_SYSTEM_DESIGN.md）
 
@@ -70,14 +72,29 @@ parliament1812/
 │   │   ├── presentation/      # UI 層：頁面、元件
 │   │   └── providers/         # Riverpod 狀態
 │   └── assets/                # 素材
-├── backend/                    # Node.js 後端（待建立）
+├── server/                     # Rust 後端（主要）
 │   ├── src/
-│   │   ├── server.ts
-│   │   ├── socket/            # WebSocket 處理
-│   │   ├── game/              # 遊戲邏輯
-│   │   └── models/            # 資料模型
-│   └── package.json
-└── railway.toml               # Railway 部署設定
+│   │   ├── main.rs            # 應用程式入口
+│   │   ├── lib.rs             # 模組匯出
+│   │   ├── api/               # HTTP API 路由和處理器
+│   │   ├── auth/              # JWT 認證
+│   │   ├── cache/             # Redis 快取
+│   │   ├── config/            # 應用設定
+│   │   ├── domain/            # 領域模型
+│   │   ├── error/             # 錯誤處理
+│   │   ├── game/              # 遊戲引擎
+│   │   ├── repository/        # 資料存取層
+│   │   ├── services/          # 業務邏輯
+│   │   └── websocket/         # WebSocket 模組
+│   ├── migrations/            # 資料庫遷移
+│   ├── fly.toml               # Fly.io 部署設定
+│   ├── Dockerfile             # Docker 映像檔
+│   └── Cargo.toml             # Rust 依賴
+├── backend/                    # Node.js 後端（舊版）
+│   └── ...
+└── .github/workflows/          # GitHub Actions CI/CD
+    ├── deploy-server.yml      # 自動部署
+    └── rust-check.yml         # PR 檢查
 ```
 
 ## 開發原則
@@ -104,6 +121,124 @@ textPrimary: Color(0xFFE8E8E8)    // 淺灰
 textSecondary: Color(0xFFA0A0A0)  // 中灰
 danger: Color(0xFFE74C3C)         // 紅色
 success: Color(0xFF27AE60)        // 綠色
+```
+
+## 單人模式
+
+單人模式允許玩家與 AI 對戰，無需連線伺服器。
+
+### 檔案結構
+
+```
+lib/
+├── presentation/pages/
+│   ├── solo_mode_page.dart        # 單人模式入口
+│   ├── solo_game_setup_page.dart  # 遊戲設定（難度、角色）
+│   ├── solo_game_page.dart        # 主遊戲畫面
+│   └── solo_game_result_page.dart # 結算畫面
+├── providers/
+│   ├── solo_game_provider.dart    # 單人遊戲狀態管理
+│   └── tutorial_provider.dart     # 教學系統狀態
+└── domain/services/
+    ├── ai_decision_engine.dart    # AI 決策引擎
+    ├── ai_character_behaviors.dart # 角色專屬行為
+    └── ai_dialogue_manager.dart   # AI 對話管理
+```
+
+### 遊戲流程
+
+```
+入口頁 → 設定頁（3 步驟）→ 遊戲頁 → 結算頁
+         │
+         ├── 1. 選擇難度
+         ├── 2. 選擇角色
+         └── 3. 確認開始
+```
+
+## AI 系統架構
+
+### 決策引擎 (`ai_decision_engine.dart`)
+
+AI 決策流程：
+1. **局勢分析** - 評估自身狀態、威脅、機會
+2. **策略選擇** - 根據個性選擇攻擊/防守/外交策略
+3. **行動生成** - 根據遊戲階段生成可能行動
+4. **行動評分** - 策略適配、目標選擇、風險評估
+5. **難度調整** - 根據難度加入隨機因子
+
+### AI 難度設定
+
+| 難度 | 隨機因子 | 傷害修正 | 攻擊頻率 | 玩家勝率 |
+|------|----------|----------|----------|----------|
+| 見習 | 70% | 60% | 30% | ~80% |
+| 資淺 | 45% | 80% | 50% | ~65% |
+| 資深 | 25% | 100% | 70% | ~50% |
+| 老練 | 10% | 115% | 85% | ~35% |
+| 大師 | 3% | 125% | 95% | ~20% |
+
+### AI 個性類型
+
+- **激進型** (`aggressive`) - 優先攻擊
+- **防守型** (`defensive`) - 保護聲望
+- **外交型** (`diplomatic`) - 尋求盟友
+- **狡詐型** (`cunning`) - 伺機背叛
+
+### 角色專屬行為
+
+每個角色有獨特的行為模式：
+- 投票偏好（支持哪個選項）
+- 攻擊目標優先級
+- 技能使用時機
+- 行為修正因子
+
+## 教學系統 (`tutorial_provider.dart`)
+
+### 教學課程
+
+1. **基礎操作** - UI 導覽
+2. **聲望系統** - 理解聲望機制
+3. **辯論戰鬥** - 質詢與反駁
+4. **投票機制** - 聲望加權計票
+5. **進階策略** - 結盟與背叛
+
+### 教學步驟類型
+
+- `info` - 純資訊展示
+- `highlight` - 高亮 UI 元素
+- `action` - 要求玩家操作
+- `choice` - 選擇題
+- `demo` - 示範動作
+
+## 狀態管理
+
+### 主要 Provider
+
+```dart
+// 單人遊戲狀態
+final soloGameProvider = StateNotifierProvider<SoloGameNotifier, SoloGameState>
+
+// 遊戲是否結束
+final isGameOverProvider = Provider<bool>
+
+// 當前階段時間
+final phaseTimeRemainingProvider = Provider<int>
+```
+
+### SoloGameState 結構
+
+```dart
+SoloGameState {
+  SoloGameRoom? gameRoom,      // 遊戲房間
+  Player? humanPlayer,         // 人類玩家
+  List<AIPlayer> aiPlayers,    // AI 玩家列表
+  GamePhase currentPhase,      // 當前階段
+  int currentRound,            // 當前回合
+  int phaseTimeRemaining,      // 階段剩餘時間
+  List<GameEvent> gameLog,     // 遊戲日誌
+  Map<String, String> votes,   // 投票記錄
+  bool isGameOver,             // 遊戲是否結束
+  String? winner,              // 獲勝者
+}
 ```
 
 ---

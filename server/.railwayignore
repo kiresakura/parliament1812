@@ -1,0 +1,8 @@
+target/
+.git/
+.env
+*.md
+.dockerignore
+tests/
+benches/
+.cargo/

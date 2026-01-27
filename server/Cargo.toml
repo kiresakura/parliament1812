@@ -1,0 +1,48 @@
+[package]
+name = "parliament1812-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web 框架
+axum = { version = "0.7", features = ["ws", "macros"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
+
+# 異步運行時
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.21"
+futures = "0.3"
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 資料庫
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono", "migrate"] }
+deadpool-redis = "0.14"
+redis = { version = "0.24", features = ["tokio-comp"] }
+
+# 驗證
+jsonwebtoken = "9"
+argon2 = "0.5"
+
+# 工具
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.8"
+
+# 日誌
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# 錯誤處理
+thiserror = "1"
+anyhow = "1"
+
+# 設定
+dotenvy = "0.15"
+
+[dev-dependencies]
+tokio-test = "0.4"
