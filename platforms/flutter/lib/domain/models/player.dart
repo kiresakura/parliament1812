@@ -184,6 +184,9 @@ enum StatusEffectType {
   silenced,          // 沉默 - 無法發言
   bankrupt,          // 破產 - 無法使用金幣
   confused,          // 精神錯亂 - 隨機行動
+
+  // 銀行家亨利專屬狀態
+  debt,              // 負債 - 3 回合後若未還 40 金幣，聲望 -25
 }
 
 /// 狀態效果
@@ -237,6 +240,8 @@ class StatusEffect {
         return '破產';
       case StatusEffectType.confused:
         return '精神錯亂';
+      case StatusEffectType.debt:
+        return '負債';
     }
   }
 
@@ -265,6 +270,8 @@ class StatusEffect {
         return '💸';
       case StatusEffectType.confused:
         return '😵';
+      case StatusEffectType.debt:
+        return '💳';
     }
   }
 

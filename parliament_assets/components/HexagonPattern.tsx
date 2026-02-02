@@ -50,10 +50,19 @@ export function HexagonBadge({
   );
 }
 
-export function GearIcon({ className = "", spinning = false }: { className?: string; spinning?: boolean }) {
+export function GearIcon({ 
+  className = "", 
+  spinning = false,
+  style = {},
+}: { 
+  className?: string; 
+  spinning?: boolean;
+  style?: React.CSSProperties;
+}) {
   return (
     <svg 
       className={`${className} ${spinning ? 'animate-spin-slow' : ''}`} 
+      style={style}
       viewBox="0 0 24 24" 
       fill="none" 
       stroke="currentColor" 

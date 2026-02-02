@@ -139,14 +139,15 @@ class _RoomCodeDisplayState extends State<RoomCodeDisplay>
             child: Column(
               children: [
                 // 房間代碼 - 大字顯示
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: widget.code.split('').map((char) {
                     return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        horizontal: 10,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryDark,
@@ -158,7 +159,7 @@ class _RoomCodeDisplayState extends State<RoomCodeDisplay>
                       child: Text(
                         char,
                         style: GoogleFonts.cinzelDecorative(
-                          fontSize: 28,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.accent,
                         ),

@@ -30,6 +30,9 @@ class PlayerAvatar extends StatelessWidget {
   /// 是否為當前玩家
   final bool isCurrentPlayer;
 
+  /// 是否顯示名稱標籤
+  final bool showName;
+
   /// 點擊回調
   final VoidCallback? onTap;
 
@@ -41,99 +44,109 @@ class PlayerAvatar extends StatelessWidget {
     this.size = 56,
     this.isHost = false,
     this.isCurrentPlayer = false,
+    this.showName = true,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final avatarWidget = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 頭像主體
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppTheme.primaryMid,
+            border: Border.all(
+              color: isCurrentPlayer
+                  ? AppTheme.accent
+                  : AppTheme.accent.withAlpha(128),
+              width: isCurrentPlayer ? 3 : 2,
+            ),
+            boxShadow: [
+              if (status == PlayerStatus.speaking)
+                BoxShadow(
+                  color: AppTheme.accent.withAlpha(128),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+            ],
+          ),
+          child: Center(
+            child: emoji != null
+                ? Text(
+                    emoji!,
+                    style: TextStyle(fontSize: size * 0.5),
+                  )
+                : Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: GoogleFonts.cinzel(
+                      fontSize: size * 0.4,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accent,
+                    ),
+                  ),
+          ),
+        ),
+
+        // 狀態指示燈
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: Container(
+            width: size * 0.3,
+            height: size * 0.3,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _getStatusColor(),
+              border: Border.all(
+                color: AppTheme.primaryDark,
+                width: 2,
+              ),
+            ),
+          ),
+        ),
+
+        // 房主標記
+        if (isHost)
+          Positioned(
+            left: -4,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: AppTheme.accent,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.star,
+                size: size * 0.25,
+                color: AppTheme.primaryDark,
+              ),
+            ),
+          ),
+      ],
+    );
+
+    // 如果不顯示名稱，直接返回頭像
+    if (!showName) {
+      return GestureDetector(
+        onTap: onTap,
+        child: avatarWidget,
+      );
+    }
+
+    // 顯示名稱時，使用 Column 佈局
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // 頭像主體
-              Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.primaryMid,
-                  border: Border.all(
-                    color: isCurrentPlayer
-                        ? AppTheme.accent
-                        : AppTheme.accent.withAlpha(128),
-                    width: isCurrentPlayer ? 3 : 2,
-                  ),
-                  boxShadow: [
-                    if (status == PlayerStatus.speaking)
-                      BoxShadow(
-                        color: AppTheme.accent.withAlpha(128),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      ),
-                  ],
-                ),
-                child: Center(
-                  child: emoji != null
-                      ? Text(
-                          emoji!,
-                          style: TextStyle(fontSize: size * 0.5),
-                        )
-                      : Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: GoogleFonts.cinzel(
-                            fontSize: size * 0.4,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.accent,
-                          ),
-                        ),
-                ),
-              ),
-
-              // 狀態指示燈
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: size * 0.3,
-                  height: size * 0.3,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _getStatusColor(),
-                    border: Border.all(
-                      color: AppTheme.primaryDark,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-
-              // 房主標記
-              if (isHost)
-                Positioned(
-                  left: -4,
-                  top: -4,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      color: AppTheme.accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.star,
-                      size: size * 0.25,
-                      color: AppTheme.primaryDark,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
+          avatarWidget,
           const SizedBox(height: 6),
-
           // 玩家名稱
           SizedBox(
             width: size + 16,
@@ -221,6 +234,7 @@ class PlayerListTile extends StatelessWidget {
         size: 44,
         isHost: isHost,
         isCurrentPlayer: isCurrentPlayer,
+        showName: false,  // 不在頭像下方顯示名稱，因為 ListTile 的 title 已經顯示
       ),
       title: Row(
         children: [

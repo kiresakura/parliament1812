@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'socket_service.dart';
+import '../../core/constants/api_constants.dart';
 
 /// 遊戲行動類型
 enum ActionType {
-  query,
-  rebut,
+  challenge,
+  counter,
   skill,
   pass,
 }
@@ -24,7 +27,7 @@ class GameAction {
 
   Map<String, dynamic> toJson() => {
         'type': type.name,
-        if (targetId != null) 'targetId': targetId,
+        if (targetId != null) 'target_id': targetId,
         if (params != null) 'params': params,
       };
 }
@@ -42,12 +45,40 @@ class RoomInfo {
   });
 
   factory RoomInfo.fromJson(Map<String, dynamic> json) {
+    final room = json['room'] as Map<String, dynamic>?;
     return RoomInfo(
-      roomId: json['roomId'] ?? '',
-      roomCode: json['roomCode'] ?? '',
+      roomId: room?['id'] ?? json['room_id'] ?? '',
+      roomCode: room?['code'] ?? json['room_code'] ?? '',
       player: json['player'] as Map<String, dynamic>?,
     );
   }
+}
+
+/// 伺服器訊息類型常數（對應 Rust 後端）
+class ServerMessageTypes {
+  static const String connected = 'connected';
+  static const String error = 'error';
+  static const String roomState = 'room_state';
+  static const String playerJoined = 'player_joined';
+  static const String playerLeft = 'player_left';
+  static const String playerSelectedCharacter = 'player_selected_character';
+  static const String playerReady = 'player_ready';
+  static const String playerUnready = 'player_unready';
+  static const String gameStarted = 'game_started';
+  static const String phaseChanged = 'phase_changed';
+  static const String chatMessage = 'chat_message';
+  static const String challengeEvent = 'challenge_event';
+  static const String counterEvent = 'counter_event';
+  static const String skillUsed = 'skill_used';
+  static const String reputationChanged = 'reputation_changed';
+  static const String goldChanged = 'gold_changed';
+  static const String voteReceived = 'vote_received';
+  static const String voteResult = 'vote_result';
+  static const String gameResult = 'game_result';
+  static const String playerPoliticalDeath = 'player_political_death';
+  static const String systemMessage = 'system_message';
+  static const String pong = 'pong';
+  static const String timerUpdate = 'timer_update';
 }
 
 /// 遊戲服務
@@ -55,32 +86,51 @@ class GameService {
   final SocketService _socketService;
 
   // 事件流控制器
-  final _roomCreatedController = StreamController<RoomInfo>.broadcast();
-  final _roomJoinedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _connectedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _roomStateController = StreamController<Map<String, dynamic>>.broadcast();
   final _playerJoinedController = StreamController<Map<String, dynamic>>.broadcast();
   final _playerLeftController = StreamController<Map<String, dynamic>>.broadcast();
-  final _playerReadyChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _playerSelectedCharacterController = StreamController<Map<String, dynamic>>.broadcast();
+  final _playerReadyController = StreamController<Map<String, dynamic>>.broadcast();
   final _gameStartedController = StreamController<Map<String, dynamic>>.broadcast();
   final _phaseChangedController = StreamController<Map<String, dynamic>>.broadcast();
-  final _gameStateUpdateController = StreamController<Map<String, dynamic>>.broadcast();
-  final _actionResultController = StreamController<Map<String, dynamic>>.broadcast();
-  final _messageReceivedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _chatMessageController = StreamController<Map<String, dynamic>>.broadcast();
+  final _challengeEventController = StreamController<Map<String, dynamic>>.broadcast();
+  final _counterEventController = StreamController<Map<String, dynamic>>.broadcast();
+  final _skillUsedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _reputationChangedController = StreamController<Map<String, dynamic>>.broadcast();
   final _voteReceivedController = StreamController<Map<String, dynamic>>.broadcast();
-  final _gameEndedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _voteResultController = StreamController<Map<String, dynamic>>.broadcast();
+  final _gameResultController = StreamController<Map<String, dynamic>>.broadcast();
+  final _systemMessageController = StreamController<Map<String, dynamic>>.broadcast();
+  final _errorController = StreamController<Map<String, dynamic>>.broadcast();
 
   // 事件流
-  Stream<RoomInfo> get onRoomCreated => _roomCreatedController.stream;
-  Stream<Map<String, dynamic>> get onRoomJoined => _roomJoinedController.stream;
+  Stream<Map<String, dynamic>> get onConnected => _connectedController.stream;
+  Stream<Map<String, dynamic>> get onRoomState => _roomStateController.stream;
   Stream<Map<String, dynamic>> get onPlayerJoined => _playerJoinedController.stream;
   Stream<Map<String, dynamic>> get onPlayerLeft => _playerLeftController.stream;
-  Stream<Map<String, dynamic>> get onPlayerReadyChanged => _playerReadyChangedController.stream;
+  Stream<Map<String, dynamic>> get onPlayerSelectedCharacter => _playerSelectedCharacterController.stream;
+  Stream<Map<String, dynamic>> get onPlayerReady => _playerReadyController.stream;
   Stream<Map<String, dynamic>> get onGameStarted => _gameStartedController.stream;
   Stream<Map<String, dynamic>> get onPhaseChanged => _phaseChangedController.stream;
-  Stream<Map<String, dynamic>> get onGameStateUpdate => _gameStateUpdateController.stream;
-  Stream<Map<String, dynamic>> get onActionResult => _actionResultController.stream;
-  Stream<Map<String, dynamic>> get onMessageReceived => _messageReceivedController.stream;
+  Stream<Map<String, dynamic>> get onChatMessage => _chatMessageController.stream;
+  Stream<Map<String, dynamic>> get onChallengeEvent => _challengeEventController.stream;
+  Stream<Map<String, dynamic>> get onCounterEvent => _counterEventController.stream;
+  Stream<Map<String, dynamic>> get onSkillUsed => _skillUsedController.stream;
+  Stream<Map<String, dynamic>> get onReputationChanged => _reputationChangedController.stream;
   Stream<Map<String, dynamic>> get onVoteReceived => _voteReceivedController.stream;
-  Stream<Map<String, dynamic>> get onGameEnded => _gameEndedController.stream;
+  Stream<Map<String, dynamic>> get onVoteResult => _voteResultController.stream;
+  Stream<Map<String, dynamic>> get onGameResult => _gameResultController.stream;
+  Stream<Map<String, dynamic>> get onSystemMessage => _systemMessageController.stream;
+  Stream<Map<String, dynamic>> get onError => _errorController.stream;
+
+  // 向後相容的別名
+  Stream<Map<String, dynamic>> get onGameStateUpdate => _reputationChangedController.stream;
+  Stream<Map<String, dynamic>> get onActionResult => _challengeEventController.stream;
+  Stream<Map<String, dynamic>> get onMessageReceived => _chatMessageController.stream;
+  Stream<Map<String, dynamic>> get onGameEnded => _gameResultController.stream;
+  Stream<Map<String, dynamic>> get onPlayerReadyChanged => _playerReadyController.stream;
 
   GameService(this._socketService) {
     _setupEventListeners();
@@ -88,176 +138,226 @@ class GameService {
 
   /// 設置事件監聽
   void _setupEventListeners() {
-    _socketService.on(SocketEvents.roomCreated, (data) {
-      debugPrint('Room created: $data');
+    _socketService.on(ServerMessageTypes.connected, (data) {
+      debugPrint('Connected: $data');
       if (data is Map<String, dynamic>) {
-        _roomCreatedController.add(RoomInfo.fromJson(data));
+        _connectedController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.roomJoined, (data) {
-      debugPrint('Room joined: $data');
+    _socketService.on(ServerMessageTypes.roomState, (data) {
+      debugPrint('Room state: $data');
       if (data is Map<String, dynamic>) {
-        _roomJoinedController.add(data);
+        _roomStateController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.playerJoined, (data) {
+    _socketService.on(ServerMessageTypes.playerJoined, (data) {
       debugPrint('Player joined: $data');
       if (data is Map<String, dynamic>) {
         _playerJoinedController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.playerLeft, (data) {
+    _socketService.on(ServerMessageTypes.playerLeft, (data) {
       debugPrint('Player left: $data');
       if (data is Map<String, dynamic>) {
         _playerLeftController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.playerReadyChanged, (data) {
-      debugPrint('Player ready changed: $data');
+    _socketService.on(ServerMessageTypes.playerSelectedCharacter, (data) {
+      debugPrint('Player selected character: $data');
       if (data is Map<String, dynamic>) {
-        _playerReadyChangedController.add(data);
+        _playerSelectedCharacterController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.gameStarted, (data) {
+    _socketService.on(ServerMessageTypes.playerReady, (data) {
+      debugPrint('Player ready: $data');
+      if (data is Map<String, dynamic>) {
+        _playerReadyController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.playerUnready, (data) {
+      debugPrint('Player unready: $data');
+      if (data is Map<String, dynamic>) {
+        // 使用同一個 controller，但標記為 unready
+        _playerReadyController.add({...data, 'ready': false});
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.gameStarted, (data) {
       debugPrint('Game started: $data');
       if (data is Map<String, dynamic>) {
         _gameStartedController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.phaseChanged, (data) {
+    _socketService.on(ServerMessageTypes.phaseChanged, (data) {
       debugPrint('Phase changed: $data');
       if (data is Map<String, dynamic>) {
         _phaseChangedController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.gameStateUpdate, (data) {
-      // debugPrint('Game state update: $data'); // 太頻繁，不打印
+    _socketService.on(ServerMessageTypes.chatMessage, (data) {
+      debugPrint('Chat message: $data');
       if (data is Map<String, dynamic>) {
-        _gameStateUpdateController.add(data);
+        _chatMessageController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.actionResult, (data) {
-      debugPrint('Action result: $data');
+    _socketService.on(ServerMessageTypes.challengeEvent, (data) {
+      debugPrint('Challenge event: $data');
       if (data is Map<String, dynamic>) {
-        _actionResultController.add(data);
+        _challengeEventController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.messageReceived, (data) {
-      debugPrint('Message received: $data');
+    _socketService.on(ServerMessageTypes.counterEvent, (data) {
+      debugPrint('Counter event: $data');
       if (data is Map<String, dynamic>) {
-        _messageReceivedController.add(data);
+        _counterEventController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.voteReceived, (data) {
+    _socketService.on(ServerMessageTypes.skillUsed, (data) {
+      debugPrint('Skill used: $data');
+      if (data is Map<String, dynamic>) {
+        _skillUsedController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.reputationChanged, (data) {
+      debugPrint('Reputation changed: $data');
+      if (data is Map<String, dynamic>) {
+        _reputationChangedController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.voteReceived, (data) {
       debugPrint('Vote received: $data');
       if (data is Map<String, dynamic>) {
         _voteReceivedController.add(data);
       }
     });
 
-    _socketService.on(SocketEvents.gameEnded, (data) {
-      debugPrint('Game ended: $data');
+    _socketService.on(ServerMessageTypes.voteResult, (data) {
+      debugPrint('Vote result: $data');
       if (data is Map<String, dynamic>) {
-        _gameEndedController.add(data);
+        _voteResultController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.gameResult, (data) {
+      debugPrint('Game result: $data');
+      if (data is Map<String, dynamic>) {
+        _gameResultController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.systemMessage, (data) {
+      debugPrint('System message: $data');
+      if (data is Map<String, dynamic>) {
+        _systemMessageController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.error, (data) {
+      debugPrint('Error: $data');
+      if (data is Map<String, dynamic>) {
+        _errorController.add(data);
       }
     });
   }
 
-  /// 創建房間
+  /// 連接到伺服器
+  Future<bool> connect({String? token}) async {
+    return await _socketService.connect(token: token);
+  }
+
+  /// 創建房間（透過 HTTP API）
   Future<RoomInfo?> createRoom(String playerName) async {
-    // 確保已連接
-    if (!_socketService.isConnected) {
-      final connected = await _socketService.connect(playerName: playerName);
-      if (!connected) {
-        debugPrint('Failed to connect');
+    try {
+      final url = '${ApiConstants.baseUrl}/api/rooms';
+      debugPrint('Creating room: $url');
+
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+
+      final request = await client.postUrl(Uri.parse(url));
+      request.headers.contentType = ContentType.json;
+      request.write(json.encode({'host_name': playerName}));
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+
+      client.close();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(body) as Map<String, dynamic>;
+        debugPrint('Room created: $data');
+
+        // 連接並加入房間
+        if (!_socketService.isConnected) {
+          await _socketService.connect();
+        }
+
+        final roomCode = data['code'] ?? data['room_code'] ?? '';
+        if (roomCode.isNotEmpty) {
+          _socketService.joinRoom(roomCode, playerName);
+        }
+
+        return RoomInfo.fromJson(data);
+      } else {
+        debugPrint('Create room failed: ${response.statusCode} - $body');
         return null;
       }
+    } catch (e) {
+      debugPrint('Create room error: $e');
+      return null;
     }
-
-    final completer = Completer<RoomInfo?>();
-
-    void onRoomCreated(dynamic data) {
-      debugPrint('Create room callback: $data');
-      if (data is Map<String, dynamic> && !completer.isCompleted) {
-        completer.complete(RoomInfo.fromJson(data));
-      }
-    }
-
-    void onError(dynamic data) {
-      debugPrint('Create room error: $data');
-      if (!completer.isCompleted) {
-        completer.complete(null);
-      }
-    }
-
-    _socketService.once(SocketEvents.roomCreated, onRoomCreated);
-    _socketService.once(SocketEvents.error, onError);
-
-    _socketService.emit(SocketEvents.createRoom, {'playerName': playerName});
-
-    // 超時處理
-    return completer.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () {
-        _socketService.off(SocketEvents.roomCreated, onRoomCreated);
-        _socketService.off(SocketEvents.error, onError);
-        debugPrint('Create room timeout');
-        return null;
-      },
-    );
   }
 
   /// 加入房間
   Future<Map<String, dynamic>?> joinRoom(String roomCode, String playerName) async {
     // 確保已連接
     if (!_socketService.isConnected) {
-      final connected = await _socketService.connect(playerName: playerName);
+      final connected = await _socketService.connect();
       if (!connected) {
         debugPrint('Failed to connect');
         return null;
       }
     }
 
+    // 發送並等待回應
+    _socketService.joinRoom(roomCode, playerName);
+
     final completer = Completer<Map<String, dynamic>?>();
 
-    void onRoomJoined(dynamic data) {
-      debugPrint('Join room callback: $data');
+    void onRoomState(dynamic data) {
       if (data is Map<String, dynamic> && !completer.isCompleted) {
         completer.complete(data);
       }
     }
 
     void onError(dynamic data) {
-      debugPrint('Join room error: $data');
       if (!completer.isCompleted) {
         completer.complete(null);
       }
     }
 
-    _socketService.once(SocketEvents.roomJoined, onRoomJoined);
-    _socketService.once(SocketEvents.error, onError);
-
-    _socketService.emit(SocketEvents.joinRoom, {
-      'roomCode': roomCode,
-      'playerName': playerName,
-    });
+    _socketService.once(ServerMessageTypes.roomState, onRoomState);
+    _socketService.once(ServerMessageTypes.error, onError);
 
     // 超時處理
     return completer.future.timeout(
       const Duration(seconds: 10),
       onTimeout: () {
-        _socketService.off(SocketEvents.roomJoined, onRoomJoined);
-        _socketService.off(SocketEvents.error, onError);
+        _socketService.off(ServerMessageTypes.roomState);
+        _socketService.off(ServerMessageTypes.error);
         debugPrint('Join room timeout');
         return null;
       },
@@ -266,71 +366,90 @@ class GameService {
 
   /// 離開房間
   void leaveRoom() {
-    _socketService.emit(SocketEvents.leaveRoom);
+    _socketService.leaveRoom();
+  }
+
+  /// 選擇角色
+  void selectCharacter(String character) {
+    _socketService.selectCharacter(character);
   }
 
   /// 設置準備狀態
   void setReady(bool ready) {
-    _socketService.emit(SocketEvents.playerReady, {'ready': ready});
+    if (ready) {
+      _socketService.ready();
+    } else {
+      _socketService.unready();
+    }
   }
 
   /// 開始遊戲
   void startGame() {
-    _socketService.emit(SocketEvents.startGame);
+    _socketService.startGame();
   }
 
-  /// 發送遊戲行動
-  void sendAction(GameAction action) {
-    _socketService.emit(SocketEvents.gameAction, action.toJson());
+  /// 發送質詢（攻擊）
+  void sendChallenge(String targetId) {
+    _socketService.challenge(targetId);
   }
 
-  /// 發送質詢
+  /// 發送質詢（別名，向後相容）
   void sendQuery(String targetId) {
-    sendAction(GameAction(type: ActionType.query, targetId: targetId));
+    sendChallenge(targetId);
   }
 
-  /// 發送反駁
+  /// 發送反駁（防禦）
+  void sendCounter() {
+    _socketService.counter();
+  }
+
+  /// 發送反駁（別名，向後相容）
   void sendRebut() {
-    sendAction(GameAction(type: ActionType.rebut));
+    sendCounter();
   }
 
-  /// 發送技能
-  void sendSkill({String? targetId, Map<String, dynamic>? params}) {
-    sendAction(GameAction(type: ActionType.skill, targetId: targetId, params: params));
+  /// 使用技能
+  void sendSkill({String? targetId}) {
+    _socketService.useSkill(targetId: targetId);
   }
 
-  /// 跳過
-  void sendPass() {
-    sendAction(GameAction(type: ActionType.pass));
+  /// 發送公開訊息
+  void sendMessage(String content) {
+    _socketService.sendChat(content);
   }
 
-  /// 發送訊息
-  void sendMessage(String content, {String? targetId, String? type}) {
-    _socketService.emit(SocketEvents.sendMessage, {
-      'content': content,
-      if (targetId != null) 'targetId': targetId,
-      if (type != null) 'type': type,
-    });
+  /// 發送私訊
+  void sendPrivateMessage(String targetId, String content) {
+    _socketService.sendPrivateChat(targetId, content);
   }
 
   /// 投票
-  void vote(String optionId) {
-    _socketService.emit(SocketEvents.vote, {'optionId': optionId});
+  void vote(String choice) {
+    _socketService.vote(choice);
   }
+
+  /// 是否已連接
+  bool get isConnected => _socketService.isConnected;
 
   /// 清理資源
   void dispose() {
-    _roomCreatedController.close();
-    _roomJoinedController.close();
+    _connectedController.close();
+    _roomStateController.close();
     _playerJoinedController.close();
     _playerLeftController.close();
-    _playerReadyChangedController.close();
+    _playerSelectedCharacterController.close();
+    _playerReadyController.close();
     _gameStartedController.close();
     _phaseChangedController.close();
-    _gameStateUpdateController.close();
-    _actionResultController.close();
-    _messageReceivedController.close();
+    _chatMessageController.close();
+    _challengeEventController.close();
+    _counterEventController.close();
+    _skillUsedController.close();
+    _reputationChangedController.close();
     _voteReceivedController.close();
-    _gameEndedController.close();
+    _voteResultController.close();
+    _gameResultController.close();
+    _systemMessageController.close();
+    _errorController.close();
   }
 }

@@ -20,11 +20,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
   final _nicknameController = TextEditingController();
-  final _roomCodeController = TextEditingController();
   bool _isCreating = false;
-  bool _isJoining = false;
   String? _nicknameError;
-  String? _roomCodeError;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -46,45 +43,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void dispose() {
     _nicknameController.dispose();
-    _roomCodeController.dispose();
     _fadeController.dispose();
     super.dispose();
   }
 
-  /// 驗證輸入
-  bool _validateInputs({bool checkRoomCode = false}) {
-    bool valid = true;
-    setState(() {
-      _nicknameError = null;
-      _roomCodeError = null;
-    });
+  /// 驗證暱稱
+  bool _validateNickname() {
+    setState(() => _nicknameError = null);
 
     final nickname = _nicknameController.text.trim();
     if (nickname.isEmpty) {
       setState(() => _nicknameError = '請輸入暱稱');
-      valid = false;
+      return false;
     } else if (nickname.length < 2) {
       setState(() => _nicknameError = '暱稱至少需要 2 個字');
-      valid = false;
+      return false;
     }
-
-    if (checkRoomCode) {
-      final roomCode = _roomCodeController.text.trim();
-      if (roomCode.isEmpty) {
-        setState(() => _roomCodeError = '請輸入房間代碼');
-        valid = false;
-      } else if (roomCode.length != 6) {
-        setState(() => _roomCodeError = '房間代碼需為 6 位');
-        valid = false;
-      }
-    }
-
-    return valid;
+    return true;
   }
 
   /// 創建房間
   Future<void> _createRoom() async {
-    if (!_validateInputs()) return;
+    if (!_validateNickname()) return;
 
     setState(() => _isCreating = true);
 
@@ -127,39 +107,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  /// 加入房間
-  Future<void> _joinRoom() async {
-    if (!_validateInputs(checkRoomCode: true)) return;
-
-    setState(() => _isJoining = true);
-
-    try {
-      final gameService = ref.read(gameServiceProvider);
-      final playerName = _nicknameController.text.trim();
-      final roomCode = _roomCodeController.text.trim().toUpperCase();
-
-      // 呼叫後端 API 加入房間
-      final data = await gameService.joinRoom(roomCode, playerName);
-
-      if (data == null) {
-        _showError('加入房間失敗，房間可能不存在或已滿');
-        return;
-      }
-
-      // 更新本地狀態
-      await ref.read(roomProvider.notifier).joinRoom(data);
-
-      if (mounted) {
-        final roomId = data['roomId'] ?? roomCode;
-        context.goNamed('lobby', pathParameters: {'roomId': roomId});
-      }
-    } catch (e) {
-      _showError('加入房間失敗：$e');
-    } finally {
-      if (mounted) {
-        setState(() => _isJoining = false);
-      }
-    }
+  /// 導航到加入房間頁面
+  void _goToJoinRoom() {
+    context.push('/join');
   }
 
   void _showError(String message) {
@@ -327,19 +277,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _buildDivider(),
             const SizedBox(height: 24),
 
-            // 房間代碼輸入
-            RoomCodeInput(
-              controller: _roomCodeController,
-              errorText: _roomCodeError,
-            ),
-            const SizedBox(height: 16),
-
             // 加入房間按鈕
             VictorianButton(
               text: '加入房間',
               icon: Icons.login,
-              onPressed: _isJoining ? null : _joinRoom,
-              isLoading: _isJoining,
+              onPressed: _goToJoinRoom,
+              fullWidth: true,
+              type: VictorianButtonType.secondary,
+            ),
+            const SizedBox(height: 24),
+
+            // 分隔線
+            _buildDivider(),
+            const SizedBox(height: 24),
+
+            // 單人模式按鈕
+            VictorianButton(
+              text: '單人模式',
+              icon: Icons.person,
+              onPressed: () => context.push('/solo'),
               fullWidth: true,
               type: VictorianButtonType.secondary,
             ),
