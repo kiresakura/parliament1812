@@ -398,6 +398,30 @@ class MultiplayerGameNotifier extends StateNotifier<MultiplayerGameState> {
       debugPrint('MultiplayerGame: Error - $data');
       state = state.copyWith(errorMessage: data['message'] as String?);
     }));
+
+    // 卡牌使用事件
+    _subscriptions.add(_gameService.onCardUsed.listen((data) {
+      debugPrint('MultiplayerGame: Card used - $data');
+      _handleCardUsed(data);
+    }));
+
+    // 抽牌事件
+    _subscriptions.add(_gameService.onCardDrawn.listen((data) {
+      debugPrint('MultiplayerGame: Card drawn - $data');
+      _handleCardDrawn(data);
+    }));
+
+    // 手牌更新
+    _subscriptions.add(_gameService.onHandUpdated.listen((data) {
+      debugPrint('MultiplayerGame: Hand updated - $data');
+      _handleHandUpdated(data);
+    }));
+
+    // 玩家手牌數量變更
+    _subscriptions.add(_gameService.onPlayerHandCountChanged.listen((data) {
+      debugPrint('MultiplayerGame: Player hand count changed - $data');
+      _handlePlayerHandCountChanged(data);
+    }));
   }
 
   // ===== Event Handlers =====
@@ -587,6 +611,145 @@ class MultiplayerGameNotifier extends StateNotifier<MultiplayerGameState> {
     state = state.copyWith(players: players);
   }
 
+  // ===== Card Event Handlers =====
+
+  void _handleCardUsed(Map<String, dynamic> data) {
+    final playerId = data['player_id'] as String?;
+    final playerName = data['player_name'] as String? ?? '未知';
+    final cardName = data['card_name'] as String? ?? '未知卡牌';
+    final targetName = data['target_name'] as String?;
+    final effectDescription = data['effect_description'] as String? ?? '';
+
+    // 添加系統訊息到聊天
+    String message;
+    if (targetName != null) {
+      message = '$playerName 對 $targetName 使用了「$cardName」：$effectDescription';
+    } else {
+      message = '$playerName 使用了「$cardName」：$effectDescription';
+    }
+
+    final chatMessage = ChatMessage(
+      fromId: playerId ?? 'system',
+      fromName: '系統',
+      content: message,
+      isSystem: true,
+      timestamp: DateTime.now(),
+    );
+
+    state = state.copyWith(
+      chatMessages: [...state.chatMessages, chatMessage].take(100).toList(),
+    );
+  }
+
+  void _handleCardDrawn(Map<String, dynamic> data) {
+    // 本地玩家抽到卡牌
+    final cardId = data['card_id'] as String?;
+    final cardName = data['card_name'] as String?;
+    final cardType = data['card_type'] as String?;
+    final description = data['description'] as String?;
+    final cost = data['cost'] as int? ?? 0;
+
+    if (cardId == null || cardName == null) return;
+
+    // 建立新卡牌並加入手牌
+    final newCard = GameCard(
+      id: cardId,
+      name: cardName,
+      description: description ?? '',
+      type: _parseCardType(cardType),
+      rarity: CardRarity.normal,
+      targetType: TargetType.singleEnemy,
+      influenceCost: cost,
+      goldCost: 0,
+      baseValue: 0,
+    );
+
+    state = state.copyWith(hand: [...state.hand, newCard]);
+  }
+
+  void _handleHandUpdated(Map<String, dynamic> data) {
+    // 完整手牌更新
+    final cardsData = data['cards'] as List<dynamic>?;
+    if (cardsData == null) return;
+
+    final cards = cardsData.map((c) {
+      final cardMap = c as Map<String, dynamic>;
+      return GameCard(
+        id: cardMap['id'] as String,
+        name: cardMap['name'] as String,
+        description: cardMap['description'] as String? ?? '',
+        type: _parseCardType(cardMap['card_type'] as String?),
+        rarity: _parseCardRarity(cardMap['rarity'] as String?),
+        targetType: _parseTargetType(cardMap['target_type'] as String?),
+        influenceCost: cardMap['influence_cost'] as int? ?? 0,
+        goldCost: cardMap['gold_cost'] as int? ?? 0,
+        baseValue: cardMap['base_value'] as int? ?? 0,
+        roleId: cardMap['role_id'] as String?,
+      );
+    }).toList();
+
+    state = state.copyWith(hand: cards);
+  }
+
+  void _handlePlayerHandCountChanged(Map<String, dynamic> data) {
+    // 更新其他玩家的手牌數量（公開資訊）
+    // 這可以用於顯示對手有多少手牌
+    final playerId = data['player_id'] as String?;
+    final cardCount = data['card_count'] as int? ?? 0;
+
+    debugPrint('Player $playerId now has $cardCount cards');
+    // TODO: 如果需要顯示對手手牌數，可以在 MultiplayerPlayer 中添加 handCount 欄位
+  }
+
+  CardType _parseCardType(String? type) {
+    switch (type) {
+      case 'attack':
+        return CardType.attack;
+      case 'defense':
+        return CardType.defense;
+      case 'utility':
+        return CardType.utility;
+      case 'signature':
+        return CardType.signature;
+      default:
+        return CardType.utility;
+    }
+  }
+
+  CardRarity _parseCardRarity(String? rarity) {
+    switch (rarity) {
+      case 'normal':
+        return CardRarity.normal;
+      case 'rare':
+        return CardRarity.rare;
+      case 'super_rare':
+        return CardRarity.superRare;
+      case 'legendary':
+        return CardRarity.legendary;
+      default:
+        return CardRarity.normal;
+    }
+  }
+
+  TargetType _parseTargetType(String? targetType) {
+    switch (targetType) {
+      case 'self':
+        return TargetType.self;
+      case 'single_enemy':
+        return TargetType.singleEnemy;
+      case 'single_ally':
+        return TargetType.singleAlly;
+      case 'single_any':
+        return TargetType.singleAny;
+      case 'all_enemies':
+        return TargetType.allEnemies;
+      case 'all_players':
+        return TargetType.allPlayers;
+      default:
+        return TargetType.none;
+    }
+  }
+
   void _startTimer(int seconds) {
     _timer?.cancel();
     state = state.copyWith(timeRemaining: seconds);
@@ -684,10 +847,22 @@ class MultiplayerGameNotifier extends StateNotifier<MultiplayerGameState> {
   /// 使用卡牌
   void useCard(GameCard card, {String? targetId}) {
     // 發送卡牌使用訊息到伺服器
-    // TODO: 實作卡牌使用的 WebSocket 訊息
-    _gameService.sendMessage('use_card:${card.id}:${targetId ?? ""}');
+    _gameService.useCard(card.id, targetId: targetId);
 
-    // 更新本地手牌
+    // 更新本地手牌（樂觀更新）
+    final newHand = state.hand.where((c) => c.id != card.id).toList();
+    state = state.copyWith(hand: newHand);
+  }
+
+  /// 抽牌
+  void drawCard() {
+    _gameService.drawCard();
+  }
+
+  /// 棄牌
+  void discardCard(GameCard card) {
+    _gameService.discardCard(card.id);
+    // 樂觀更新
     final newHand = state.hand.where((c) => c.id != card.id).toList();
     state = state.copyWith(hand: newHand);
   }

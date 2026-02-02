@@ -79,6 +79,11 @@ class ServerMessageTypes {
   static const String systemMessage = 'system_message';
   static const String pong = 'pong';
   static const String timerUpdate = 'timer_update';
+  // 卡牌相關
+  static const String cardUsed = 'card_used';
+  static const String cardDrawn = 'card_drawn';
+  static const String handUpdated = 'hand_updated';
+  static const String playerHandCountChanged = 'player_hand_count_changed';
 }
 
 /// 遊戲服務
@@ -104,6 +109,11 @@ class GameService {
   final _gameResultController = StreamController<Map<String, dynamic>>.broadcast();
   final _systemMessageController = StreamController<Map<String, dynamic>>.broadcast();
   final _errorController = StreamController<Map<String, dynamic>>.broadcast();
+  // 卡牌相關
+  final _cardUsedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _cardDrawnController = StreamController<Map<String, dynamic>>.broadcast();
+  final _handUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _playerHandCountChangedController = StreamController<Map<String, dynamic>>.broadcast();
 
   // 事件流
   Stream<Map<String, dynamic>> get onConnected => _connectedController.stream;
@@ -124,6 +134,11 @@ class GameService {
   Stream<Map<String, dynamic>> get onGameResult => _gameResultController.stream;
   Stream<Map<String, dynamic>> get onSystemMessage => _systemMessageController.stream;
   Stream<Map<String, dynamic>> get onError => _errorController.stream;
+  // 卡牌相關事件流
+  Stream<Map<String, dynamic>> get onCardUsed => _cardUsedController.stream;
+  Stream<Map<String, dynamic>> get onCardDrawn => _cardDrawnController.stream;
+  Stream<Map<String, dynamic>> get onHandUpdated => _handUpdatedController.stream;
+  Stream<Map<String, dynamic>> get onPlayerHandCountChanged => _playerHandCountChangedController.stream;
 
   // 向後相容的別名
   Stream<Map<String, dynamic>> get onGameStateUpdate => _reputationChangedController.stream;
@@ -269,6 +284,35 @@ class GameService {
       debugPrint('Error: $data');
       if (data is Map<String, dynamic>) {
         _errorController.add(data);
+      }
+    });
+
+    // 卡牌相關事件
+    _socketService.on(ServerMessageTypes.cardUsed, (data) {
+      debugPrint('Card used: $data');
+      if (data is Map<String, dynamic>) {
+        _cardUsedController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.cardDrawn, (data) {
+      debugPrint('Card drawn: $data');
+      if (data is Map<String, dynamic>) {
+        _cardDrawnController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.handUpdated, (data) {
+      debugPrint('Hand updated: $data');
+      if (data is Map<String, dynamic>) {
+        _handUpdatedController.add(data);
+      }
+    });
+
+    _socketService.on(ServerMessageTypes.playerHandCountChanged, (data) {
+      debugPrint('Player hand count changed: $data');
+      if (data is Map<String, dynamic>) {
+        _playerHandCountChangedController.add(data);
       }
     });
   }
@@ -428,6 +472,30 @@ class GameService {
     _socketService.vote(choice);
   }
 
+  /// 使用卡牌
+  void useCard(String cardId, {String? targetId}) {
+    _socketService.send({
+      'type': 'use_card',
+      'card_id': cardId,
+      'target_id': targetId,
+    });
+  }
+
+  /// 抽牌
+  void drawCard() {
+    _socketService.send({
+      'type': 'draw_card',
+    });
+  }
+
+  /// 棄牌
+  void discardCard(String cardId) {
+    _socketService.send({
+      'type': 'discard_card',
+      'card_id': cardId,
+    });
+  }
+
   /// 是否已連接
   bool get isConnected => _socketService.isConnected;
 
@@ -451,5 +519,10 @@ class GameService {
     _gameResultController.close();
     _systemMessageController.close();
     _errorController.close();
+    // 卡牌相關
+    _cardUsedController.close();
+    _cardDrawnController.close();
+    _handUpdatedController.close();
+    _playerHandCountChangedController.close();
   }
 }

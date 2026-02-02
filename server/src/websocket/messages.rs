@@ -77,6 +77,23 @@ pub enum ClientMessage {
         choice: VoteChoice,
     },
 
+    /// 使用卡牌
+    UseCard {
+        /// 卡牌 ID
+        card_id: String,
+        /// 目標玩家 ID（可選）
+        target_id: Option<Uuid>,
+    },
+
+    /// 抽牌
+    DrawCard,
+
+    /// 棄牌
+    DiscardCard {
+        /// 卡牌 ID
+        card_id: String,
+    },
+
     /// 心跳
     Ping,
 }
@@ -249,6 +266,54 @@ pub enum ServerMessage {
         reason: String,
     },
 
+    /// 卡牌使用事件
+    CardUsed {
+        /// 使用者 ID
+        player_id: Uuid,
+        /// 使用者名稱
+        player_name: String,
+        /// 卡牌 ID
+        card_id: String,
+        /// 卡牌名稱
+        card_name: String,
+        /// 目標 ID（可選）
+        target_id: Option<Uuid>,
+        /// 目標名稱（可選）
+        target_name: Option<String>,
+        /// 效果描述
+        effect_description: String,
+        /// 造成的傷害/治療值
+        value: i32,
+    },
+
+    /// 抽牌事件（僅發送給當事人）
+    CardDrawn {
+        /// 卡牌 ID
+        card_id: String,
+        /// 卡牌名稱
+        card_name: String,
+        /// 卡牌類型
+        card_type: String,
+        /// 卡牌描述
+        description: String,
+        /// 消耗
+        cost: i32,
+    },
+
+    /// 手牌更新（發送完整手牌）
+    HandUpdated {
+        /// 手牌列表
+        cards: Vec<CardInfo>,
+    },
+
+    /// 玩家手牌數量更新（公開資訊）
+    PlayerHandCountChanged {
+        /// 玩家 ID
+        player_id: Uuid,
+        /// 手牌數量
+        card_count: u32,
+    },
+
     /// 收到投票
     VoteReceived {
         /// 投票者 ID
@@ -304,6 +369,31 @@ pub enum ServerMessage {
         /// 剩餘秒數
         remaining_secs: u32,
     },
+}
+
+/// 卡牌資訊（用於 WebSocket 傳輸）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CardInfo {
+    /// 卡牌 ID
+    pub id: String,
+    /// 卡牌名稱
+    pub name: String,
+    /// 卡牌描述
+    pub description: String,
+    /// 卡牌類型
+    pub card_type: String,
+    /// 稀有度
+    pub rarity: String,
+    /// 目標類型
+    pub target_type: String,
+    /// 影響力消耗
+    pub influence_cost: i32,
+    /// 金幣消耗
+    pub gold_cost: i32,
+    /// 基礎效果值
+    pub base_value: i32,
+    /// 角色專屬（可選）
+    pub role_id: Option<String>,
 }
 
 /// 玩家排名
