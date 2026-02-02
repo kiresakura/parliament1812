@@ -19,3 +19,21 @@ export 'tutorial.dart';
 
 // 用戶認證模型
 export 'user_account.dart';
+
+// 用戶帳號系統
+export 'user_stats.dart';
+export 'user_currency.dart';
+export 'user_settings.dart';
+
+// 卡牌與資源系統
+export 'card.dart';
+export 'player_resources.dart';
+
+// 皮膚系統
+export 'skin.dart';
+
+// 課金系統
+export 'battle_pass.dart';
+
+// 玩家生涯系統
+export 'player_career.dart';
