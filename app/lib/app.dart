@@ -8,6 +8,9 @@ import 'screens/main_menu_screen.dart';
 import 'screens/room_list_screen.dart';
 import 'screens/room_screen.dart';
 import 'screens/game_screen.dart';
+import 'screens/game_result_screen.dart';
+import 'providers/game_provider.dart';
+import 'screens/game_result_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -42,6 +45,32 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final code = state.pathParameters['code']!;
           return GameScreen(roomCode: code);
+        },
+      ),
+      GoRoute(
+        path: '/game/:code/result',
+        name: 'game_result',
+        builder: (context, state) {
+          final code = state.pathParameters['code']!;
+          // GameResult will be passed via ref.read(gameStateProvider)
+          return Consumer(
+            builder: (context, ref, _) {
+              final gameState = ref.watch(gameStateProvider);
+              if (gameState?.result == null) {
+                // 如果沒有結果，返回房間
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/room/$code');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              return GameResultScreen(
+                roomCode: code,
+                gameResult: gameState!.result!,
+              );
+            },
+          );
         },
       ),
     ],

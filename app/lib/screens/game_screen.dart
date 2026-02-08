@@ -24,6 +24,24 @@ class _GameScreenState extends ConsumerState<GameScreen>
     with TickerProviderStateMixin {
   bool _isChatExpanded = false;
   late AnimationController _chatAnimationController;
+  final TextEditingController _chatController = TextEditingController();
+  
+  // 階段轉場動畫
+  late AnimationController _phaseTransitionController;
+  late Animation<double> _phaseTransitionOpacity;
+  late Animation<double> _phaseTransitionScale;
+  bool _isShowingPhaseTransition = false;
+  GamePhase? _currentPhase;
+  
+  // 預設快捷語
+  final List<String> _quickMessages = [
+    '好手段！',
+    '結盟？',
+    '你完了。',
+    '投我一票',
+    '有意思...',
+    '我同意。',
+  ];
   
   @override
   void initState() {
@@ -32,11 +50,49 @@ class _GameScreenState extends ConsumerState<GameScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    
+    // 階段轉場動畫初始化
+    _phaseTransitionController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    
+    _phaseTransitionOpacity = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _phaseTransitionController,
+      curve: const Interval(0.0, 0.3, curve: Curves.easeIn),
+    ));
+    
+    _phaseTransitionScale = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(
+      parent: _phaseTransitionController,
+      curve: const Interval(0.2, 0.8, curve: Curves.elasticOut),
+    ));
+    
+    // 動畫完成後自動隱藏轉場
+    _phaseTransitionController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            setState(() {
+              _isShowingPhaseTransition = false;
+            });
+            _phaseTransitionController.reset();
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _chatAnimationController.dispose();
+    _phaseTransitionController.dispose();
+    _chatController.dispose();
     super.dispose();
   }
 
@@ -44,6 +100,22 @@ class _GameScreenState extends ConsumerState<GameScreen>
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameStateProvider);
     final theme = Theme.of(context);
+
+    // 監聽遊戲結果，當有結果時導航到結算畫面
+    ref.listen(gameStateProvider, (previous, next) {
+      if (next?.result != null && previous?.result == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            context.go('/game/${widget.roomCode}/result');
+          }
+        });
+      }
+      
+      // 監聽階段變化，觸發轉場動畫
+      if (next?.phase != previous?.phase && next?.phase != null) {
+        _triggerPhaseTransition(next!.phase);
+      }
+    });
 
     if (gameState == null) {
       return _buildLoadingScreen(theme);
@@ -61,7 +133,19 @@ class _GameScreenState extends ConsumerState<GameScreen>
               
               // 主遊戲區域
               Expanded(
-                child: _buildGameArea(gameState, theme),
+                child: Column(
+                  children: [
+                    // 議案區域
+                    if (gameState.phase == GamePhase.voting || 
+                        gameState.phase == GamePhase.debate)
+                      _buildBillArea(gameState, theme),
+                    
+                    // 遊戲區域
+                    Expanded(
+                      child: _buildGameArea(gameState, theme),
+                    ),
+                  ],
+                ),
               ),
               
               // 底部操作區
@@ -71,6 +155,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
           
           // 聊天浮層
           _buildChatOverlay(gameState, theme),
+          
+          // 階段轉場動畫覆蓋層
+          if (_isShowingPhaseTransition)
+            _buildPhaseTransitionOverlay(theme),
         ],
       ),
     );
@@ -795,8 +883,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           // 聊天內容區
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            height: _isChatExpanded ? 300 : 0,
-            width: _isChatExpanded ? 280 : 0,
+            height: _isChatExpanded ? 400 : 0,
+            width: _isChatExpanded ? 320 : 0,
             child: _isChatExpanded 
                 ? _buildChatContent(gameState.chatMessages, theme)
                 : const SizedBox.shrink(),
@@ -805,14 +893,45 @@ class _GameScreenState extends ConsumerState<GameScreen>
           const SizedBox(height: 8),
           
           // 聊天按鈕
-          FloatingActionButton(
-            mini: true,
-            onPressed: _toggleChat,
-            backgroundColor: theme.colorScheme.secondary,
-            child: Icon(
-              _isChatExpanded ? Icons.close : Icons.chat,
-              color: theme.colorScheme.onSecondary,
-            ),
+          Stack(
+            children: [
+              FloatingActionButton(
+                mini: true,
+                onPressed: _toggleChat,
+                backgroundColor: theme.colorScheme.secondary,
+                child: Icon(
+                  _isChatExpanded ? Icons.close : Icons.chat,
+                  color: theme.colorScheme.onSecondary,
+                ),
+              ),
+              
+              // 未讀數 Badge
+              if (!_isChatExpanded && gameState.chatMessages.isNotEmpty)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${gameState.chatMessages.length > 9 ? '9+' : gameState.chatMessages.length}',
+                      style: TextStyle(
+                        color: theme.colorScheme.onError,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -868,6 +987,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           
           // 聊天訊息列表
           Expanded(
+            flex: 3,
             child: ListView.builder(
               padding: const EdgeInsets.all(8),
               itemCount: messages.length,
@@ -877,6 +997,18 @@ class _GameScreenState extends ConsumerState<GameScreen>
               },
             ),
           ),
+          
+          // 分隔線
+          Divider(
+            height: 1,
+            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+          ),
+          
+          // 快捷語按鈕
+          _buildQuickMessages(theme),
+          
+          // 輸入框
+          _buildChatInput(theme),
         ],
       ),
     );
@@ -903,6 +1035,442 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildQuickMessages(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: _quickMessages.map((message) {
+          return InkWell(
+            onTap: () => _sendQuickMessage(message),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Text(
+                message,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildChatInput(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _chatController,
+              style: theme.textTheme.bodySmall,
+              decoration: InputDecoration(
+                hintText: '輸入訊息...',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+              ),
+              onSubmitted: (text) {
+                _sendChatMessage(text);
+              },
+            ),
+          ),
+          
+          const SizedBox(width: 8),
+          
+          InkWell(
+            onTap: () => _sendChatMessage(_chatController.text),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.send,
+                size: 16,
+                color: theme.colorScheme.onSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendQuickMessage(String message) {
+    final gameActions = ref.read(gameActionsProvider);
+    gameActions.sendChat(message);
+  }
+
+  void _sendChatMessage(String text) {
+    if (text.trim().isEmpty) return;
+    
+    final gameActions = ref.read(gameActionsProvider);
+    gameActions.sendChat(text.trim());
+    
+    _chatController.clear();
+  }
+
+  void _triggerPhaseTransition(GamePhase newPhase) {
+    if (!mounted) return;
+    
+    setState(() {
+      _currentPhase = newPhase;
+      _isShowingPhaseTransition = true;
+    });
+    
+    _phaseTransitionController.forward();
+  }
+
+  Widget _buildPhaseTransitionOverlay(ThemeData theme) {
+    if (_currentPhase == null) return const SizedBox.shrink();
+    
+    final phaseInfo = _getPhaseTransitionInfo(_currentPhase!);
+    
+    return AnimatedBuilder(
+      animation: _phaseTransitionController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _phaseTransitionOpacity.value,
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: phaseInfo.colors,
+              ),
+            ),
+            child: Center(
+              child: Transform.scale(
+                scale: _phaseTransitionScale.value,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        phaseInfo.icon,
+                        size: 60,
+                        color: Colors.white,
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    Text(
+                      phaseInfo.title,
+                      style: theme.textTheme.displayMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: const Offset(0, 2),
+                            blurRadius: 4,
+                            color: Colors.black.withValues(alpha: 0.3),
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    Text(
+                      phaseInfo.subtitle,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        shadows: [
+                          Shadow(
+                            offset: const Offset(0, 1),
+                            blurRadius: 2,
+                            color: Colors.black.withValues(alpha: 0.3),
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  PhaseTransitionInfo _getPhaseTransitionInfo(GamePhase phase) {
+    switch (phase) {
+      case GamePhase.conspiracy:
+        return PhaseTransitionInfo(
+          title: '密謀階段',
+          subtitle: '策劃你的行動',
+          icon: Icons.visibility_off,
+          colors: [
+            const Color(0xFF2C3E50).withValues(alpha: 0.9),
+            const Color(0xFF34495E).withValues(alpha: 0.9),
+          ],
+        );
+      
+      case GamePhase.debate:
+        return PhaseTransitionInfo(
+          title: '辯論階段',
+          subtitle: '展開激烈的政治攻防',
+          icon: Icons.campaign,
+          colors: [
+            const Color(0xFF8B0000).withValues(alpha: 0.9),
+            const Color(0xFFDC143C).withValues(alpha: 0.9),
+          ],
+        );
+      
+      case GamePhase.voting:
+        return PhaseTransitionInfo(
+          title: '投票階段',
+          subtitle: '決定議案的命運',
+          icon: Icons.how_to_vote,
+          colors: [
+            const Color(0xFFD4AF37).withValues(alpha: 0.9),
+            const Color(0xFFFFD700).withValues(alpha: 0.9),
+          ],
+        );
+      
+      case GamePhase.result:
+        return PhaseTransitionInfo(
+          title: '結算中...',
+          subtitle: '統計投票結果',
+          icon: Icons.analytics,
+          colors: [
+            const Color(0xFF4A90E2).withValues(alpha: 0.9),
+            const Color(0xFF7B68EE).withValues(alpha: 0.9),
+          ],
+        );
+      
+      default:
+        return PhaseTransitionInfo(
+          title: '遊戲進行中',
+          subtitle: '',
+          icon: Icons.play_arrow,
+          colors: [
+            const Color(0xFF2C3E50).withValues(alpha: 0.9),
+            const Color(0xFF34495E).withValues(alpha: 0.9),
+          ],
+        );
+    }
+  }
+
+  Widget _buildBillArea(GameState gameState, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.secondary.withValues(alpha: 0.1),
+            theme.colorScheme.secondary.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withValues(alpha: 0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 議案標題
+          Row(
+            children: [
+              Icon(
+                Icons.gavel,
+                color: theme.colorScheme.secondary,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '當前議案',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // 議案名稱（從 gameState 獲取）
+          Text(
+            gameState.currentBill ?? '等待議案',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // 議案描述
+          Text(
+            _getBillDescription(gameState.currentBill),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+            ),
+          ),
+          
+          // 投票階段時顯示效果預覽
+          if (gameState.phase == GamePhase.voting) ...[
+            const SizedBox(height: 16),
+            _buildBillEffectPreview(gameState.currentBill, theme),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillEffectPreview(String? billName, ThemeData theme) {
+    final effects = _getBillEffects(billName);
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '投票效果預覽',
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          ...effects.map((effect) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 12,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    effect,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  String _getBillDescription(String? billName) {
+    switch (billName) {
+      case '《工廠法案》':
+        return '限制工廠工時，改善勞工待遇。';
+      case '《新聞審查法》':
+        return '限制新聞自由，控制輿論傳播。';
+      case '《穀物法廢除》':
+        return '廢除穀物進口關稅，降低糧食價格。';
+      case '《結社自由法》':
+        return '允許工人組織工會和政治團體。';
+      case '《選舉改革法》':
+        return '擴大選舉權，改革議會選舉制度。';
+      default:
+        return '議案詳情待定...';
+    }
+  }
+
+  List<String> _getBillEffects(String? billName) {
+    switch (billName) {
+      case '《工廠法案》':
+        return [
+          '通過：工人聲望 +10，工廠主聲望 -10',
+          '否決：工人聲望 -5，工廠主聲望 +5',
+        ];
+      case '《新聞審查法》':
+        return [
+          '通過：記者聲望 -15，其他人聲望 +5',
+          '否決：記者聲望 +8，其他人聲望 -2',
+        ];
+      case '《穀物法廢除》':
+        return [
+          '通過：工廠主聲望 +10，工人聲望 +5',
+          '否決：工廠主聲望 -5，工人聲望 -3',
+        ];
+      case '《結社自由法》':
+        return [
+          '通過：盧德派聲望 +15，工廠主聲望 -10',
+          '否決：盧德派聲望 -8，工廠主聲望 +5',
+        ];
+      case '《選舉改革法》':
+        return [
+          '通過：全員聲望 +5，最高聲望者 -10',
+          '否決：全員聲望 -3',
+        ];
+      default:
+        return ['投票效果將在議案確定後顯示'];
+    }
   }
 
   void _toggleChat() {
@@ -980,4 +1548,19 @@ class _GameScreenState extends ConsumerState<GameScreen>
       ),
     );
   }
+}
+
+/// 階段轉場資訊
+class PhaseTransitionInfo {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> colors;
+
+  const PhaseTransitionInfo({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.colors,
+  });
 }

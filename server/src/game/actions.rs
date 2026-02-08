@@ -161,6 +161,21 @@ pub struct VoteCounts {
     pub option_c: f64,
 }
 
+impl VoteCounts {
+    /// 獲取獲勝選項
+    pub fn get_winner(&self) -> Option<VoteChoice> {
+        if self.option_a == 0.0 && self.option_b == 0.0 && self.option_c == 0.0 {
+            None
+        } else if self.option_a >= self.option_b && self.option_a >= self.option_c {
+            Some(VoteChoice::A)
+        } else if self.option_b >= self.option_c {
+            Some(VoteChoice::B)
+        } else {
+            Some(VoteChoice::C)
+        }
+    }
+}
+
 /// 玩家得分
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerScore {

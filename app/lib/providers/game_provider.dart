@@ -109,6 +109,9 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     if (state == null) return;
 
     state = state!.copyWith(result: result);
+    
+    // 自動導航到結算畫面
+    // 這個導航會在 UI 層處理
   }
 
   /// 處理計時器更新
@@ -489,6 +492,17 @@ void _handleGameWebSocketMessage(ServerMessage message, GameStateNotifier notifi
         playerId: message.playerId,
         cardCount: message.cardCount,
       );
+      break;
+
+    case GameResultMessage():
+      final rankings = message.rankings.map((r) => PlayerRanking.fromJson(r)).toList();
+      final gameResult = GameResult(
+        winnerFaction: message.winnerFaction,
+        votes: message.votes.map((key, value) => MapEntry(key, (value as num).toDouble())),
+        rankings: rankings,
+        endTime: DateTime.now(),
+      );
+      notifier.handleGameResult(gameResult);
       break;
 
     // TODO: 處理其他遊戲相關訊息

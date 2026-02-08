@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use super::actions::{ActionResult, GameAction, GameEffect, GameResult, PlayerScore, VoteCounts};
 use super::ai::{AIAction, AIDifficulty, AIManager};
+use super::bills::{BillSystem, VoteEffectResult};
 use super::cards;
 use super::characters::{CharacterSkills, GameError};
 use super::state::{GameState, PendingChallenge, PlayerState};
@@ -63,6 +64,8 @@ pub struct GameEngine {
     pub config: GameConfig,
     /// AI 管理器
     pub ai_manager: AIManager,
+    /// 議案系統
+    pub bill_system: BillSystem,
 }
 
 impl GameEngine {
@@ -105,6 +108,7 @@ impl GameEngine {
             state,
             config,
             ai_manager: AIManager::new(),
+            bill_system: BillSystem::new(),
         }
     }
 
@@ -124,6 +128,7 @@ impl GameEngine {
             state,
             config: GameConfig::default(),
             ai_manager: AIManager::new(),
+            bill_system: BillSystem::new(),
         }
     }
 
@@ -164,6 +169,9 @@ impl GameEngine {
         self.state.phase = GamePhase::Conspiracy;
         self.state.phase_start_time = Utc::now();
         self.state.current_round = 1;
+
+        // 選擇第一回合的議案
+        self.select_round_bill();
 
         Ok(())
     }
@@ -210,7 +218,18 @@ impl GameEngine {
             GamePhase::Voting => {
                 // AI 投票
                 let _ai_results = self.process_ai_actions();
-                // 投票結果會在 calculate_results 中處理
+                
+                // 計算投票結果並應用議案效果
+                if !self.state.votes.is_empty() {
+                    // 計算獲勝選項
+                    let vote_counts = self.calculate_vote_counts();
+                    let winning_choice = vote_counts.get_winner();
+                    
+                    if let Some(choice) = winning_choice {
+                        // 應用議案效果
+                        let _effects = self.apply_bill_effects(choice);
+                    }
+                }
             }
             _ => {}
         }
@@ -241,6 +260,91 @@ impl GameEngine {
                     timestamp: Utc::now(),
                 });
             }
+        }
+
+        // 選擇新回合的議案
+        self.select_round_bill();
+    }
+
+    /// 選擇當回合的議案
+    fn select_round_bill(&mut self) {
+        let mut rng = rand::thread_rng();
+        if let Some(bill) = self.bill_system.select_random_bill(&mut rng) {
+            // 更新當前議案到遊戲狀態
+            self.state.current_bill = bill.name.clone();
+        }
+    }
+
+    /// 獲取當前議案信息
+    pub fn get_current_bill_info(&self) -> Option<(String, String)> {
+        if let Some(bill) = self.bill_system.get_current_bill() {
+            Some((bill.name.clone(), bill.description.clone()))
+        } else {
+            None
+        }
+    }
+
+    /// 應用投票結果的議案效果到遊戲狀態
+    pub fn apply_bill_effects(&mut self, winning_choice: VoteChoice) -> VoteEffectResult {
+        let player_characters: std::collections::HashMap<Uuid, CharacterType> = self
+            .state
+            .players
+            .iter()
+            .map(|(id, p)| (*id, p.character))
+            .collect();
+        
+        let player_reputations: std::collections::HashMap<Uuid, i32> = self
+            .state
+            .players
+            .iter()
+            .map(|(id, p)| (*id, p.reputation))
+            .collect();
+
+        let vote_effects = self.bill_system.calculate_vote_effects(
+            winning_choice,
+            &player_characters,
+            &player_reputations,
+        );
+
+        // 應用聲望變化
+        for (player_id, reputation_change) in &vote_effects.reputation_changes {
+            if let Some(player) = self.state.get_player_mut(*player_id) {
+                player.reputation = (player.reputation + reputation_change).max(0);
+            }
+        }
+
+        vote_effects
+    }
+
+    /// 計算投票數量
+    fn calculate_vote_counts(&self) -> VoteCounts {
+        let mut option_a: f64 = 0.0;
+        let mut option_b: f64 = 0.0;
+        let mut option_c: f64 = 0.0;
+
+        // 計算加權票數
+        for (player_id, choice) in &self.state.votes {
+            if let Some(player) = self.state.get_player(*player_id) {
+                let weight = if player.is_politically_dead {
+                    0.0
+                } else if player.reputation >= 50 {
+                    1.0
+                } else {
+                    0.5
+                };
+
+                match choice {
+                    VoteChoice::A => option_a += weight,
+                    VoteChoice::B => option_b += weight,
+                    VoteChoice::C => option_c += weight,
+                }
+            }
+        }
+
+        VoteCounts {
+            option_a,
+            option_b,
+            option_c,
         }
     }
 
@@ -899,6 +1003,32 @@ impl GameEngine {
             Some(VoteChoice::C)
         };
 
+        // 應用議案效果（如果有獲勝選項）
+        let mut reputation_adjustments = std::collections::HashMap::new();
+        if let Some(choice) = winning_choice {
+            let player_characters: std::collections::HashMap<Uuid, CharacterType> = self
+                .state
+                .players
+                .iter()
+                .map(|(id, p)| (*id, p.character))
+                .collect();
+            
+            let player_reputations: std::collections::HashMap<Uuid, i32> = self
+                .state
+                .players
+                .iter()
+                .map(|(id, p)| (*id, p.reputation))
+                .collect();
+
+            let vote_effects = self.bill_system.calculate_vote_effects(
+                choice,
+                &player_characters,
+                &player_reputations,
+            );
+
+            reputation_adjustments = vote_effects.reputation_changes;
+        }
+
         // 決定獲勝派系
         let winning_faction = winning_choice.map(|c| match c {
             VoteChoice::A => "工人派".to_string(),
@@ -906,13 +1036,16 @@ impl GameEngine {
             VoteChoice::C => "改革派".to_string(),
         });
 
-        // 計算玩家得分
+        // 計算玩家得分（包含議案效果）
         let player_scores: Vec<PlayerScore> = self
             .state
             .players
             .values()
             .map(|p| {
-                let base_score = p.reputation + p.gold;
+                let bill_reputation_change = reputation_adjustments.get(&p.id).unwrap_or(&0);
+                let adjusted_reputation = p.reputation + bill_reputation_change;
+                let base_score = adjusted_reputation + p.gold;
+                
                 // 如果投票給獲勝選項，加分
                 let vote_bonus = self
                     .state
@@ -927,7 +1060,7 @@ impl GameEngine {
                     player_id: p.id,
                     player_name: p.name.clone(),
                     character: p.character,
-                    final_reputation: p.reputation,
+                    final_reputation: adjusted_reputation,
                     final_gold: p.gold,
                     total_score: if p.is_politically_dead {
                         0
@@ -1270,6 +1403,7 @@ impl GameEngine {
             state,
             config: GameConfig::default(),
             ai_manager,
+            bill_system: BillSystem::new(),
         }
     }
 

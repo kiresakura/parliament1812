@@ -22,6 +22,8 @@ pub struct GameState {
     pub phase_start_time: DateTime<Utc>,
     /// 當前回合
     pub current_round: i32,
+    /// 當前議案名稱
+    pub current_bill: String,
     /// 玩家狀態
     pub players: HashMap<Uuid, PlayerState>,
     /// 投票記錄（玩家 ID -> 投票選擇）
@@ -62,6 +64,7 @@ impl GameState {
             phase: GamePhase::Waiting,
             phase_start_time: Utc::now(),
             current_round: 0,
+            current_bill: "等待中".to_string(),
             players: player_map,
             votes: HashMap::new(),
             alliances: Vec::new(),

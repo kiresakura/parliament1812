@@ -9,6 +9,7 @@
 
 pub mod actions;
 pub mod ai;
+pub mod bills;
 pub mod cards;
 pub mod characters;
 pub mod engine;
