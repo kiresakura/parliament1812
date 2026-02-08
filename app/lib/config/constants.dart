@@ -14,6 +14,9 @@ class AppConstants {
     if (Platform.isAndroid) {
       // Android 模擬器需要用 10.0.2.2 來存取 localhost
       return 'http://10.0.2.2:8080';
+    } else if (Platform.isIOS) {
+      // iOS 真機需要用 Mac 的區域網路 IP
+      return 'http://192.168.8.190:8080';
     } else {
       return 'http://localhost:8080';
     }
@@ -26,6 +29,8 @@ class AppConstants {
     // 本地開發預設
     if (Platform.isAndroid) {
       return 'ws://10.0.2.2:8080/ws';
+    } else if (Platform.isIOS) {
+      return 'ws://192.168.8.190:8080/ws';
     } else {
       return 'ws://localhost:8080/ws';
     }
