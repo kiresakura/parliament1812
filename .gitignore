@@ -60,3 +60,7 @@ local.properties
 # 文檔
 docs/
 server/target/
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
