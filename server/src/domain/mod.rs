@@ -2,6 +2,7 @@
 //!
 //! 定義遊戲核心的資料結構
 
+pub mod card;
 pub mod game;
 pub mod player;
 pub mod room;

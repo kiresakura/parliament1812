@@ -5,8 +5,10 @@
 //! - 角色技能系統
 //! - 遊戲行動處理
 //! - 遊戲流程控制
+//! - 卡牌系統
 
 pub mod actions;
+pub mod cards;
 pub mod characters;
 pub mod engine;
 pub mod state;

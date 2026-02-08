@@ -228,6 +228,30 @@ pub async fn process_message(
         ClientMessage::Vote { choice } => {
             handle_vote(conn_id, choice, state, sender).await?;
         }
+
+        ClientMessage::UseCard { card_id, target_id } => {
+            // TODO: M2 卡牌系統實現
+            let _ = sender.send(ServerMessage::Error {
+                code: "NOT_IMPLEMENTED".to_string(),
+                message: "卡牌系統尚未實現".to_string(),
+            });
+        }
+
+        ClientMessage::DrawCard => {
+            // TODO: M2 卡牌系統實現
+            let _ = sender.send(ServerMessage::Error {
+                code: "NOT_IMPLEMENTED".to_string(),
+                message: "抽卡系統尚未實現".to_string(),
+            });
+        }
+
+        ClientMessage::DiscardCard { card_id } => {
+            // TODO: M2 卡牌系統實現
+            let _ = sender.send(ServerMessage::Error {
+                code: "NOT_IMPLEMENTED".to_string(),
+                message: "棄卡系統尚未實現".to_string(),
+            });
+        }
     }
 
     Ok(())
