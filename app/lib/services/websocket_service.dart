@@ -492,6 +492,42 @@ sealed class ServerMessage {
         return PhaseChangedMessage.fromJson(json);
       case 'chat_message':
         return ChatMessageMessage.fromJson(json);
+      case 'player_selected_character':
+        return PlayerSelectedCharacterMessage.fromJson(json);
+      case 'player_ready':
+        return PlayerReadyMessage.fromJson(json);
+      case 'player_unready':
+        return PlayerUnreadyMessage.fromJson(json);
+      case 'challenge_event':
+        return ChallengeEventMessage.fromJson(json);
+      case 'counter_event':
+        return CounterEventMessage.fromJson(json);
+      case 'skill_used':
+        return SkillUsedMessage.fromJson(json);
+      case 'reputation_changed':
+        return ReputationChangedMessage.fromJson(json);
+      case 'gold_changed':
+        return GoldChangedMessage.fromJson(json);
+      case 'card_used':
+        return CardUsedMessage.fromJson(json);
+      case 'card_drawn':
+        return CardDrawnMessage.fromJson(json);
+      case 'hand_updated':
+        return HandUpdatedMessage.fromJson(json);
+      case 'player_hand_count_changed':
+        return PlayerHandCountChangedMessage.fromJson(json);
+      case 'vote_received':
+        return VoteReceivedMessage.fromJson(json);
+      case 'vote_result':
+        return VoteResultMessage.fromJson(json);
+      case 'game_result':
+        return GameResultMessage.fromJson(json);
+      case 'player_political_death':
+        return PlayerPoliticalDeathMessage.fromJson(json);
+      case 'system_message':
+        return SystemMessageMessage.fromJson(json);
+      case 'timer_update':
+        return TimerUpdateMessage.fromJson(json);
       case 'pong':
         return PongMessage.fromJson(json);
       default:
@@ -661,6 +697,373 @@ class PongMessage extends ServerMessage {
   factory PongMessage.fromJson(Map<String, dynamic> json) {
     return PongMessage(
       timestamp: json['timestamp'] as int,
+    );
+  }
+}
+
+// 新增的 ServerMessage 類型
+class PlayerSelectedCharacterMessage extends ServerMessage {
+  final String playerId;
+  final String character;
+
+  const PlayerSelectedCharacterMessage({
+    required this.playerId,
+    required this.character,
+  }) : super('player_selected_character');
+
+  factory PlayerSelectedCharacterMessage.fromJson(Map<String, dynamic> json) {
+    return PlayerSelectedCharacterMessage(
+      playerId: json['player_id'] as String,
+      character: json['character'] as String,
+    );
+  }
+}
+
+class PlayerReadyMessage extends ServerMessage {
+  final String playerId;
+
+  const PlayerReadyMessage({
+    required this.playerId,
+  }) : super('player_ready');
+
+  factory PlayerReadyMessage.fromJson(Map<String, dynamic> json) {
+    return PlayerReadyMessage(
+      playerId: json['player_id'] as String,
+    );
+  }
+}
+
+class PlayerUnreadyMessage extends ServerMessage {
+  final String playerId;
+
+  const PlayerUnreadyMessage({
+    required this.playerId,
+  }) : super('player_unready');
+
+  factory PlayerUnreadyMessage.fromJson(Map<String, dynamic> json) {
+    return PlayerUnreadyMessage(
+      playerId: json['player_id'] as String,
+    );
+  }
+}
+
+class ChallengeEventMessage extends ServerMessage {
+  final String attackerId;
+  final String attackerName;
+  final String targetId;
+  final String targetName;
+  final int damage;
+  final bool countered;
+
+  const ChallengeEventMessage({
+    required this.attackerId,
+    required this.attackerName,
+    required this.targetId,
+    required this.targetName,
+    required this.damage,
+    required this.countered,
+  }) : super('challenge_event');
+
+  factory ChallengeEventMessage.fromJson(Map<String, dynamic> json) {
+    return ChallengeEventMessage(
+      attackerId: json['attacker_id'] as String,
+      attackerName: json['attacker_name'] as String,
+      targetId: json['target_id'] as String,
+      targetName: json['target_name'] as String,
+      damage: json['damage'] as int,
+      countered: json['countered'] as bool,
+    );
+  }
+}
+
+class CounterEventMessage extends ServerMessage {
+  final String defenderId;
+  final String defenderName;
+  final int damageBlocked;
+
+  const CounterEventMessage({
+    required this.defenderId,
+    required this.defenderName,
+    required this.damageBlocked,
+  }) : super('counter_event');
+
+  factory CounterEventMessage.fromJson(Map<String, dynamic> json) {
+    return CounterEventMessage(
+      defenderId: json['defender_id'] as String,
+      defenderName: json['defender_name'] as String,
+      damageBlocked: json['damage_blocked'] as int,
+    );
+  }
+}
+
+class SkillUsedMessage extends ServerMessage {
+  final String playerId;
+  final String playerName;
+  final String skillName;
+  final String? targetId;
+  final String? targetName;
+  final String effectDescription;
+
+  const SkillUsedMessage({
+    required this.playerId,
+    required this.playerName,
+    required this.skillName,
+    this.targetId,
+    this.targetName,
+    required this.effectDescription,
+  }) : super('skill_used');
+
+  factory SkillUsedMessage.fromJson(Map<String, dynamic> json) {
+    return SkillUsedMessage(
+      playerId: json['player_id'] as String,
+      playerName: json['player_name'] as String,
+      skillName: json['skill_name'] as String,
+      targetId: json['target_id'] as String?,
+      targetName: json['target_name'] as String?,
+      effectDescription: json['effect_description'] as String,
+    );
+  }
+}
+
+class ReputationChangedMessage extends ServerMessage {
+  final String playerId;
+  final int newReputation;
+  final int change;
+  final String reason;
+
+  const ReputationChangedMessage({
+    required this.playerId,
+    required this.newReputation,
+    required this.change,
+    required this.reason,
+  }) : super('reputation_changed');
+
+  factory ReputationChangedMessage.fromJson(Map<String, dynamic> json) {
+    return ReputationChangedMessage(
+      playerId: json['player_id'] as String,
+      newReputation: json['new_reputation'] as int,
+      change: json['change'] as int,
+      reason: json['reason'] as String,
+    );
+  }
+}
+
+class GoldChangedMessage extends ServerMessage {
+  final String playerId;
+  final int newGold;
+  final int change;
+  final String reason;
+
+  const GoldChangedMessage({
+    required this.playerId,
+    required this.newGold,
+    required this.change,
+    required this.reason,
+  }) : super('gold_changed');
+
+  factory GoldChangedMessage.fromJson(Map<String, dynamic> json) {
+    return GoldChangedMessage(
+      playerId: json['player_id'] as String,
+      newGold: json['new_gold'] as int,
+      change: json['change'] as int,
+      reason: json['reason'] as String,
+    );
+  }
+}
+
+class CardUsedMessage extends ServerMessage {
+  final String playerId;
+  final String playerName;
+  final String cardId;
+  final String cardName;
+  final String? targetId;
+  final String? targetName;
+  final String effectDescription;
+  final int value;
+
+  const CardUsedMessage({
+    required this.playerId,
+    required this.playerName,
+    required this.cardId,
+    required this.cardName,
+    this.targetId,
+    this.targetName,
+    required this.effectDescription,
+    required this.value,
+  }) : super('card_used');
+
+  factory CardUsedMessage.fromJson(Map<String, dynamic> json) {
+    return CardUsedMessage(
+      playerId: json['player_id'] as String,
+      playerName: json['player_name'] as String,
+      cardId: json['card_id'] as String,
+      cardName: json['card_name'] as String,
+      targetId: json['target_id'] as String?,
+      targetName: json['target_name'] as String?,
+      effectDescription: json['effect_description'] as String,
+      value: json['value'] as int,
+    );
+  }
+}
+
+class CardDrawnMessage extends ServerMessage {
+  final String cardId;
+  final String cardName;
+  final String cardType;
+  final String description;
+  final int cost;
+
+  const CardDrawnMessage({
+    required this.cardId,
+    required this.cardName,
+    required this.cardType,
+    required this.description,
+    required this.cost,
+  }) : super('card_drawn');
+
+  factory CardDrawnMessage.fromJson(Map<String, dynamic> json) {
+    return CardDrawnMessage(
+      cardId: json['card_id'] as String,
+      cardName: json['card_name'] as String,
+      cardType: json['card_type'] as String,
+      description: json['description'] as String,
+      cost: json['cost'] as int,
+    );
+  }
+}
+
+class HandUpdatedMessage extends ServerMessage {
+  final List<Map<String, dynamic>> cards;
+
+  const HandUpdatedMessage({
+    required this.cards,
+  }) : super('hand_updated');
+
+  factory HandUpdatedMessage.fromJson(Map<String, dynamic> json) {
+    return HandUpdatedMessage(
+      cards: (json['cards'] as List).cast<Map<String, dynamic>>(),
+    );
+  }
+}
+
+class PlayerHandCountChangedMessage extends ServerMessage {
+  final String playerId;
+  final int cardCount;
+
+  const PlayerHandCountChangedMessage({
+    required this.playerId,
+    required this.cardCount,
+  }) : super('player_hand_count_changed');
+
+  factory PlayerHandCountChangedMessage.fromJson(Map<String, dynamic> json) {
+    return PlayerHandCountChangedMessage(
+      playerId: json['player_id'] as String,
+      cardCount: json['card_count'] as int,
+    );
+  }
+}
+
+class VoteReceivedMessage extends ServerMessage {
+  final String playerId;
+  final int votesCount;
+  final int totalPlayers;
+
+  const VoteReceivedMessage({
+    required this.playerId,
+    required this.votesCount,
+    required this.totalPlayers,
+  }) : super('vote_received');
+
+  factory VoteReceivedMessage.fromJson(Map<String, dynamic> json) {
+    return VoteReceivedMessage(
+      playerId: json['player_id'] as String,
+      votesCount: json['votes_count'] as int,
+      totalPlayers: json['total_players'] as int,
+    );
+  }
+}
+
+class VoteResultMessage extends ServerMessage {
+  final Map<String, dynamic> votes;
+  final String winner;
+
+  const VoteResultMessage({
+    required this.votes,
+    required this.winner,
+  }) : super('vote_result');
+
+  factory VoteResultMessage.fromJson(Map<String, dynamic> json) {
+    return VoteResultMessage(
+      votes: json['votes'] as Map<String, dynamic>,
+      winner: json['winner'] as String,
+    );
+  }
+}
+
+class GameResultMessage extends ServerMessage {
+  final String winnerFaction;
+  final Map<String, dynamic> votes;
+  final List<Map<String, dynamic>> rankings;
+
+  const GameResultMessage({
+    required this.winnerFaction,
+    required this.votes,
+    required this.rankings,
+  }) : super('game_result');
+
+  factory GameResultMessage.fromJson(Map<String, dynamic> json) {
+    return GameResultMessage(
+      winnerFaction: json['winner_faction'] as String,
+      votes: json['votes'] as Map<String, dynamic>,
+      rankings: (json['rankings'] as List).cast<Map<String, dynamic>>(),
+    );
+  }
+}
+
+class PlayerPoliticalDeathMessage extends ServerMessage {
+  final String playerId;
+  final String playerName;
+
+  const PlayerPoliticalDeathMessage({
+    required this.playerId,
+    required this.playerName,
+  }) : super('player_political_death');
+
+  factory PlayerPoliticalDeathMessage.fromJson(Map<String, dynamic> json) {
+    return PlayerPoliticalDeathMessage(
+      playerId: json['player_id'] as String,
+      playerName: json['player_name'] as String,
+    );
+  }
+}
+
+class SystemMessageMessage extends ServerMessage {
+  final String content;
+  final String messageType;
+
+  const SystemMessageMessage({
+    required this.content,
+    required this.messageType,
+  }) : super('system_message');
+
+  factory SystemMessageMessage.fromJson(Map<String, dynamic> json) {
+    return SystemMessageMessage(
+      content: json['content'] as String,
+      messageType: json['message_type'] as String,
+    );
+  }
+}
+
+class TimerUpdateMessage extends ServerMessage {
+  final int remainingSecs;
+
+  const TimerUpdateMessage({
+    required this.remainingSecs,
+  }) : super('timer_update');
+
+  factory TimerUpdateMessage.fromJson(Map<String, dynamic> json) {
+    return TimerUpdateMessage(
+      remainingSecs: json['remaining_secs'] as int,
     );
   }
 }
