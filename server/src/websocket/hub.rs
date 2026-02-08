@@ -55,6 +55,10 @@ pub struct WebSocketHub {
     connections: RwLock<HashMap<Uuid, ConnectionHandle>>,
     /// 房間連線映射（房間代碼 -> 連線 ID 集合）
     rooms: RwLock<HashMap<String, HashSet<Uuid>>>,
+    /// 房間序列號（房間代碼 -> 序列號）
+    room_sequences: RwLock<HashMap<String, u64>>,
+    /// 斷線玩家保留（玩家 ID -> 斷線時間戳）
+    disconnected_players: RwLock<HashMap<Uuid, i64>>,
     /// 關閉信號發送器
     shutdown_tx: broadcast::Sender<()>,
     /// Redis 連接池（可選，用於跨實例通訊）
@@ -71,6 +75,8 @@ impl WebSocketHub {
         Arc::new(Self {
             connections: RwLock::new(HashMap::new()),
             rooms: RwLock::new(HashMap::new()),
+            room_sequences: RwLock::new(HashMap::new()),
+            disconnected_players: RwLock::new(HashMap::new()),
             shutdown_tx,
             redis_pool: RwLock::new(None),
             subscribed_rooms: RwLock::new(HashSet::new()),
@@ -84,6 +90,8 @@ impl WebSocketHub {
         Arc::new(Self {
             connections: RwLock::new(HashMap::new()),
             rooms: RwLock::new(HashMap::new()),
+            room_sequences: RwLock::new(HashMap::new()),
+            disconnected_players: RwLock::new(HashMap::new()),
             shutdown_tx,
             redis_pool: RwLock::new(Some(redis_pool)),
             subscribed_rooms: RwLock::new(HashSet::new()),
@@ -561,6 +569,125 @@ impl WebSocketHub {
             handle.player_id = Some(player_id);
         }
     }
+
+    /// 獲取房間的下一個序列號
+    pub async fn get_next_sequence(&self, room_code: &str) -> u64 {
+        let mut sequences = self.room_sequences.write().await;
+        let seq = sequences.entry(room_code.to_string()).or_insert(0);
+        *seq += 1;
+        *seq
+    }
+
+    /// 廣播帶序列號的訊息到房間
+    pub async fn broadcast_to_room_with_sequence(&self, room_code: &str, message: ServerMessage) {
+        use super::messages::WrappedMessage;
+        
+        let seq = self.get_next_sequence(room_code).await;
+        let wrapped = WrappedMessage::new(seq, message);
+        
+        // 發送到本地連線
+        self.broadcast_wrapped_message_local(room_code, wrapped.clone()).await;
+        
+        // 發布到 Redis
+        self.publish_wrapped_message_to_redis(room_code, &wrapped).await;
+    }
+
+    /// 廣播包裝訊息到本地房間連線
+    async fn broadcast_wrapped_message_local(&self, room_code: &str, message: super::messages::WrappedMessage) {
+        let conn_ids = {
+            let rooms = self.rooms.read().await;
+            rooms.get(room_code).cloned().unwrap_or_default()
+        };
+
+        if conn_ids.is_empty() {
+            return;
+        }
+
+        let connections = self.connections.read().await;
+        let mut sent_count = 0;
+
+        for conn_id in conn_ids {
+            if let Some(handle) = connections.get(&conn_id) {
+                // 將 WrappedMessage 序列化為 JSON，然後發送為文字消息
+                if let Ok(json) = serde_json::to_string(&message) {
+                    // 這裡暫時使用 SystemMessage 來傳送 JSON，
+                    // 實際實現中應該修改 ConnectionHandle 以支持原始 JSON
+                    if handle.send(ServerMessage::system(json, super::messages::SystemMessageType::Info)) {
+                        sent_count += 1;
+                    }
+                }
+            }
+        }
+
+        tracing::trace!(
+            room_code = %room_code,
+            sent_count = sent_count,
+            seq = message.seq,
+            "廣播包裝訊息到本地房間連線"
+        );
+    }
+
+    /// 發布包裝訊息到 Redis
+    async fn publish_wrapped_message_to_redis(&self, room_code: &str, message: &super::messages::WrappedMessage) {
+        let pool = {
+            let redis = self.redis_pool.read().await;
+            match redis.as_ref() {
+                Some(p) => p.clone(),
+                None => return,
+            }
+        };
+
+        let json = match serde_json::to_string(message) {
+            Ok(j) => j,
+            Err(e) => {
+                tracing::warn!(error = %e, "序列化包裝訊息失敗");
+                return;
+            }
+        };
+
+        let game_cache = GameCache::new(pool);
+        if let Err(e) = game_cache.publish_to_room(room_code, &json).await {
+            tracing::warn!(room_code = %room_code, error = %e, "發布包裝訊息到 Redis 失敗");
+        }
+    }
+
+    /// 記錄玩家斷線（保留 120 秒）
+    pub async fn record_player_disconnect(&self, player_id: Uuid) {
+        let timestamp = chrono::Utc::now().timestamp();
+        let mut disconnected = self.disconnected_players.write().await;
+        disconnected.insert(player_id, timestamp);
+        
+        tracing::info!(player_id = %player_id, "玩家斷線已記錄");
+    }
+
+    /// 清理斷線玩家記錄
+    pub async fn cleanup_disconnected_players(&self) {
+        let now = chrono::Utc::now().timestamp();
+        let mut disconnected = self.disconnected_players.write().await;
+        
+        // 移除 120 秒前斷線的玩家
+        disconnected.retain(|player_id, &mut timestamp| {
+            let keep = now - timestamp < 120;
+            if !keep {
+                tracing::info!(player_id = %player_id, "清理過期斷線記錄");
+            }
+            keep
+        });
+    }
+
+    /// 檢查玩家是否在斷線保護期內
+    pub async fn is_player_disconnected(&self, player_id: Uuid) -> bool {
+        let disconnected = self.disconnected_players.read().await;
+        disconnected.contains_key(&player_id)
+    }
+
+    /// 玩家重連時移除斷線記錄
+    pub async fn player_reconnected(&self, player_id: Uuid) {
+        let mut disconnected = self.disconnected_players.write().await;
+        if disconnected.remove(&player_id).is_some() {
+            tracing::info!(player_id = %player_id, "玩家重連，移除斷線記錄");
+        }
+    }
 }
 
 impl Default for WebSocketHub {
@@ -569,6 +696,8 @@ impl Default for WebSocketHub {
         Self {
             connections: RwLock::new(HashMap::new()),
             rooms: RwLock::new(HashMap::new()),
+            room_sequences: RwLock::new(HashMap::new()),
+            disconnected_players: RwLock::new(HashMap::new()),
             shutdown_tx,
             redis_pool: RwLock::new(None),
             subscribed_rooms: RwLock::new(HashSet::new()),

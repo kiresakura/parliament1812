@@ -9,6 +9,33 @@ use uuid::Uuid;
 use crate::domain::{CharacterType, GamePhase, PlayerResponse, RoomResponse, VoteChoice};
 
 // ============================================================
+// 序列化訊息包裝器
+// ============================================================
+
+/// WebSocket 訊息包裝器（包含序列號）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WrappedMessage {
+    /// 序列號（用於防止亂序）
+    pub seq: u64,
+    /// 時間戳
+    pub timestamp: i64,
+    /// 實際訊息
+    #[serde(flatten)]
+    pub message: ServerMessage,
+}
+
+impl WrappedMessage {
+    /// 創建包裝訊息
+    pub fn new(seq: u64, message: ServerMessage) -> Self {
+        Self {
+            seq,
+            timestamp: chrono::Utc::now().timestamp_millis(),
+            message,
+        }
+    }
+}
+
+// ============================================================
 // 客戶端訊息（玩家發送到伺服器）
 // ============================================================
 
@@ -92,6 +119,28 @@ pub enum ClientMessage {
     DiscardCard {
         /// 卡牌 ID
         card_id: String,
+    },
+
+    /// 提議同盟
+    ProposeAlliance {
+        /// 目標玩家 ID
+        target_id: Uuid,
+    },
+
+    /// 回應同盟提議
+    RespondToAlliance {
+        /// 提議者 ID
+        proposer_id: Uuid,
+        /// 是否接受
+        accept: bool,
+    },
+
+    /// 表情反應
+    ReactToMessage {
+        /// 目標消息 ID（房間內的消息序列號）
+        message_seq: u64,
+        /// 表情 emoji
+        emoji: String,
     },
 
     /// 心跳
@@ -196,6 +245,22 @@ pub enum ServerMessage {
         content: String,
         /// 是否為私訊
         is_private: bool,
+        /// 時間戳
+        timestamp: i64,
+        /// 訊息序列號（用於表情反應）
+        message_seq: Option<u64>,
+    },
+
+    /// 表情反應
+    MessageReaction {
+        /// 反應者 ID
+        from_id: Uuid,
+        /// 反應者名稱
+        from_name: String,
+        /// 目標訊息序列號
+        target_message_seq: u64,
+        /// 表情 emoji
+        emoji: String,
         /// 時間戳
         timestamp: i64,
     },
@@ -369,6 +434,80 @@ pub enum ServerMessage {
         /// 剩餘秒數
         remaining_secs: u32,
     },
+
+    /// 重連數據（發送完整遊戲狀態）
+    ReconnectData {
+        /// 房間資訊
+        room: RoomResponse,
+        /// 玩家列表
+        players: Vec<PlayerResponse>,
+        /// 遊戲狀態（如果遊戲已開始）
+        game_state: Option<GameStateSnapshot>,
+        /// 最新序列號
+        latest_seq: u64,
+    },
+
+    /// 房間狀態廣播（玩家加入/離開）
+    RoomUpdate {
+        /// 房間資訊
+        room: RoomResponse,
+        /// 玩家列表
+        players: Vec<PlayerResponse>,
+        /// 更新類型
+        update_type: RoomUpdateType,
+        /// 相關玩家 ID
+        related_player_id: Option<Uuid>,
+    },
+
+    /// 同盟提議收到
+    AllianceProposed {
+        /// 同盟 ID
+        alliance_id: Uuid,
+        /// 提議者 ID
+        proposer_id: Uuid,
+        /// 提議者名稱
+        proposer_name: String,
+        /// 目標 ID
+        target_id: Uuid,
+        /// 目標名稱
+        target_name: String,
+    },
+
+    /// 同盟提議被接受
+    AllianceAccepted {
+        /// 同盟 ID
+        alliance_id: Uuid,
+        /// 成員 ID 列表
+        members: Vec<Uuid>,
+        /// 成員名稱列表
+        member_names: Vec<String>,
+    },
+
+    /// 同盟提議被拒絕
+    AllianceRejected {
+        /// 提議者 ID
+        proposer_id: Uuid,
+        /// 提議者名稱
+        proposer_name: String,
+        /// 拒絕者 ID
+        rejecter_id: Uuid,
+        /// 拒絕者名稱
+        rejecter_name: String,
+    },
+
+    /// 同盟被背叛
+    AllianceBetrayed {
+        /// 同盟 ID
+        alliance_id: Uuid,
+        /// 背叛者 ID
+        betrayer_id: Uuid,
+        /// 背叛者名稱
+        betrayer_name: String,
+        /// 受害者 ID
+        victim_id: Uuid,
+        /// 受害者名稱
+        victim_name: String,
+    },
 }
 
 /// 卡牌資訊（用於 WebSocket 傳輸）
@@ -425,6 +564,72 @@ pub enum SystemMessageType {
     Success,
     /// 錯誤
     Error,
+}
+
+/// 房間更新類型
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoomUpdateType {
+    /// 玩家加入
+    PlayerJoined,
+    /// 玩家離開
+    PlayerLeft,
+    /// 房主變更
+    HostChanged,
+    /// 房間設定變更
+    SettingsChanged,
+}
+
+/// 遊戲狀態快照（用於重連）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameStateSnapshot {
+    /// 遊戲階段
+    pub phase: GamePhase,
+    /// 當前回合
+    pub round: u32,
+    /// 階段剩餘時間（秒）
+    pub phase_remaining_secs: u32,
+    /// 當前玩家（輪到誰）
+    pub current_player: Option<Uuid>,
+    /// 玩家手牌數量
+    pub player_hand_counts: HashMap<Uuid, u32>,
+    /// 當前議案（如果有）
+    pub current_bill: Option<BillSnapshot>,
+    /// 投票狀態（如果在投票階段）
+    pub vote_state: Option<VoteStateSnapshot>,
+    /// 同盟關係
+    pub alliances: Vec<AllianceSnapshot>,
+}
+
+/// 議案快照
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BillSnapshot {
+    /// 議案 ID
+    pub id: String,
+    /// 議案標題
+    pub title: String,
+    /// 議案內容
+    pub content: String,
+    /// 提案者 ID
+    pub proposer_id: Option<Uuid>,
+}
+
+/// 投票狀態快照
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoteStateSnapshot {
+    /// 已投票的玩家
+    pub voted_players: Vec<Uuid>,
+    /// 各選項得票（如果投票已結束且公開）
+    pub results: Option<HashMap<String, f64>>,
+}
+
+/// 同盟快照
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AllianceSnapshot {
+    /// 同盟成員
+    pub members: Vec<Uuid>,
+    /// 同盟建立時間
+    pub created_at: i64,
 }
 
 // ============================================================

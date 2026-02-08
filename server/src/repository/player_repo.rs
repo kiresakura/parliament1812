@@ -404,6 +404,7 @@ impl PlayerRecord {
             gold: self.gold,
             is_ready: self.is_ready,
             is_host: self.is_host,
+            is_spectator: false, // 從資料庫載入的都是正常玩家，不是觀戰者
         }
     }
 }

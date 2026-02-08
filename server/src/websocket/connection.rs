@@ -413,6 +413,18 @@ pub async fn process_message(
                 }
             }
         }
+
+        ClientMessage::ProposeAlliance { target_id } => {
+            handle_propose_alliance(conn_id, target_id, state, sender).await?;
+        }
+
+        ClientMessage::RespondToAlliance { proposer_id, accept } => {
+            handle_respond_to_alliance(conn_id, proposer_id, accept, state, sender).await?;
+        }
+
+        ClientMessage::ReactToMessage { message_seq, emoji } => {
+            handle_message_reaction(conn_id, message_seq, &emoji, state, sender).await?;
+        }
     }
 
     Ok(())
@@ -744,12 +756,21 @@ async fn handle_chat(
             .unwrap_or_else(|| "Unknown".to_string())
     };
 
+    // 獲取消息序列號
+    let message_seq = if target_id.is_none() {
+        // 只有公開消息才有序列號（用於表情反應）
+        Some(state.ws_hub.get_next_sequence(&room_code).await)
+    } else {
+        None
+    };
+
     let chat_msg = ServerMessage::ChatMessage {
         from_id: player_id,
         from_name,
         content: content.to_string(),
         is_private: target_id.is_some(),
         timestamp: chrono::Utc::now().timestamp(),
+        message_seq,
     };
 
     if let Some(target) = target_id {
@@ -880,4 +901,248 @@ async fn handle_vote(
 async fn get_room_and_player(conn_id: Uuid, state: &AppState) -> Option<(String, Uuid)> {
     let info = state.ws_hub.get_connection(conn_id).await?;
     Some((info.room_code?, info.player_id?))
+}
+
+/// 處理同盟提議
+async fn handle_propose_alliance(
+    conn_id: Uuid,
+    target_id: Uuid,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+        Some(ids) => ids,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::NOT_IN_ROOM,
+                "您不在任何房間中",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 檢查遊戲狀態（只能在密謀階段提議同盟）
+    {
+        let games = state.games.read().await;
+        if let Some(game) = games.get(&room_code) {
+            use crate::domain::GamePhase;
+            if game.state.phase != GamePhase::Conspiracy {
+                let _ = sender.send(ServerMessage::error(
+                    error_codes::INVALID_ACTION,
+                    "只能在密謀階段提議同盟",
+                ));
+                return Ok(());
+            }
+        } else {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "遊戲尚未開始",
+            ));
+            return Ok(());
+        }
+    }
+
+    // 獲取玩家名稱
+    let (proposer_name, target_name) = {
+        let players = state.players.read().await;
+        let proposer_name = players.get(&player_id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "未知玩家".to_string());
+        let target_name = players.get(&target_id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "未知玩家".to_string());
+        (proposer_name, target_name)
+    };
+
+    // 使用同盟管理器處理提議
+    let alliance_id = {
+        let mut games = state.games.write().await;
+        if let Some(game) = games.get_mut(&room_code) {
+            match game.propose_alliance(player_id, target_id) {
+                Ok(id) => id,
+                Err(e) => {
+                    let _ = sender.send(ServerMessage::error(
+                        error_codes::INVALID_ACTION,
+                        format!("提議同盟失敗: {}", e),
+                    ));
+                    return Ok(());
+                }
+            }
+        } else {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "遊戲不存在",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 廣播同盟提議
+    state
+        .ws_hub
+        .broadcast_to_room_with_sequence(
+            &room_code,
+            ServerMessage::AllianceProposed {
+                alliance_id,
+                proposer_id: player_id,
+                proposer_name,
+                target_id,
+                target_name,
+            },
+        )
+        .await;
+
+    Ok(())
+}
+
+/// 處理回應同盟提議
+async fn handle_respond_to_alliance(
+    conn_id: Uuid,
+    proposer_id: Uuid,
+    accept: bool,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+        Some(ids) => ids,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::NOT_IN_ROOM,
+                "您不在任何房間中",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 獲取玩家名稱
+    let (proposer_name, responder_name) = {
+        let players = state.players.read().await;
+        let proposer_name = players.get(&proposer_id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "未知玩家".to_string());
+        let responder_name = players.get(&player_id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "未知玩家".to_string());
+        (proposer_name, responder_name)
+    };
+
+    if accept {
+        // 接受同盟
+        let alliance_id = {
+            let mut games = state.games.write().await;
+            if let Some(game) = games.get_mut(&room_code) {
+                match game.accept_alliance(player_id, proposer_id) {
+                    Ok(id) => id,
+                    Err(e) => {
+                        let _ = sender.send(ServerMessage::error(
+                            error_codes::INVALID_ACTION,
+                            format!("接受同盟失敗: {}", e),
+                        ));
+                        return Ok(());
+                    }
+                }
+            } else {
+                let _ = sender.send(ServerMessage::error(
+                    error_codes::INVALID_ACTION,
+                    "遊戲不存在",
+                ));
+                return Ok(());
+            }
+        };
+
+        // 廣播同盟建立
+        state
+            .ws_hub
+            .broadcast_to_room_with_sequence(
+                &room_code,
+                ServerMessage::AllianceAccepted {
+                    alliance_id,
+                    members: vec![proposer_id, player_id],
+                    member_names: vec![proposer_name, responder_name],
+                },
+            )
+            .await;
+    } else {
+        // 拒絕同盟
+        {
+            let mut games = state.games.write().await;
+            if let Some(game) = games.get_mut(&room_code) {
+                if let Err(e) = game.reject_alliance(player_id, proposer_id) {
+                    let _ = sender.send(ServerMessage::error(
+                        error_codes::INVALID_ACTION,
+                        format!("拒絕同盟失敗: {}", e),
+                    ));
+                    return Ok(());
+                }
+            }
+        }
+
+        // 廣播同盟拒絕
+        state
+            .ws_hub
+            .broadcast_to_room_with_sequence(
+                &room_code,
+                ServerMessage::AllianceRejected {
+                    proposer_id,
+                    proposer_name,
+                    rejecter_id: player_id,
+                    rejecter_name: responder_name,
+                },
+            )
+            .await;
+    }
+
+    Ok(())
+}
+
+/// 處理表情反應
+async fn handle_message_reaction(
+    conn_id: Uuid,
+    target_message_seq: u64,
+    emoji: &str,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+        Some(ids) => ids,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::NOT_IN_ROOM,
+                "您不在任何房間中",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 驗證表情（只允許特定的表情）
+    let allowed_emojis = ["👍", "👎", "😂", "🔥", "❤️", "😮"];
+    if !allowed_emojis.contains(&emoji) {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "不支援的表情反應",
+        ));
+        return Ok(());
+    }
+
+    // 取得反應者名稱
+    let from_name = {
+        let players = state.players.read().await;
+        players
+            .get(&player_id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "Unknown".to_string())
+    };
+
+    let reaction_msg = ServerMessage::MessageReaction {
+        from_id: player_id,
+        from_name,
+        target_message_seq,
+        emoji: emoji.to_string(),
+        timestamp: chrono::Utc::now().timestamp(),
+    };
+
+    // 廣播表情反應到房間
+    state.ws_hub.broadcast_to_room_with_sequence(&room_code, reaction_msg).await;
+
+    Ok(())
 }

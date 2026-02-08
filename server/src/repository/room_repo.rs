@@ -229,6 +229,7 @@ impl RoomRecord {
             host_id: self.host_id,
             status,
             max_players: self.max_players,
+            max_spectators: 10, // 預設最大觀戰者數
             created_at: self.created_at.unwrap_or_else(Utc::now),
         }
     }

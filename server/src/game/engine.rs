@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use super::actions::{ActionResult, GameAction, GameEffect, GameResult, PlayerScore, VoteCounts};
 use super::ai::{AIAction, AIDifficulty, AIManager};
+use super::alliance::{AllianceError, AllianceManager};
 use super::bills::{BillSystem, VoteEffectResult};
 use super::cards;
 use super::characters::{CharacterSkills, GameError};
@@ -66,6 +67,8 @@ pub struct GameEngine {
     pub ai_manager: AIManager,
     /// 議案系統
     pub bill_system: BillSystem,
+    /// 同盟管理器
+    pub alliance_manager: AllianceManager,
 }
 
 impl GameEngine {
@@ -109,6 +112,7 @@ impl GameEngine {
             config,
             ai_manager: AIManager::new(),
             bill_system: BillSystem::new(),
+            alliance_manager: AllianceManager::new(),
         }
     }
 
@@ -129,6 +133,7 @@ impl GameEngine {
             config: GameConfig::default(),
             ai_manager: AIManager::new(),
             bill_system: BillSystem::new(),
+            alliance_manager: AllianceManager::new(),
         }
     }
 
@@ -428,11 +433,14 @@ impl GameEngine {
             attacker.take_damage(self.config.challenge_cost);
         }
 
+        // 計算考慮同盟的傷害
+        let actual_damage = self.calculate_alliance_damage(attacker_id, target_id, self.config.base_challenge_damage);
+
         // 設定待處理的質詢
         self.state.pending_challenge = Some(PendingChallenge {
             attacker_id,
             target_id,
-            damage: self.config.base_challenge_damage,
+            damage: actual_damage,
             timestamp: Utc::now(),
         });
 
@@ -440,12 +448,13 @@ impl GameEngine {
         self.state.action_log.push(GameAction::Challenge {
             attacker_id,
             target_id,
-            damage: self.config.base_challenge_damage,
+            damage: actual_damage,
             was_countered: false,
         });
 
         Ok(ActionResult::success_with_effects(
-            format!("質詢 {}，等待反駁", target_name),
+            format!("質詢 {}，等待反駁{}", target_name, 
+                    if actual_damage < self.config.base_challenge_damage { "（盟友減傷）" } else { "" }),
             vec![
                 GameEffect::ReputationChange {
                     player_id: attacker_id,
@@ -454,7 +463,7 @@ impl GameEngine {
                 GameEffect::PendingCounter {
                     defender_id: target_id,
                     attacker_id,
-                    damage: self.config.base_challenge_damage,
+                    damage: actual_damage,
                 },
             ],
         ))
@@ -874,6 +883,37 @@ impl GameEngine {
             ));
         }
 
+        // 檢查背叛（盟友投對方反對票）
+        let mut betrayal_effects = Vec::new();
+        
+        // 先收集需要背叛的盟友ID
+        let betrayal_targets: Vec<Uuid> = {
+            let player_alliances = self.get_player_alliances(player_id);
+            let mut targets = Vec::new();
+            for alliance in player_alliances {
+                if let Some(partner_id) = alliance.get_partner(player_id) {
+                    // 檢查盟友是否已經投票
+                    if let Some(partner_vote) = self.state.votes.get(&partner_id) {
+                        // 如果雙方投票不同，構成背叛
+                        if choice != *partner_vote {
+                            targets.push(partner_id);
+                        }
+                    }
+                }
+            }
+            targets
+        };
+        
+        // 處理背叛
+        for partner_id in betrayal_targets {
+            if let Ok(_) = self.betray_alliance(player_id, partner_id) {
+                betrayal_effects.push(GameEffect::AllianceBroken {
+                    betrayer_id: player_id,
+                    victim_id: partner_id,
+                });
+            }
+        }
+
         // 記錄投票
         self.state.votes.insert(player_id, choice);
 
@@ -882,7 +922,12 @@ impl GameEngine {
             .action_log
             .push(GameAction::Vote { player_id, choice });
 
-        Ok(ActionResult::success(format!("已投票給 {}", choice)))
+        let mut result_message = format!("已投票給 {}", choice);
+        if !betrayal_effects.is_empty() {
+            result_message.push_str("（觸發背叛）");
+        }
+
+        Ok(ActionResult::success_with_effects(result_message, betrayal_effects))
     }
 
     /// 處理結盟
@@ -1404,6 +1449,7 @@ impl GameEngine {
             config: GameConfig::default(),
             ai_manager,
             bill_system: BillSystem::new(),
+            alliance_manager: AllianceManager::new(),
         }
     }
 
@@ -1458,6 +1504,50 @@ impl GameEngine {
     /// 檢查遊戲是否結束
     pub fn is_game_over(&self) -> bool {
         self.state.alive_player_count() <= 1 || self.state.phase == GamePhase::Finished
+    }
+
+    // ============================================================
+    // 同盟系統方法
+    // ============================================================
+
+    /// 提議同盟
+    pub fn propose_alliance(&mut self, proposer_id: Uuid, target_id: Uuid) -> Result<Uuid, AllianceError> {
+        self.alliance_manager.propose_alliance(proposer_id, target_id)
+    }
+
+    /// 接受同盟提議
+    pub fn accept_alliance(&mut self, target_id: Uuid, proposer_id: Uuid) -> Result<Uuid, AllianceError> {
+        self.alliance_manager.accept_proposal(target_id, proposer_id)
+    }
+
+    /// 拒絕同盟提議
+    pub fn reject_alliance(&mut self, target_id: Uuid, proposer_id: Uuid) -> Result<(), AllianceError> {
+        self.alliance_manager.reject_proposal(target_id, proposer_id)
+    }
+
+    /// 背叛同盟（在投票階段投反對票觸發）
+    pub fn betray_alliance(&mut self, betrayer_id: Uuid, target_id: Uuid) -> Result<Uuid, AllianceError> {
+        self.alliance_manager.betray_alliance(betrayer_id, target_id)
+    }
+
+    /// 檢查兩個玩家是否有同盟關係
+    pub fn are_allied(&self, player1: Uuid, player2: Uuid) -> bool {
+        self.alliance_manager.are_allied(player1, player2)
+    }
+
+    /// 計算考慮同盟的傷害
+    pub fn calculate_alliance_damage(&self, attacker_id: Uuid, target_id: Uuid, base_damage: i32) -> i32 {
+        self.alliance_manager.calculate_damage_reduction(attacker_id, target_id, base_damage)
+    }
+
+    /// 獲取玩家的所有有效同盟
+    pub fn get_player_alliances(&self, player_id: Uuid) -> Vec<&super::alliance::Alliance> {
+        self.alliance_manager.get_player_alliances(player_id)
+    }
+
+    /// 清理過期的同盟提議
+    pub fn cleanup_expired_alliances(&mut self) {
+        self.alliance_manager.cleanup_expired_proposals();
     }
 }
 

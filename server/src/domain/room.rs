@@ -43,6 +43,8 @@ pub struct Room {
     pub status: RoomStatus,
     /// 最大玩家數
     pub max_players: i32,
+    /// 最大觀戰者數
+    pub max_spectators: i32,
     /// 建立時間
     pub created_at: DateTime<Utc>,
 }
@@ -56,6 +58,7 @@ impl Room {
             host_id,
             status: RoomStatus::Waiting,
             max_players: 4,
+            max_spectators: 10,
             created_at: Utc::now(),
         }
     }
@@ -65,6 +68,12 @@ impl Room {
         let mut room = Self::new(host_id);
         room.max_players = max_players.clamp(2, 8);
         room
+    }
+
+    /// 檢查是否可以觀戰
+    pub fn can_spectate(&self, current_spectator_count: usize) -> bool {
+        (current_spectator_count as i32) < self.max_spectators && 
+        (self.status == RoomStatus::Waiting || self.status == RoomStatus::Playing)
     }
 
     /// 生成 6 位房間代碼

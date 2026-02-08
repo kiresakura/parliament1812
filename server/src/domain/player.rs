@@ -118,6 +118,8 @@ pub struct Player {
     pub is_ready: bool,
     /// 是否為房主
     pub is_host: bool,
+    /// 是否為觀戰者
+    pub is_spectator: bool,
 }
 
 impl Player {
@@ -133,6 +135,23 @@ impl Player {
             gold: 0,
             is_ready: false,
             is_host,
+            is_spectator: false,
+        }
+    }
+
+    /// 建立觀戰者
+    pub fn new_spectator(user_id: Uuid, room_id: Uuid, name: String) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            user_id,
+            room_id,
+            name,
+            character: None,
+            reputation: 0,
+            gold: 0,
+            is_ready: true, // 觀戰者自動準備
+            is_host: false,
+            is_spectator: true,
         }
     }
 
@@ -216,6 +235,8 @@ pub struct PlayerResponse {
     pub is_ready: bool,
     /// 是否為房主
     pub is_host: bool,
+    /// 是否為觀戰者
+    pub is_spectator: bool,
 }
 
 impl From<Player> for PlayerResponse {
@@ -228,6 +249,7 @@ impl From<Player> for PlayerResponse {
             gold: player.gold,
             is_ready: player.is_ready,
             is_host: player.is_host,
+            is_spectator: player.is_spectator,
         }
     }
 }
@@ -242,6 +264,7 @@ impl From<&Player> for PlayerResponse {
             gold: player.gold,
             is_ready: player.is_ready,
             is_host: player.is_host,
+            is_spectator: player.is_spectator,
         }
     }
 }

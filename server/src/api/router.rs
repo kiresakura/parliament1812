@@ -87,7 +87,9 @@ pub fn create_router(state: AppState) -> Router {
     // 受保護的房間路由
     let protected_room_routes = Router::new()
         .route("/", post(handlers::create_room))
+        .route("/quickmatch", post(handlers::quick_match))
         .route("/:code/join", post(handlers::join_room))
+        .route("/:code/spectate", post(handlers::spectate_room))
         .route("/:code/leave", post(handlers::leave_room))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
