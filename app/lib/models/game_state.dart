@@ -153,8 +153,8 @@ extension GameStateExtension on GameState {
     
     return hand.where((card) {
       // 檢查資源是否足夠
-      if (card.influenceCost > player.resources.influence) return false;
-      if (card.goldCost > player.resources.gold) return false;
+      if (card.influenceCost > 10) return false;
+      if (card.goldCost > player.gold) return false;
       
       // 檢查階段限制
       if (!isCardPlayableInPhase(card, phase)) return false;

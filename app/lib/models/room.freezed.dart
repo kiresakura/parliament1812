@@ -34,6 +34,7 @@ mixin _$Room {
   String get currentBill => throw _privateConstructorUsedError; // 當前議案內容
   Map<String, dynamic> get gameState =>
       throw _privateConstructorUsedError; // 遊戲狀態資料
+  List<Player> get spectators => throw _privateConstructorUsedError; // 觀戰者列表
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime? get startedAt => throw _privateConstructorUsedError;
 
@@ -64,6 +65,7 @@ abstract class $RoomCopyWith<$Res> {
     int remainingSeconds,
     String currentBill,
     Map<String, dynamic> gameState,
+    List<Player> spectators,
     DateTime createdAt,
     DateTime? startedAt,
   });
@@ -98,6 +100,7 @@ class _$RoomCopyWithImpl<$Res, $Val extends Room>
     Object? remainingSeconds = null,
     Object? currentBill = null,
     Object? gameState = null,
+    Object? spectators = null,
     Object? createdAt = null,
     Object? startedAt = freezed,
   }) {
@@ -151,6 +154,10 @@ class _$RoomCopyWithImpl<$Res, $Val extends Room>
                 ? _value.gameState
                 : gameState // ignore: cast_nullable_to_non_nullable
                       as Map<String, dynamic>,
+            spectators: null == spectators
+                ? _value.spectators
+                : spectators // ignore: cast_nullable_to_non_nullable
+                      as List<Player>,
             createdAt: null == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -196,6 +203,7 @@ abstract class _$$RoomImplCopyWith<$Res> implements $RoomCopyWith<$Res> {
     int remainingSeconds,
     String currentBill,
     Map<String, dynamic> gameState,
+    List<Player> spectators,
     DateTime createdAt,
     DateTime? startedAt,
   });
@@ -228,6 +236,7 @@ class __$$RoomImplCopyWithImpl<$Res>
     Object? remainingSeconds = null,
     Object? currentBill = null,
     Object? gameState = null,
+    Object? spectators = null,
     Object? createdAt = null,
     Object? startedAt = freezed,
   }) {
@@ -281,6 +290,10 @@ class __$$RoomImplCopyWithImpl<$Res>
             ? _value._gameState
             : gameState // ignore: cast_nullable_to_non_nullable
                   as Map<String, dynamic>,
+        spectators: null == spectators
+            ? _value._spectators
+            : spectators // ignore: cast_nullable_to_non_nullable
+                  as List<Player>,
         createdAt: null == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -310,10 +323,12 @@ class _$RoomImpl implements _Room {
     this.remainingSeconds = 0,
     this.currentBill = '',
     final Map<String, dynamic> gameState = const {},
+    final List<Player> spectators = const [],
     required this.createdAt,
     this.startedAt,
   }) : _players = players,
-       _gameState = gameState;
+       _gameState = gameState,
+       _spectators = spectators;
 
   factory _$RoomImpl.fromJson(Map<String, dynamic> json) =>
       _$$RoomImplFromJson(json);
@@ -361,6 +376,17 @@ class _$RoomImpl implements _Room {
   }
 
   // 遊戲狀態資料
+  final List<Player> _spectators;
+  // 遊戲狀態資料
+  @override
+  @JsonKey()
+  List<Player> get spectators {
+    if (_spectators is EqualUnmodifiableListView) return _spectators;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_spectators);
+  }
+
+  // 觀戰者列表
   @override
   final DateTime createdAt;
   @override
@@ -368,7 +394,7 @@ class _$RoomImpl implements _Room {
 
   @override
   String toString() {
-    return 'Room(id: $id, code: $code, name: $name, hostId: $hostId, status: $status, phase: $phase, players: $players, settings: $settings, round: $round, remainingSeconds: $remainingSeconds, currentBill: $currentBill, gameState: $gameState, createdAt: $createdAt, startedAt: $startedAt)';
+    return 'Room(id: $id, code: $code, name: $name, hostId: $hostId, status: $status, phase: $phase, players: $players, settings: $settings, round: $round, remainingSeconds: $remainingSeconds, currentBill: $currentBill, gameState: $gameState, spectators: $spectators, createdAt: $createdAt, startedAt: $startedAt)';
   }
 
   @override
@@ -394,6 +420,10 @@ class _$RoomImpl implements _Room {
               other._gameState,
               _gameState,
             ) &&
+            const DeepCollectionEquality().equals(
+              other._spectators,
+              _spectators,
+            ) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.startedAt, startedAt) ||
@@ -416,6 +446,7 @@ class _$RoomImpl implements _Room {
     remainingSeconds,
     currentBill,
     const DeepCollectionEquality().hash(_gameState),
+    const DeepCollectionEquality().hash(_spectators),
     createdAt,
     startedAt,
   );
@@ -448,6 +479,7 @@ abstract class _Room implements Room {
     final int remainingSeconds,
     final String currentBill,
     final Map<String, dynamic> gameState,
+    final List<Player> spectators,
     required final DateTime createdAt,
     final DateTime? startedAt,
   }) = _$RoomImpl;
@@ -479,6 +511,8 @@ abstract class _Room implements Room {
   @override
   Map<String, dynamic> get gameState; // 遊戲狀態資料
   @override
+  List<Player> get spectators; // 觀戰者列表
+  @override
   DateTime get createdAt;
   @override
   DateTime? get startedAt;
@@ -500,6 +534,7 @@ mixin _$RoomSettings {
   int get maxPlayers => throw _privateConstructorUsedError;
   int get minPlayers => throw _privateConstructorUsedError;
   bool get allowSpectators => throw _privateConstructorUsedError;
+  int get maxSpectators => throw _privateConstructorUsedError;
   bool get isPrivate => throw _privateConstructorUsedError;
   String get password => throw _privateConstructorUsedError;
   int get preparationDuration => throw _privateConstructorUsedError;
@@ -530,6 +565,7 @@ abstract class $RoomSettingsCopyWith<$Res> {
     int maxPlayers,
     int minPlayers,
     bool allowSpectators,
+    int maxSpectators,
     bool isPrivate,
     String password,
     int preparationDuration,
@@ -559,6 +595,7 @@ class _$RoomSettingsCopyWithImpl<$Res, $Val extends RoomSettings>
     Object? maxPlayers = null,
     Object? minPlayers = null,
     Object? allowSpectators = null,
+    Object? maxSpectators = null,
     Object? isPrivate = null,
     Object? password = null,
     Object? preparationDuration = null,
@@ -582,6 +619,10 @@ class _$RoomSettingsCopyWithImpl<$Res, $Val extends RoomSettings>
                 ? _value.allowSpectators
                 : allowSpectators // ignore: cast_nullable_to_non_nullable
                       as bool,
+            maxSpectators: null == maxSpectators
+                ? _value.maxSpectators
+                : maxSpectators // ignore: cast_nullable_to_non_nullable
+                      as int,
             isPrivate: null == isPrivate
                 ? _value.isPrivate
                 : isPrivate // ignore: cast_nullable_to_non_nullable
@@ -633,6 +674,7 @@ abstract class _$$RoomSettingsImplCopyWith<$Res>
     int maxPlayers,
     int minPlayers,
     bool allowSpectators,
+    int maxSpectators,
     bool isPrivate,
     String password,
     int preparationDuration,
@@ -661,6 +703,7 @@ class __$$RoomSettingsImplCopyWithImpl<$Res>
     Object? maxPlayers = null,
     Object? minPlayers = null,
     Object? allowSpectators = null,
+    Object? maxSpectators = null,
     Object? isPrivate = null,
     Object? password = null,
     Object? preparationDuration = null,
@@ -684,6 +727,10 @@ class __$$RoomSettingsImplCopyWithImpl<$Res>
             ? _value.allowSpectators
             : allowSpectators // ignore: cast_nullable_to_non_nullable
                   as bool,
+        maxSpectators: null == maxSpectators
+            ? _value.maxSpectators
+            : maxSpectators // ignore: cast_nullable_to_non_nullable
+                  as int,
         isPrivate: null == isPrivate
             ? _value.isPrivate
             : isPrivate // ignore: cast_nullable_to_non_nullable
@@ -725,9 +772,10 @@ class __$$RoomSettingsImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$RoomSettingsImpl implements _RoomSettings {
   const _$RoomSettingsImpl({
-    this.maxPlayers = 7,
-    this.minPlayers = 3,
+    this.maxPlayers = 4,
+    this.minPlayers = 2,
     this.allowSpectators = true,
+    this.maxSpectators = 10,
     this.isPrivate = false,
     this.password = '',
     this.preparationDuration = 60,
@@ -750,6 +798,9 @@ class _$RoomSettingsImpl implements _RoomSettings {
   @override
   @JsonKey()
   final bool allowSpectators;
+  @override
+  @JsonKey()
+  final int maxSpectators;
   @override
   @JsonKey()
   final bool isPrivate;
@@ -777,7 +828,7 @@ class _$RoomSettingsImpl implements _RoomSettings {
 
   @override
   String toString() {
-    return 'RoomSettings(maxPlayers: $maxPlayers, minPlayers: $minPlayers, allowSpectators: $allowSpectators, isPrivate: $isPrivate, password: $password, preparationDuration: $preparationDuration, conspiracyDuration: $conspiracyDuration, debateDuration: $debateDuration, eventDuration: $eventDuration, finalSpeechDuration: $finalSpeechDuration, votingDuration: $votingDuration)';
+    return 'RoomSettings(maxPlayers: $maxPlayers, minPlayers: $minPlayers, allowSpectators: $allowSpectators, maxSpectators: $maxSpectators, isPrivate: $isPrivate, password: $password, preparationDuration: $preparationDuration, conspiracyDuration: $conspiracyDuration, debateDuration: $debateDuration, eventDuration: $eventDuration, finalSpeechDuration: $finalSpeechDuration, votingDuration: $votingDuration)';
   }
 
   @override
@@ -791,6 +842,8 @@ class _$RoomSettingsImpl implements _RoomSettings {
                 other.minPlayers == minPlayers) &&
             (identical(other.allowSpectators, allowSpectators) ||
                 other.allowSpectators == allowSpectators) &&
+            (identical(other.maxSpectators, maxSpectators) ||
+                other.maxSpectators == maxSpectators) &&
             (identical(other.isPrivate, isPrivate) ||
                 other.isPrivate == isPrivate) &&
             (identical(other.password, password) ||
@@ -816,6 +869,7 @@ class _$RoomSettingsImpl implements _RoomSettings {
     maxPlayers,
     minPlayers,
     allowSpectators,
+    maxSpectators,
     isPrivate,
     password,
     preparationDuration,
@@ -845,6 +899,7 @@ abstract class _RoomSettings implements RoomSettings {
     final int maxPlayers,
     final int minPlayers,
     final bool allowSpectators,
+    final int maxSpectators,
     final bool isPrivate,
     final String password,
     final int preparationDuration,
@@ -864,6 +919,8 @@ abstract class _RoomSettings implements RoomSettings {
   int get minPlayers;
   @override
   bool get allowSpectators;
+  @override
+  int get maxSpectators;
   @override
   bool get isPrivate;
   @override

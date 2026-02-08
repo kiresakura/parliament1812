@@ -450,7 +450,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
               radius: 24,
               backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
               child: Text(
-                player.character.displayName.substring(0, 1),
+                player.character?.displayName ?? "".substring(0, 1),
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -472,7 +472,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             
             // 角色
             Text(
-              player.character.displayName,
+              player.character?.displayName ?? "",
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacity(0.7),
               ),
@@ -483,7 +483,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             const SizedBox(height: 8),
             
             // 聲望條
-            _buildReputationBar(player.resources.reputation, theme),
+            _buildReputationBar(player.reputation, theme),
             
             const SizedBox(height: 4),
             

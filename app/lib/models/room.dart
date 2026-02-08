@@ -61,6 +61,7 @@ class Room with _$Room {
     @Default(0) int remainingSeconds,
     @Default('') String currentBill,  // 當前議案內容
     @Default({}) Map<String, dynamic> gameState,  // 遊戲狀態資料
+    @Default([]) List<Player> spectators,  // 觀戰者列表
     required DateTime createdAt,
     DateTime? startedAt,
   }) = _Room;
@@ -71,9 +72,10 @@ class Room with _$Room {
 @freezed
 class RoomSettings with _$RoomSettings {
   const factory RoomSettings({
-    @Default(7) int maxPlayers,
-    @Default(3) int minPlayers,
+    @Default(4) int maxPlayers,
+    @Default(2) int minPlayers,
     @Default(true) bool allowSpectators,
+    @Default(10) int maxSpectators,
     @Default(false) bool isPrivate,
     @Default('') String password,
     @Default(60) int preparationDuration,
@@ -162,7 +164,7 @@ extension RoomExtension on Room {
   Map<String, int> get factionCounts {
     final counts = <String, int>{};
     for (final player in players) {
-      counts[player.faction] = (counts[player.faction] ?? 0) + 1;
+      counts[player.character?.faction ?? "neutral"] = (counts[player.character?.faction ?? "neutral"] ?? 0) + 1;
     }
     return counts;
   }

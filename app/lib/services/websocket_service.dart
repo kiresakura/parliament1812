@@ -20,6 +20,16 @@ class WebSocketService {
   int _reconnectAttempts = 0;
   bool _isConnecting = false;
   String? _lastUrl;
+  
+  // 序列號追蹤
+  int _expectedSeq = 1;
+  int _latestSeq = 0;
+  final _pendingMessages = <int, ServerMessage>{};
+  
+  // 自動重連配置
+  static const _maxReconnectAttempts = 10;
+  static const _baseReconnectDelay = Duration(seconds: 1);
+  static const _maxReconnectDelay = Duration(seconds: 30);
 
   // 事件流控制器
   final _connectionStateController = StreamController<ConnectionState>.broadcast();
@@ -116,6 +126,13 @@ class WebSocketService {
   void _onMessage(dynamic data) {
     try {
       final jsonData = jsonDecode(data as String) as Map<String, dynamic>;
+      
+      // 檢查是否為包裝消息（帶序列號）
+      if (jsonData.containsKey('seq') && jsonData.containsKey('message')) {
+        _handleWrappedMessage(jsonData);
+        return;
+      }
+      
       final message = ServerMessage.fromJson(jsonData);
       
       print('WebSocket received: ${message.runtimeType}');
@@ -131,6 +148,66 @@ class WebSocketService {
       print('WebSocket message parse error: $e');
       _errorController.add('訊息解析錯誤: $e');
     }
+  }
+  
+  void _handleWrappedMessage(Map<String, dynamic> jsonData) {
+    try {
+      final seq = jsonData['seq'] as int;
+      final timestamp = jsonData['timestamp'] as int;
+      final messageData = jsonData['message'] as Map<String, dynamic>;
+      
+      final message = ServerMessage.fromJson(messageData);
+      
+      // 更新最新序列號
+      if (seq > _latestSeq) {
+        _latestSeq = seq;
+      }
+      
+      // 檢查序列號順序
+      if (seq == _expectedSeq) {
+        // 正確順序，直接處理
+        _processMessage(message);
+        _expectedSeq++;
+        
+        // 檢查是否有等待的後續消息
+        _processPendingMessages();
+      } else if (seq > _expectedSeq) {
+        // 亂序消息，暫存
+        _pendingMessages[seq] = message;
+        print('Message out of order: expected $_expectedSeq, got $seq');
+        
+        // 如果積壓太多，請求重新同步
+        if (_pendingMessages.length > 10) {
+          _requestResync();
+        }
+      } else {
+        // 重複或過期消息，忽略
+        print('Duplicate or old message: seq $seq (expected $_expectedSeq)');
+      }
+    } catch (e) {
+      print('Error handling wrapped message: $e');
+    }
+  }
+  
+  void _processPendingMessages() {
+    while (_pendingMessages.containsKey(_expectedSeq)) {
+      final message = _pendingMessages.remove(_expectedSeq)!;
+      _processMessage(message);
+      _expectedSeq++;
+    }
+  }
+  
+  void _processMessage(ServerMessage message) {
+    print('Processing message: ${message.runtimeType}');
+    _messageController.add(message);
+  }
+  
+  void _requestResync() {
+    print('Requesting resync due to too many out-of-order messages');
+    // 清空待處理消息
+    _pendingMessages.clear();
+    // 重置序列號期望（將由重連或重新同步處理）
+    _expectedSeq = _latestSeq + 1;
   }
 
   void _onError(dynamic error) {
@@ -173,18 +250,51 @@ class WebSocketService {
 
   void _attemptReconnect() {
     if (_reconnectTimer != null || 
-        _reconnectAttempts >= AppConstants.maxReconnectAttempts ||
+        _reconnectAttempts >= _maxReconnectAttempts ||
         _lastUrl == null) {
       return;
     }
 
     _reconnectAttempts++;
-    print('WebSocket attempting reconnect $_reconnectAttempts/${AppConstants.maxReconnectAttempts}');
+    
+    // 指數退避：1s → 2s → 4s → 8s → ... → max 30s
+    final delay = Duration(
+      milliseconds: (_baseReconnectDelay.inMilliseconds * 
+        (1 << (_reconnectAttempts - 1))).clamp(
+          _baseReconnectDelay.inMilliseconds,
+          _maxReconnectDelay.inMilliseconds,
+        ),
+    );
+    
+    print('WebSocket attempting reconnect $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s');
+    
+    _updateConnectionState(ConnectionState.reconnecting);
 
-    _reconnectTimer = Timer(AppConstants.reconnectDelay, () {
+    _reconnectTimer = Timer(delay, () async {
       _reconnectTimer = null;
-      connect(customUrl: _lastUrl);
+      final success = await connect(customUrl: _lastUrl);
+      
+      if (success) {
+        // 重連成功，請求完整狀態
+        _requestReconnectData();
+      } else if (_reconnectAttempts < _maxReconnectAttempts) {
+        // 繼續嘗試重連
+        _attemptReconnect();
+      } else {
+        // 達到最大重連次數，停止嘗試
+        print('Max reconnect attempts reached, giving up');
+        _updateConnectionState(ConnectionState.error);
+      }
     });
+  }
+  
+  void _requestReconnectData() {
+    // 這裡可以發送一個請求以獲取完整的房間/遊戲狀態
+    // 重置序列號追蹤
+    _expectedSeq = 1;
+    _latestSeq = 0;
+    _pendingMessages.clear();
+    print('Requesting reconnect data after successful reconnection');
   }
 
   void _stopReconnecting() {
@@ -212,6 +322,7 @@ enum ConnectionState {
   disconnected,
   connecting,
   connected,
+  reconnecting,
   error,
 }
 
@@ -458,6 +569,46 @@ class DiscardCardMessage extends ClientMessage {
   };
 }
 
+class ProposeAllianceMessage extends ClientMessage {
+  final String targetId;
+
+  const ProposeAllianceMessage({required this.targetId});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'propose_alliance',
+    'target_id': targetId,
+  };
+}
+
+class RespondToAllianceMessage extends ClientMessage {
+  final String proposerId;
+  final bool accept;
+
+  const RespondToAllianceMessage({required this.proposerId, required this.accept});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'respond_to_alliance',
+    'proposer_id': proposerId,
+    'accept': accept,
+  };
+}
+
+class ReactToMessageMessage extends ClientMessage {
+  final int messageSeq;
+  final String emoji;
+
+  const ReactToMessageMessage({required this.messageSeq, required this.emoji});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'react_to_message',
+    'message_seq': messageSeq,
+    'emoji': emoji,
+  };
+}
+
 class PingMessage extends ClientMessage {
   const PingMessage();
 
@@ -528,6 +679,20 @@ sealed class ServerMessage {
         return SystemMessageMessage.fromJson(json);
       case 'timer_update':
         return TimerUpdateMessage.fromJson(json);
+      case 'alliance_proposed':
+        return AllianceProposedMessage.fromJson(json);
+      case 'alliance_accepted':
+        return AllianceAcceptedMessage.fromJson(json);
+      case 'alliance_rejected':
+        return AllianceRejectedMessage.fromJson(json);
+      case 'alliance_betrayed':
+        return AllianceBetrayedMessage.fromJson(json);
+      case 'message_reaction':
+        return MessageReactionMessage.fromJson(json);
+      case 'room_update':
+        return RoomUpdateMessage.fromJson(json);
+      case 'reconnect_data':
+        return ReconnectDataMessage.fromJson(json);
       case 'pong':
         return PongMessage.fromJson(json);
       default:
@@ -669,6 +834,7 @@ class ChatMessageMessage extends ServerMessage {
   final String content;
   final bool isPrivate;
   final int timestamp;
+  final int? messageSeq; // 用於表情反應的序列號
 
   const ChatMessageMessage({
     required this.fromId,
@@ -676,6 +842,7 @@ class ChatMessageMessage extends ServerMessage {
     required this.content,
     required this.isPrivate,
     required this.timestamp,
+    this.messageSeq,
   }) : super('chat_message');
 
   factory ChatMessageMessage.fromJson(Map<String, dynamic> json) {
@@ -685,6 +852,7 @@ class ChatMessageMessage extends ServerMessage {
       content: json['content'] as String,
       isPrivate: json['is_private'] as bool,
       timestamp: json['timestamp'] as int,
+      messageSeq: json['message_seq'] as int?,
     );
   }
 }
@@ -1064,6 +1232,181 @@ class TimerUpdateMessage extends ServerMessage {
   factory TimerUpdateMessage.fromJson(Map<String, dynamic> json) {
     return TimerUpdateMessage(
       remainingSecs: json['remaining_secs'] as int,
+    );
+  }
+}
+
+// 同盟相關消息
+class AllianceProposedMessage extends ServerMessage {
+  final String allianceId;
+  final String proposerId;
+  final String proposerName;
+  final String targetId;
+  final String targetName;
+
+  const AllianceProposedMessage({
+    required this.allianceId,
+    required this.proposerId,
+    required this.proposerName,
+    required this.targetId,
+    required this.targetName,
+  }) : super('alliance_proposed');
+
+  factory AllianceProposedMessage.fromJson(Map<String, dynamic> json) {
+    return AllianceProposedMessage(
+      allianceId: json['alliance_id'] as String,
+      proposerId: json['proposer_id'] as String,
+      proposerName: json['proposer_name'] as String,
+      targetId: json['target_id'] as String,
+      targetName: json['target_name'] as String,
+    );
+  }
+}
+
+class AllianceAcceptedMessage extends ServerMessage {
+  final String allianceId;
+  final List<String> members;
+  final List<String> memberNames;
+
+  const AllianceAcceptedMessage({
+    required this.allianceId,
+    required this.members,
+    required this.memberNames,
+  }) : super('alliance_accepted');
+
+  factory AllianceAcceptedMessage.fromJson(Map<String, dynamic> json) {
+    return AllianceAcceptedMessage(
+      allianceId: json['alliance_id'] as String,
+      members: List<String>.from(json['members'] as List),
+      memberNames: List<String>.from(json['member_names'] as List),
+    );
+  }
+}
+
+class AllianceRejectedMessage extends ServerMessage {
+  final String proposerId;
+  final String proposerName;
+  final String rejecterId;
+  final String rejecterName;
+
+  const AllianceRejectedMessage({
+    required this.proposerId,
+    required this.proposerName,
+    required this.rejecterId,
+    required this.rejecterName,
+  }) : super('alliance_rejected');
+
+  factory AllianceRejectedMessage.fromJson(Map<String, dynamic> json) {
+    return AllianceRejectedMessage(
+      proposerId: json['proposer_id'] as String,
+      proposerName: json['proposer_name'] as String,
+      rejecterId: json['rejecter_id'] as String,
+      rejecterName: json['rejecter_name'] as String,
+    );
+  }
+}
+
+class AllianceBetrayedMessage extends ServerMessage {
+  final String allianceId;
+  final String betrayerId;
+  final String betrayerName;
+  final String victimId;
+  final String victimName;
+
+  const AllianceBetrayedMessage({
+    required this.allianceId,
+    required this.betrayerId,
+    required this.betrayerName,
+    required this.victimId,
+    required this.victimName,
+  }) : super('alliance_betrayed');
+
+  factory AllianceBetrayedMessage.fromJson(Map<String, dynamic> json) {
+    return AllianceBetrayedMessage(
+      allianceId: json['alliance_id'] as String,
+      betrayerId: json['betrayer_id'] as String,
+      betrayerName: json['betrayer_name'] as String,
+      victimId: json['victim_id'] as String,
+      victimName: json['victim_name'] as String,
+    );
+  }
+}
+
+// 表情反應消息
+class MessageReactionMessage extends ServerMessage {
+  final String fromId;
+  final String fromName;
+  final int targetMessageSeq;
+  final String emoji;
+  final int timestamp;
+
+  const MessageReactionMessage({
+    required this.fromId,
+    required this.fromName,
+    required this.targetMessageSeq,
+    required this.emoji,
+    required this.timestamp,
+  }) : super('message_reaction');
+
+  factory MessageReactionMessage.fromJson(Map<String, dynamic> json) {
+    return MessageReactionMessage(
+      fromId: json['from_id'] as String,
+      fromName: json['from_name'] as String,
+      targetMessageSeq: json['target_message_seq'] as int,
+      emoji: json['emoji'] as String,
+      timestamp: json['timestamp'] as int,
+    );
+  }
+}
+
+// 房間更新消息
+class RoomUpdateMessage extends ServerMessage {
+  final Room room;
+  final List<Player> players;
+  final String updateType;
+  final String? relatedPlayerId;
+
+  const RoomUpdateMessage({
+    required this.room,
+    required this.players,
+    required this.updateType,
+    this.relatedPlayerId,
+  }) : super('room_update');
+
+  factory RoomUpdateMessage.fromJson(Map<String, dynamic> json) {
+    return RoomUpdateMessage(
+      room: Room.fromJson(json['room'] as Map<String, dynamic>),
+      players: (json['players'] as List)
+          .map((p) => Player.fromJson(p as Map<String, dynamic>))
+          .toList(),
+      updateType: json['update_type'] as String,
+      relatedPlayerId: json['related_player_id'] as String?,
+    );
+  }
+}
+
+// 重連數據消息
+class ReconnectDataMessage extends ServerMessage {
+  final Room room;
+  final List<Player> players;
+  final Map<String, dynamic>? gameState;
+  final int latestSeq;
+
+  const ReconnectDataMessage({
+    required this.room,
+    required this.players,
+    this.gameState,
+    required this.latestSeq,
+  }) : super('reconnect_data');
+
+  factory ReconnectDataMessage.fromJson(Map<String, dynamic> json) {
+    return ReconnectDataMessage(
+      room: Room.fromJson(json['room'] as Map<String, dynamic>),
+      players: (json['players'] as List)
+          .map((p) => Player.fromJson(p as Map<String, dynamic>))
+          .toList(),
+      gameState: json['game_state'] as Map<String, dynamic>?,
+      latestSeq: json['latest_seq'] as int,
     );
   }
 }

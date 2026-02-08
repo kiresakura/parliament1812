@@ -9,29 +9,22 @@ class Player with _$Player {
   const factory Player({
     required String id,
     required String name,
-    required CharacterType character,
-    required String faction,
-    required PlayerResources resources,
+    CharacterType? character, // 可為空，因為初始時未選角
+    required int reputation,  // 聲望（直接從後端）
+    required int gold,       // 金幣（直接從後端）
     required bool isReady,
     required bool isHost,
-    required bool isAlive,  // false = 政治死亡
+    @Default(false) bool isSpectator, // 觀戰者標記
+    @Default(true) bool isAlive,  // false = 政治死亡
     @Default([]) List<String> handCards,  // 手牌 ID 列表
     @Default([]) List<String> negativeTraits,  // 負面特質
     @Default({}) Map<String, dynamic> status,  // 狀態效果（沉默、封印等）
+    // 同盟相關
+    @Default([]) List<String> allianceIds, // 同盟 ID 列表
+    @Default(false) bool hasPendingAlliance, // 是否有待處理的同盟請求
   }) = _Player;
 
   factory Player.fromJson(Map<String, Object?> json) => _$PlayerFromJson(json);
-}
-
-@freezed
-class PlayerResources with _$PlayerResources {
-  const factory PlayerResources({
-    @Default(50) int reputation,   // 聲望 ❤️
-    @Default(10) int influence,    // 影響力 🌟
-    @Default(30) int gold,         // 金幣 💰
-  }) = _PlayerResources;
-
-  factory PlayerResources.fromJson(Map<String, Object?> json) => _$PlayerResourcesFromJson(json);
 }
 
 enum CharacterType {
@@ -113,22 +106,27 @@ extension CharacterTypeExtension on CharacterType {
     }
   }
 
-  PlayerResources get initialResources {
+  int get initialReputation {
     switch (this) {
-      case CharacterType.thomasWorker:
-        return const PlayerResources(reputation: 70, influence: 10, gold: 20);
-      case CharacterType.richardFactory:
-        return const PlayerResources(reputation: 60, influence: 10, gold: 100);
-      case CharacterType.georgeLuddite:
-        return const PlayerResources(reputation: 80, influence: 10, gold: 10);
-      case CharacterType.robertReformer:
-        return const PlayerResources(reputation: 65, influence: 12, gold: 40);
-      case CharacterType.edwardJournalist:
-        return const PlayerResources(reputation: 50, influence: 10, gold: 30);
-      case CharacterType.williamMp:
-        return const PlayerResources(reputation: 75, influence: 10, gold: 60);
-      case CharacterType.georgeKing:
-        return const PlayerResources(reputation: 90, influence: 8, gold: 80);
+      case CharacterType.thomasWorker: return 70;
+      case CharacterType.richardFactory: return 60;
+      case CharacterType.georgeLuddite: return 80;
+      case CharacterType.robertReformer: return 65;
+      case CharacterType.edwardJournalist: return 50;
+      case CharacterType.williamMp: return 75;
+      case CharacterType.georgeKing: return 90;
+    }
+  }
+
+  int get initialGold {
+    switch (this) {
+      case CharacterType.thomasWorker: return 20;
+      case CharacterType.richardFactory: return 100;
+      case CharacterType.georgeLuddite: return 10;
+      case CharacterType.robertReformer: return 40;
+      case CharacterType.edwardJournalist: return 30;
+      case CharacterType.williamMp: return 60;
+      case CharacterType.georgeKing: return 80;
     }
   }
 
@@ -165,8 +163,8 @@ class PlayerFactory {
       id: _uuid.v4(),
       name: name,
       character: character,
-      faction: character.faction,
-      resources: character.initialResources,
+      reputation: character.initialReputation,
+      gold: character.initialGold,
       isReady: false,
       isHost: isHost,
       isAlive: true,

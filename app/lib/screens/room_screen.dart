@@ -27,7 +27,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
   
   // 獲取已被選擇的角色
   Set<CharacterType> get _selectedCharacters {
-    return _room.players.map((p) => p.character).toSet();
+    return _room.players.map((p) => p.character).whereType<CharacterType>().toSet();
   }
 
   @override
@@ -760,7 +760,7 @@ class _PlayerSlot extends StatelessWidget {
                       ),
                       
                       Text(
-                        player.character.displayName,
+                        player.character?.displayName ?? "未選角色",
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withOpacity(0.7),
                         ),

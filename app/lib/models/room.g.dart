@@ -21,6 +21,11 @@ _$RoomImpl _$$RoomImplFromJson(Map<String, dynamic> json) => _$RoomImpl(
   remainingSeconds: (json['remainingSeconds'] as num?)?.toInt() ?? 0,
   currentBill: json['currentBill'] as String? ?? '',
   gameState: json['gameState'] as Map<String, dynamic>? ?? const {},
+  spectators:
+      (json['spectators'] as List<dynamic>?)
+          ?.map((e) => Player.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
   createdAt: DateTime.parse(json['createdAt'] as String),
   startedAt: json['startedAt'] == null
       ? null
@@ -41,6 +46,7 @@ Map<String, dynamic> _$$RoomImplToJson(_$RoomImpl instance) =>
       'remainingSeconds': instance.remainingSeconds,
       'currentBill': instance.currentBill,
       'gameState': instance.gameState,
+      'spectators': instance.spectators,
       'createdAt': instance.createdAt.toIso8601String(),
       'startedAt': instance.startedAt?.toIso8601String(),
     };
@@ -66,9 +72,10 @@ const _$GamePhaseEnumMap = {
 
 _$RoomSettingsImpl _$$RoomSettingsImplFromJson(Map<String, dynamic> json) =>
     _$RoomSettingsImpl(
-      maxPlayers: (json['maxPlayers'] as num?)?.toInt() ?? 7,
-      minPlayers: (json['minPlayers'] as num?)?.toInt() ?? 3,
+      maxPlayers: (json['maxPlayers'] as num?)?.toInt() ?? 4,
+      minPlayers: (json['minPlayers'] as num?)?.toInt() ?? 2,
       allowSpectators: json['allowSpectators'] as bool? ?? true,
+      maxSpectators: (json['maxSpectators'] as num?)?.toInt() ?? 10,
       isPrivate: json['isPrivate'] as bool? ?? false,
       password: json['password'] as String? ?? '',
       preparationDuration: (json['preparationDuration'] as num?)?.toInt() ?? 60,
@@ -85,6 +92,7 @@ Map<String, dynamic> _$$RoomSettingsImplToJson(_$RoomSettingsImpl instance) =>
       'maxPlayers': instance.maxPlayers,
       'minPlayers': instance.minPlayers,
       'allowSpectators': instance.allowSpectators,
+      'maxSpectators': instance.maxSpectators,
       'isPrivate': instance.isPrivate,
       'password': instance.password,
       'preparationDuration': instance.preparationDuration,

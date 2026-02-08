@@ -4,7 +4,7 @@ import '../models/player.dart';
 import '../config/theme.dart';
 
 class PlayerAvatar extends StatelessWidget {
-  final CharacterType character;
+  final CharacterType? character;
   final double size;
   final bool showBorder;
   final bool isOnline;
@@ -22,7 +22,7 @@ class PlayerAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final factionColor = Parliament1812Theme.getFactionColor(character.faction);
+    final factionColor = Parliament1812Theme.getFactionColor(character?.faction ?? "neutral");
     
     return Stack(
       children: [
@@ -132,7 +132,7 @@ class PlayerAvatar extends StatelessWidget {
     );
   }
 
-  String _getCharacterEmoji(CharacterType character) {
+  String _getCharacterEmoji(CharacterType? character) {
     switch (character) {
       case CharacterType.thomasWorker:
         return '👷';
@@ -148,10 +148,12 @@ class PlayerAvatar extends StatelessWidget {
         return '🏛️';
       case CharacterType.georgeKing:
         return '👑';
+      case null:
+        return '❓';
     }
   }
 
-  IconData _getCharacterIcon(CharacterType character) {
+  IconData _getCharacterIcon(CharacterType? character) {
     switch (character) {
       case CharacterType.thomasWorker:
         return Icons.construction;
@@ -167,12 +169,14 @@ class PlayerAvatar extends StatelessWidget {
         return Icons.account_balance;
       case CharacterType.georgeKing:
         return Icons.diamond;
+      case null:
+        return Icons.person;
     }
   }
 }
 
 class PlayerAvatarWithName extends StatelessWidget {
-  final CharacterType character;
+  final CharacterType? character;
   final String playerName;
   final double size;
   final bool showFaction;
@@ -192,7 +196,7 @@ class PlayerAvatarWithName extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final factionColor = Parliament1812Theme.getFactionColor(character.faction);
+    final factionColor = Parliament1812Theme.getFactionColor(character?.faction ?? "neutral");
     
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -227,7 +231,7 @@ class PlayerAvatarWithName extends StatelessWidget {
         SizedBox(
           width: size + 16,
           child: Text(
-            character.displayName,
+            character?.displayName ?? "?",
             style: theme.textTheme.bodySmall?.copyWith(
               color: isDead 
                   ? theme.colorScheme.onSurface.withOpacity(0.4)
@@ -257,7 +261,7 @@ class PlayerAvatarWithName extends StatelessWidget {
               ),
             ),
             child: Text(
-              _getFactionDisplayName(character.faction),
+              _getFactionDisplayName(character?.faction ?? "neutral"),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: isDead 
                     ? Colors.grey

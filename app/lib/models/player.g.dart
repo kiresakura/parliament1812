@@ -9,14 +9,13 @@ part of 'player.dart';
 _$PlayerImpl _$$PlayerImplFromJson(Map<String, dynamic> json) => _$PlayerImpl(
   id: json['id'] as String,
   name: json['name'] as String,
-  character: $enumDecode(_$CharacterTypeEnumMap, json['character']),
-  faction: json['faction'] as String,
-  resources: PlayerResources.fromJson(
-    json['resources'] as Map<String, dynamic>,
-  ),
+  character: $enumDecodeNullable(_$CharacterTypeEnumMap, json['character']),
+  reputation: (json['reputation'] as num).toInt(),
+  gold: (json['gold'] as num).toInt(),
   isReady: json['isReady'] as bool,
   isHost: json['isHost'] as bool,
-  isAlive: json['isAlive'] as bool,
+  isSpectator: json['isSpectator'] as bool? ?? false,
+  isAlive: json['isAlive'] as bool? ?? true,
   handCards:
       (json['handCards'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       const [],
@@ -26,21 +25,30 @@ _$PlayerImpl _$$PlayerImplFromJson(Map<String, dynamic> json) => _$PlayerImpl(
           .toList() ??
       const [],
   status: json['status'] as Map<String, dynamic>? ?? const {},
+  allianceIds:
+      (json['allianceIds'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const [],
+  hasPendingAlliance: json['hasPendingAlliance'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$$PlayerImplToJson(_$PlayerImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
-      'character': _$CharacterTypeEnumMap[instance.character]!,
-      'faction': instance.faction,
-      'resources': instance.resources,
+      'character': _$CharacterTypeEnumMap[instance.character],
+      'reputation': instance.reputation,
+      'gold': instance.gold,
       'isReady': instance.isReady,
       'isHost': instance.isHost,
+      'isSpectator': instance.isSpectator,
       'isAlive': instance.isAlive,
       'handCards': instance.handCards,
       'negativeTraits': instance.negativeTraits,
       'status': instance.status,
+      'allianceIds': instance.allianceIds,
+      'hasPendingAlliance': instance.hasPendingAlliance,
     };
 
 const _$CharacterTypeEnumMap = {
@@ -51,20 +59,4 @@ const _$CharacterTypeEnumMap = {
   CharacterType.edwardJournalist: 'edward_journalist',
   CharacterType.williamMp: 'william_mp',
   CharacterType.georgeKing: 'george_king',
-};
-
-_$PlayerResourcesImpl _$$PlayerResourcesImplFromJson(
-  Map<String, dynamic> json,
-) => _$PlayerResourcesImpl(
-  reputation: (json['reputation'] as num?)?.toInt() ?? 50,
-  influence: (json['influence'] as num?)?.toInt() ?? 10,
-  gold: (json['gold'] as num?)?.toInt() ?? 30,
-);
-
-Map<String, dynamic> _$$PlayerResourcesImplToJson(
-  _$PlayerResourcesImpl instance,
-) => <String, dynamic>{
-  'reputation': instance.reputation,
-  'influence': instance.influence,
-  'gold': instance.gold,
 };

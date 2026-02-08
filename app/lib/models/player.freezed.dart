@@ -23,15 +23,22 @@ Player _$PlayerFromJson(Map<String, dynamic> json) {
 mixin _$Player {
   String get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  CharacterType get character => throw _privateConstructorUsedError;
-  String get faction => throw _privateConstructorUsedError;
-  PlayerResources get resources => throw _privateConstructorUsedError;
+  CharacterType? get character =>
+      throw _privateConstructorUsedError; // 可為空，因為初始時未選角
+  int get reputation => throw _privateConstructorUsedError; // 聲望（直接從後端）
+  int get gold => throw _privateConstructorUsedError; // 金幣（直接從後端）
   bool get isReady => throw _privateConstructorUsedError;
   bool get isHost => throw _privateConstructorUsedError;
+  bool get isSpectator => throw _privateConstructorUsedError; // 觀戰者標記
   bool get isAlive => throw _privateConstructorUsedError; // false = 政治死亡
   List<String> get handCards => throw _privateConstructorUsedError; // 手牌 ID 列表
   List<String> get negativeTraits => throw _privateConstructorUsedError; // 負面特質
-  Map<String, dynamic> get status => throw _privateConstructorUsedError;
+  Map<String, dynamic> get status =>
+      throw _privateConstructorUsedError; // 狀態效果（沉默、封印等）
+  // 同盟相關
+  List<String> get allianceIds =>
+      throw _privateConstructorUsedError; // 同盟 ID 列表
+  bool get hasPendingAlliance => throw _privateConstructorUsedError;
 
   /// Serializes this Player to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -50,18 +57,19 @@ abstract class $PlayerCopyWith<$Res> {
   $Res call({
     String id,
     String name,
-    CharacterType character,
-    String faction,
-    PlayerResources resources,
+    CharacterType? character,
+    int reputation,
+    int gold,
     bool isReady,
     bool isHost,
+    bool isSpectator,
     bool isAlive,
     List<String> handCards,
     List<String> negativeTraits,
     Map<String, dynamic> status,
+    List<String> allianceIds,
+    bool hasPendingAlliance,
   });
-
-  $PlayerResourcesCopyWith<$Res> get resources;
 }
 
 /// @nodoc
@@ -81,15 +89,18 @@ class _$PlayerCopyWithImpl<$Res, $Val extends Player>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? character = null,
-    Object? faction = null,
-    Object? resources = null,
+    Object? character = freezed,
+    Object? reputation = null,
+    Object? gold = null,
     Object? isReady = null,
     Object? isHost = null,
+    Object? isSpectator = null,
     Object? isAlive = null,
     Object? handCards = null,
     Object? negativeTraits = null,
     Object? status = null,
+    Object? allianceIds = null,
+    Object? hasPendingAlliance = null,
   }) {
     return _then(
       _value.copyWith(
@@ -101,18 +112,18 @@ class _$PlayerCopyWithImpl<$Res, $Val extends Player>
                 ? _value.name
                 : name // ignore: cast_nullable_to_non_nullable
                       as String,
-            character: null == character
+            character: freezed == character
                 ? _value.character
                 : character // ignore: cast_nullable_to_non_nullable
-                      as CharacterType,
-            faction: null == faction
-                ? _value.faction
-                : faction // ignore: cast_nullable_to_non_nullable
-                      as String,
-            resources: null == resources
-                ? _value.resources
-                : resources // ignore: cast_nullable_to_non_nullable
-                      as PlayerResources,
+                      as CharacterType?,
+            reputation: null == reputation
+                ? _value.reputation
+                : reputation // ignore: cast_nullable_to_non_nullable
+                      as int,
+            gold: null == gold
+                ? _value.gold
+                : gold // ignore: cast_nullable_to_non_nullable
+                      as int,
             isReady: null == isReady
                 ? _value.isReady
                 : isReady // ignore: cast_nullable_to_non_nullable
@@ -120,6 +131,10 @@ class _$PlayerCopyWithImpl<$Res, $Val extends Player>
             isHost: null == isHost
                 ? _value.isHost
                 : isHost // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            isSpectator: null == isSpectator
+                ? _value.isSpectator
+                : isSpectator // ignore: cast_nullable_to_non_nullable
                       as bool,
             isAlive: null == isAlive
                 ? _value.isAlive
@@ -137,19 +152,17 @@ class _$PlayerCopyWithImpl<$Res, $Val extends Player>
                 ? _value.status
                 : status // ignore: cast_nullable_to_non_nullable
                       as Map<String, dynamic>,
+            allianceIds: null == allianceIds
+                ? _value.allianceIds
+                : allianceIds // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
+            hasPendingAlliance: null == hasPendingAlliance
+                ? _value.hasPendingAlliance
+                : hasPendingAlliance // ignore: cast_nullable_to_non_nullable
+                      as bool,
           )
           as $Val,
     );
-  }
-
-  /// Create a copy of Player
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $PlayerResourcesCopyWith<$Res> get resources {
-    return $PlayerResourcesCopyWith<$Res>(_value.resources, (value) {
-      return _then(_value.copyWith(resources: value) as $Val);
-    });
   }
 }
 
@@ -164,19 +177,19 @@ abstract class _$$PlayerImplCopyWith<$Res> implements $PlayerCopyWith<$Res> {
   $Res call({
     String id,
     String name,
-    CharacterType character,
-    String faction,
-    PlayerResources resources,
+    CharacterType? character,
+    int reputation,
+    int gold,
     bool isReady,
     bool isHost,
+    bool isSpectator,
     bool isAlive,
     List<String> handCards,
     List<String> negativeTraits,
     Map<String, dynamic> status,
+    List<String> allianceIds,
+    bool hasPendingAlliance,
   });
-
-  @override
-  $PlayerResourcesCopyWith<$Res> get resources;
 }
 
 /// @nodoc
@@ -195,15 +208,18 @@ class __$$PlayerImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? character = null,
-    Object? faction = null,
-    Object? resources = null,
+    Object? character = freezed,
+    Object? reputation = null,
+    Object? gold = null,
     Object? isReady = null,
     Object? isHost = null,
+    Object? isSpectator = null,
     Object? isAlive = null,
     Object? handCards = null,
     Object? negativeTraits = null,
     Object? status = null,
+    Object? allianceIds = null,
+    Object? hasPendingAlliance = null,
   }) {
     return _then(
       _$PlayerImpl(
@@ -215,18 +231,18 @@ class __$$PlayerImplCopyWithImpl<$Res>
             ? _value.name
             : name // ignore: cast_nullable_to_non_nullable
                   as String,
-        character: null == character
+        character: freezed == character
             ? _value.character
             : character // ignore: cast_nullable_to_non_nullable
-                  as CharacterType,
-        faction: null == faction
-            ? _value.faction
-            : faction // ignore: cast_nullable_to_non_nullable
-                  as String,
-        resources: null == resources
-            ? _value.resources
-            : resources // ignore: cast_nullable_to_non_nullable
-                  as PlayerResources,
+                  as CharacterType?,
+        reputation: null == reputation
+            ? _value.reputation
+            : reputation // ignore: cast_nullable_to_non_nullable
+                  as int,
+        gold: null == gold
+            ? _value.gold
+            : gold // ignore: cast_nullable_to_non_nullable
+                  as int,
         isReady: null == isReady
             ? _value.isReady
             : isReady // ignore: cast_nullable_to_non_nullable
@@ -234,6 +250,10 @@ class __$$PlayerImplCopyWithImpl<$Res>
         isHost: null == isHost
             ? _value.isHost
             : isHost // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        isSpectator: null == isSpectator
+            ? _value.isSpectator
+            : isSpectator // ignore: cast_nullable_to_non_nullable
                   as bool,
         isAlive: null == isAlive
             ? _value.isAlive
@@ -251,6 +271,14 @@ class __$$PlayerImplCopyWithImpl<$Res>
             ? _value._status
             : status // ignore: cast_nullable_to_non_nullable
                   as Map<String, dynamic>,
+        allianceIds: null == allianceIds
+            ? _value._allianceIds
+            : allianceIds // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
+        hasPendingAlliance: null == hasPendingAlliance
+            ? _value.hasPendingAlliance
+            : hasPendingAlliance // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -262,18 +290,22 @@ class _$PlayerImpl implements _Player {
   const _$PlayerImpl({
     required this.id,
     required this.name,
-    required this.character,
-    required this.faction,
-    required this.resources,
+    this.character,
+    required this.reputation,
+    required this.gold,
     required this.isReady,
     required this.isHost,
-    required this.isAlive,
+    this.isSpectator = false,
+    this.isAlive = true,
     final List<String> handCards = const [],
     final List<String> negativeTraits = const [],
     final Map<String, dynamic> status = const {},
+    final List<String> allianceIds = const [],
+    this.hasPendingAlliance = false,
   }) : _handCards = handCards,
        _negativeTraits = negativeTraits,
-       _status = status;
+       _status = status,
+       _allianceIds = allianceIds;
 
   factory _$PlayerImpl.fromJson(Map<String, dynamic> json) =>
       _$$PlayerImplFromJson(json);
@@ -283,16 +315,24 @@ class _$PlayerImpl implements _Player {
   @override
   final String name;
   @override
-  final CharacterType character;
+  final CharacterType? character;
+  // 可為空，因為初始時未選角
   @override
-  final String faction;
+  final int reputation;
+  // 聲望（直接從後端）
   @override
-  final PlayerResources resources;
+  final int gold;
+  // 金幣（直接從後端）
   @override
   final bool isReady;
   @override
   final bool isHost;
   @override
+  @JsonKey()
+  final bool isSpectator;
+  // 觀戰者標記
+  @override
+  @JsonKey()
   final bool isAlive;
   // false = 政治死亡
   final List<String> _handCards;
@@ -327,9 +367,27 @@ class _$PlayerImpl implements _Player {
     return EqualUnmodifiableMapView(_status);
   }
 
+  // 狀態效果（沉默、封印等）
+  // 同盟相關
+  final List<String> _allianceIds;
+  // 狀態效果（沉默、封印等）
+  // 同盟相關
+  @override
+  @JsonKey()
+  List<String> get allianceIds {
+    if (_allianceIds is EqualUnmodifiableListView) return _allianceIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_allianceIds);
+  }
+
+  // 同盟 ID 列表
+  @override
+  @JsonKey()
+  final bool hasPendingAlliance;
+
   @override
   String toString() {
-    return 'Player(id: $id, name: $name, character: $character, faction: $faction, resources: $resources, isReady: $isReady, isHost: $isHost, isAlive: $isAlive, handCards: $handCards, negativeTraits: $negativeTraits, status: $status)';
+    return 'Player(id: $id, name: $name, character: $character, reputation: $reputation, gold: $gold, isReady: $isReady, isHost: $isHost, isSpectator: $isSpectator, isAlive: $isAlive, handCards: $handCards, negativeTraits: $negativeTraits, status: $status, allianceIds: $allianceIds, hasPendingAlliance: $hasPendingAlliance)';
   }
 
   @override
@@ -341,11 +399,13 @@ class _$PlayerImpl implements _Player {
             (identical(other.name, name) || other.name == name) &&
             (identical(other.character, character) ||
                 other.character == character) &&
-            (identical(other.faction, faction) || other.faction == faction) &&
-            (identical(other.resources, resources) ||
-                other.resources == resources) &&
+            (identical(other.reputation, reputation) ||
+                other.reputation == reputation) &&
+            (identical(other.gold, gold) || other.gold == gold) &&
             (identical(other.isReady, isReady) || other.isReady == isReady) &&
             (identical(other.isHost, isHost) || other.isHost == isHost) &&
+            (identical(other.isSpectator, isSpectator) ||
+                other.isSpectator == isSpectator) &&
             (identical(other.isAlive, isAlive) || other.isAlive == isAlive) &&
             const DeepCollectionEquality().equals(
               other._handCards,
@@ -355,7 +415,13 @@ class _$PlayerImpl implements _Player {
               other._negativeTraits,
               _negativeTraits,
             ) &&
-            const DeepCollectionEquality().equals(other._status, _status));
+            const DeepCollectionEquality().equals(other._status, _status) &&
+            const DeepCollectionEquality().equals(
+              other._allianceIds,
+              _allianceIds,
+            ) &&
+            (identical(other.hasPendingAlliance, hasPendingAlliance) ||
+                other.hasPendingAlliance == hasPendingAlliance));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -365,14 +431,17 @@ class _$PlayerImpl implements _Player {
     id,
     name,
     character,
-    faction,
-    resources,
+    reputation,
+    gold,
     isReady,
     isHost,
+    isSpectator,
     isAlive,
     const DeepCollectionEquality().hash(_handCards),
     const DeepCollectionEquality().hash(_negativeTraits),
     const DeepCollectionEquality().hash(_status),
+    const DeepCollectionEquality().hash(_allianceIds),
+    hasPendingAlliance,
   );
 
   /// Create a copy of Player
@@ -393,15 +462,18 @@ abstract class _Player implements Player {
   const factory _Player({
     required final String id,
     required final String name,
-    required final CharacterType character,
-    required final String faction,
-    required final PlayerResources resources,
+    final CharacterType? character,
+    required final int reputation,
+    required final int gold,
     required final bool isReady,
     required final bool isHost,
-    required final bool isAlive,
+    final bool isSpectator,
+    final bool isAlive,
     final List<String> handCards,
     final List<String> negativeTraits,
     final Map<String, dynamic> status,
+    final List<String> allianceIds,
+    final bool hasPendingAlliance,
   }) = _$PlayerImpl;
 
   factory _Player.fromJson(Map<String, dynamic> json) = _$PlayerImpl.fromJson;
@@ -411,15 +483,17 @@ abstract class _Player implements Player {
   @override
   String get name;
   @override
-  CharacterType get character;
+  CharacterType? get character; // 可為空，因為初始時未選角
   @override
-  String get faction;
+  int get reputation; // 聲望（直接從後端）
   @override
-  PlayerResources get resources;
+  int get gold; // 金幣（直接從後端）
   @override
   bool get isReady;
   @override
   bool get isHost;
+  @override
+  bool get isSpectator; // 觀戰者標記
   @override
   bool get isAlive; // false = 政治死亡
   @override
@@ -427,217 +501,17 @@ abstract class _Player implements Player {
   @override
   List<String> get negativeTraits; // 負面特質
   @override
-  Map<String, dynamic> get status;
+  Map<String, dynamic> get status; // 狀態效果（沉默、封印等）
+  // 同盟相關
+  @override
+  List<String> get allianceIds; // 同盟 ID 列表
+  @override
+  bool get hasPendingAlliance;
 
   /// Create a copy of Player
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$PlayerImplCopyWith<_$PlayerImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-PlayerResources _$PlayerResourcesFromJson(Map<String, dynamic> json) {
-  return _PlayerResources.fromJson(json);
-}
-
-/// @nodoc
-mixin _$PlayerResources {
-  int get reputation => throw _privateConstructorUsedError; // 聲望 ❤️
-  int get influence => throw _privateConstructorUsedError; // 影響力 🌟
-  int get gold => throw _privateConstructorUsedError;
-
-  /// Serializes this PlayerResources to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of PlayerResources
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $PlayerResourcesCopyWith<PlayerResources> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $PlayerResourcesCopyWith<$Res> {
-  factory $PlayerResourcesCopyWith(
-    PlayerResources value,
-    $Res Function(PlayerResources) then,
-  ) = _$PlayerResourcesCopyWithImpl<$Res, PlayerResources>;
-  @useResult
-  $Res call({int reputation, int influence, int gold});
-}
-
-/// @nodoc
-class _$PlayerResourcesCopyWithImpl<$Res, $Val extends PlayerResources>
-    implements $PlayerResourcesCopyWith<$Res> {
-  _$PlayerResourcesCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of PlayerResources
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? reputation = null,
-    Object? influence = null,
-    Object? gold = null,
-  }) {
-    return _then(
-      _value.copyWith(
-            reputation: null == reputation
-                ? _value.reputation
-                : reputation // ignore: cast_nullable_to_non_nullable
-                      as int,
-            influence: null == influence
-                ? _value.influence
-                : influence // ignore: cast_nullable_to_non_nullable
-                      as int,
-            gold: null == gold
-                ? _value.gold
-                : gold // ignore: cast_nullable_to_non_nullable
-                      as int,
-          )
-          as $Val,
-    );
-  }
-}
-
-/// @nodoc
-abstract class _$$PlayerResourcesImplCopyWith<$Res>
-    implements $PlayerResourcesCopyWith<$Res> {
-  factory _$$PlayerResourcesImplCopyWith(
-    _$PlayerResourcesImpl value,
-    $Res Function(_$PlayerResourcesImpl) then,
-  ) = __$$PlayerResourcesImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({int reputation, int influence, int gold});
-}
-
-/// @nodoc
-class __$$PlayerResourcesImplCopyWithImpl<$Res>
-    extends _$PlayerResourcesCopyWithImpl<$Res, _$PlayerResourcesImpl>
-    implements _$$PlayerResourcesImplCopyWith<$Res> {
-  __$$PlayerResourcesImplCopyWithImpl(
-    _$PlayerResourcesImpl _value,
-    $Res Function(_$PlayerResourcesImpl) _then,
-  ) : super(_value, _then);
-
-  /// Create a copy of PlayerResources
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? reputation = null,
-    Object? influence = null,
-    Object? gold = null,
-  }) {
-    return _then(
-      _$PlayerResourcesImpl(
-        reputation: null == reputation
-            ? _value.reputation
-            : reputation // ignore: cast_nullable_to_non_nullable
-                  as int,
-        influence: null == influence
-            ? _value.influence
-            : influence // ignore: cast_nullable_to_non_nullable
-                  as int,
-        gold: null == gold
-            ? _value.gold
-            : gold // ignore: cast_nullable_to_non_nullable
-                  as int,
-      ),
-    );
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$PlayerResourcesImpl implements _PlayerResources {
-  const _$PlayerResourcesImpl({
-    this.reputation = 50,
-    this.influence = 10,
-    this.gold = 30,
-  });
-
-  factory _$PlayerResourcesImpl.fromJson(Map<String, dynamic> json) =>
-      _$$PlayerResourcesImplFromJson(json);
-
-  @override
-  @JsonKey()
-  final int reputation;
-  // 聲望 ❤️
-  @override
-  @JsonKey()
-  final int influence;
-  // 影響力 🌟
-  @override
-  @JsonKey()
-  final int gold;
-
-  @override
-  String toString() {
-    return 'PlayerResources(reputation: $reputation, influence: $influence, gold: $gold)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$PlayerResourcesImpl &&
-            (identical(other.reputation, reputation) ||
-                other.reputation == reputation) &&
-            (identical(other.influence, influence) ||
-                other.influence == influence) &&
-            (identical(other.gold, gold) || other.gold == gold));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, reputation, influence, gold);
-
-  /// Create a copy of PlayerResources
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$PlayerResourcesImplCopyWith<_$PlayerResourcesImpl> get copyWith =>
-      __$$PlayerResourcesImplCopyWithImpl<_$PlayerResourcesImpl>(
-        this,
-        _$identity,
-      );
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$PlayerResourcesImplToJson(this);
-  }
-}
-
-abstract class _PlayerResources implements PlayerResources {
-  const factory _PlayerResources({
-    final int reputation,
-    final int influence,
-    final int gold,
-  }) = _$PlayerResourcesImpl;
-
-  factory _PlayerResources.fromJson(Map<String, dynamic> json) =
-      _$PlayerResourcesImpl.fromJson;
-
-  @override
-  int get reputation; // 聲望 ❤️
-  @override
-  int get influence; // 影響力 🌟
-  @override
-  int get gold;
-
-  /// Create a copy of PlayerResources
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$PlayerResourcesImplCopyWith<_$PlayerResourcesImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

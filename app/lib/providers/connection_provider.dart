@@ -22,6 +22,8 @@ final connectionStatusProvider = StreamProvider<ConnectionStatus>((ref) {
         return ConnectionStatus.disconnected;
       case ConnectionState.error:
         return ConnectionStatus.error;
+      case ConnectionState.reconnecting:
+        return ConnectionStatus.connecting;
     }
   });
 });

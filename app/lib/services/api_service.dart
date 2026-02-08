@@ -84,6 +84,37 @@ class ApiService {
     }
   }
 
+  /// 快速匹配房間
+  Future<ApiResult<Room>> quickMatch({
+    required String playerName,
+    int? preferredMaxPlayers,
+    bool? allowAi,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'player_name': playerName,
+      };
+      if (preferredMaxPlayers != null) {
+        body['preferred_max_players'] = preferredMaxPlayers;
+      }
+      if (allowAi != null) {
+        body['allow_ai'] = allowAi;
+      }
+
+      final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.roomsEndpoint}/quickmatch');
+      final response = await _makeRequest('POST', uri, body: body);
+      
+      if (response.success && response.data != null) {
+        final room = Room.fromJson(response.data!['room'] as Map<String, dynamic>);
+        return ApiResult.success(room);
+      } else {
+        return ApiResult.error(response.error!);
+      }
+    } catch (e) {
+      return ApiResult.error('快速匹配失敗: $e');
+    }
+  }
+
   /// 獲取房間詳情
   Future<ApiResult<Room>> getRoomDetails(String roomCode) async {
     try {
@@ -98,6 +129,30 @@ class ApiService {
       }
     } catch (e) {
       return ApiResult.error('載入房間詳情失敗: $e');
+    }
+  }
+
+  /// 觀戰房間
+  Future<ApiResult<Player>> spectateRoom({
+    required String roomCode,
+    required String spectatorName,
+  }) async {
+    try {
+      final body = {
+        'spectator_name': spectatorName,
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.roomsEndpoint}/$roomCode/spectate');
+      final response = await _makeRequest('POST', uri, body: body);
+      
+      if (response.success && response.data != null) {
+        final player = Player.fromJson(response.data! as Map<String, dynamic>);
+        return ApiResult.success(player);
+      } else {
+        return ApiResult.error(response.error!);
+      }
+    } catch (e) {
+      return ApiResult.error('觀戰失敗: $e');
     }
   }
 
