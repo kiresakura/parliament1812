@@ -152,6 +152,42 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     }
   }
 
+  /// 抽牌
+  void drawCard() {
+    if (state == null) return;
+
+    // 檢查手牌是否已滿
+    if (state!.hand.length >= 10) {
+      print('Hand is full, cannot draw more cards');
+      return;
+    }
+
+    // 發送抽牌請求
+    final success = _wsSender.sendMessage(const ClientMessage.drawCard());
+
+    if (!success) {
+      // TODO: 處理發送失敗
+      print('Failed to draw card');
+    }
+  }
+
+  /// 棄牌
+  void discardCard(String cardId) {
+    if (state == null) return;
+
+    // 檢查是否擁有該卡牌
+    final hasCard = state!.hand.any((card) => card.id == cardId);
+    if (!hasCard) return;
+
+    // 發送棄牌請求
+    final success = _wsSender.sendMessage(ClientMessage.discardCard(cardId: cardId));
+
+    if (!success) {
+      // TODO: 處理發送失敗
+      print('Failed to discard card: $cardId');
+    }
+  }
+
   /// 投票
   void vote(VoteChoice choice) {
     if (state == null) return;
@@ -189,6 +225,57 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       // TODO: 處理發送失敗
       print('Failed to counter');
     }
+  }
+
+  /// 處理卡牌使用事件
+  void handleCardUsed({
+    required String playerId,
+    required String cardName,
+    String? targetId,
+    required String effectDescription,
+  }) {
+    if (state == null) return;
+
+    // TODO: 更新遊戲狀態以反映卡牌使用
+    // 例如：更新玩家手牌數量，顯示效果等
+    
+    // 添加遊戲事件
+    final event = GameStateFactory.createGameEvent(
+      type: GameEventType.cardUsed,
+      playerId: playerId,
+      description: '$cardName: $effectDescription',
+    );
+    
+    // TODO: 更新遊戲狀態以包含新事件
+    // 需要檢查 GameState 是否有 recentGameEvents 欄位
+  }
+
+  /// 處理抽牌事件
+  void handleCardDrawn({
+    required String cardId,
+    required String cardName,
+    required String cardType,
+    required String description,
+    required int cost,
+  }) {
+    if (state == null) return;
+
+    // 如果是當前玩家抽牌，添加到手牌
+    // TODO: 創建 GameCard 對象並添加到手牌
+    // 這需要從 cardType, cost 等信息構建完整的 GameCard
+    
+    print('Player drew card: $cardName');
+  }
+
+  /// 處理玩家手牌數量變化
+  void handlePlayerHandCountChanged({
+    required String playerId,
+    required int cardCount,
+  }) {
+    if (state == null) return;
+
+    // TODO: 更新指定玩家的手牌數量顯示
+    print('Player $playerId hand count changed to $cardCount');
   }
 
   /// 清除遊戲狀態
@@ -378,6 +465,32 @@ void _handleGameWebSocketMessage(ServerMessage message, GameStateNotifier notifi
       }
       break;
 
+    case CardUsedMessage():
+      notifier.handleCardUsed(
+        playerId: message.playerId,
+        cardName: message.cardName,
+        targetId: message.targetId,
+        effectDescription: message.effectDescription,
+      );
+      break;
+
+    case CardDrawnMessage():
+      notifier.handleCardDrawn(
+        cardId: message.cardId,
+        cardName: message.cardName,
+        cardType: message.cardType,
+        description: message.description,
+        cost: message.cost,
+      );
+      break;
+
+    case PlayerHandCountChangedMessage():
+      notifier.handlePlayerHandCountChanged(
+        playerId: message.playerId,
+        cardCount: message.cardCount,
+      );
+      break;
+
     // TODO: 處理其他遊戲相關訊息
     default:
       break;
@@ -428,6 +541,16 @@ class GameActions {
   /// 使用卡牌
   void useCard(GameCard card, {Player? target}) {
     _notifier.useCard(card.id, targetId: target?.id);
+  }
+
+  /// 抽牌
+  void drawCard() {
+    _notifier.drawCard();
+  }
+
+  /// 棄牌
+  void discardCard(GameCard card) {
+    _notifier.discardCard(card.id);
   }
 
   /// 質詢玩家

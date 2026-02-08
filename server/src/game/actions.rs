@@ -2,6 +2,7 @@
 //!
 //! 定義遊戲行動類型和結果
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -40,6 +41,25 @@ pub enum GameAction {
     FormAlliance { player_a: Uuid, player_b: Uuid },
     /// 背叛
     Betray { betrayer_id: Uuid, target_id: Uuid },
+    /// 使用卡牌
+    CardUsed {
+        player_id: Uuid,
+        card_name: String,
+        target_id: Option<Uuid>,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
+    /// 抽牌
+    CardDrawn {
+        player_id: Uuid,
+        card_name: String,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
+    /// 棄牌
+    CardDiscarded {
+        player_id: Uuid,
+        card_name: String,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
 }
 
 /// 行動結果

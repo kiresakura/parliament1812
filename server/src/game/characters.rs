@@ -27,6 +27,20 @@ pub enum GameError {
     InvalidAction(String),
 }
 
+impl std::fmt::Display for GameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GameError::PlayerNotFound => write!(f, "玩家不存在"),
+            GameError::TargetNotFound => write!(f, "目標不存在"),
+            GameError::InsufficientGold => write!(f, "金幣不足"),
+            GameError::SkillAlreadyUsed => write!(f, "技能已在本回合使用"),
+            GameError::PlayerSilenced => write!(f, "您已被沉默，無法行動"),
+            GameError::PoliticallyDead => write!(f, "您已政治死亡"),
+            GameError::InvalidAction(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
 impl From<GameError> for AppError {
     fn from(err: GameError) -> Self {
         match err {

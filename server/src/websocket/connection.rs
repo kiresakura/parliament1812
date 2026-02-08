@@ -10,6 +10,7 @@ use uuid::Uuid;
 use super::messages::{error_codes, ClientMessage, ServerMessage};
 use crate::domain::{GamePhase, PlayerResponse, RoomResponse};
 use crate::error::AppError;
+use crate::game::cards;
 use crate::services::RoomService;
 use crate::AppState;
 
@@ -230,27 +231,187 @@ pub async fn process_message(
         }
 
         ClientMessage::UseCard { card_id, target_id } => {
-            // TODO: M2 卡牌系統實現
-            let _ = sender.send(ServerMessage::Error {
-                code: "NOT_IMPLEMENTED".to_string(),
-                message: "卡牌系統尚未實現".to_string(),
-            });
+            let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+                Some(ids) => ids,
+                None => {
+                    let _ = sender.send(ServerMessage::error(
+                        error_codes::NOT_IN_ROOM,
+                        "未加入房間".to_string(),
+                    ));
+                    return Ok(());
+                }
+            };
+
+            {
+                let mut games = state.games.write().await;
+                if let Some(game) = games.get_mut(&room_code) {
+                    match game.use_card(player_id, &card_id, target_id) {
+                        Ok(result) => {
+                            // 獲取卡牌名稱和目標名稱
+                            let card_name = cards::get_card_by_id(&card_id)
+                                .map(|c| c.name)
+                                .unwrap_or_else(|| "未知卡牌".to_string());
+                            let target_name = if let Some(tid) = target_id {
+                                // 從遊戲狀態中獲取玩家名稱
+                                game.state.get_player(tid).map(|p| p.name.clone())
+                            } else {
+                                None
+                            };
+                            let player_name = game
+                                .state
+                                .get_player(player_id)
+                                .map(|p| p.name.clone())
+                                .unwrap_or_else(|| "未知玩家".to_string());
+
+                            let _ = state
+                                .ws_hub
+                                .broadcast_to_room(
+                                    &room_code,
+                                    ServerMessage::CardUsed {
+                                        player_id,
+                                        player_name,
+                                        card_id: card_id.clone(),
+                                        card_name,
+                                        target_id,
+                                        target_name,
+                                        effect_description: result.message.clone(),
+                                        value: 0, // 可以根據效果計算實際值
+                                    },
+                                )
+                                .await;
+
+                            // TODO: 發送更新的遊戲狀態（需要實現 GameStateUpdated ServerMessage）
+                        }
+                        Err(e) => {
+                            let _ = sender.send(ServerMessage::Error {
+                                code: "CARD_USE_FAILED".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = sender.send(ServerMessage::Error {
+                        code: "GAME_NOT_FOUND".to_string(),
+                        message: "遊戲不存在".to_string(),
+                    });
+                }
+            }
         }
 
         ClientMessage::DrawCard => {
-            // TODO: M2 卡牌系統實現
-            let _ = sender.send(ServerMessage::Error {
-                code: "NOT_IMPLEMENTED".to_string(),
-                message: "抽卡系統尚未實現".to_string(),
-            });
+            let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+                Some(ids) => ids,
+                None => {
+                    let _ = sender.send(ServerMessage::error(
+                        error_codes::NOT_IN_ROOM,
+                        "未加入房間".to_string(),
+                    ));
+                    return Ok(());
+                }
+            };
+
+            {
+                let mut games = state.games.write().await;
+                if let Some(game) = games.get_mut(&room_code) {
+                    match game.draw_card(player_id) {
+                        Ok(card) => {
+                            // 只向抽牌玩家發送抽到的卡牌
+                            let _ = sender.send(ServerMessage::CardDrawn {
+                                card_id: card.id.clone(),
+                                card_name: card.name.clone(),
+                                card_type: format!("{:?}", card.card_type),
+                                description: card.description.clone(),
+                                cost: card.influence_cost,
+                            });
+
+                            // 向其他玩家廣播手牌數量變化
+                            let hand_count = game
+                                .state
+                                .get_player(player_id)
+                                .map(|p| p.hand.count())
+                                .unwrap_or(0) as u32;
+                            let _ = state
+                                .ws_hub
+                                .broadcast_to_room_except(
+                                    &room_code,
+                                    ServerMessage::PlayerHandCountChanged {
+                                        player_id,
+                                        card_count: hand_count,
+                                    },
+                                    player_id,
+                                )
+                                .await;
+
+                            // TODO: 發送更新的遊戲狀態（需要實現 GameStateUpdated ServerMessage）
+                        }
+                        Err(e) => {
+                            let _ = sender.send(ServerMessage::Error {
+                                code: "DRAW_CARD_FAILED".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = sender.send(ServerMessage::Error {
+                        code: "GAME_NOT_FOUND".to_string(),
+                        message: "遊戲不存在".to_string(),
+                    });
+                }
+            }
         }
 
         ClientMessage::DiscardCard { card_id } => {
-            // TODO: M2 卡牌系統實現
-            let _ = sender.send(ServerMessage::Error {
-                code: "NOT_IMPLEMENTED".to_string(),
-                message: "棄卡系統尚未實現".to_string(),
-            });
+            let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+                Some(ids) => ids,
+                None => {
+                    let _ = sender.send(ServerMessage::error(
+                        error_codes::NOT_IN_ROOM,
+                        "未加入房間".to_string(),
+                    ));
+                    return Ok(());
+                }
+            };
+
+            {
+                let mut games = state.games.write().await;
+                if let Some(game) = games.get_mut(&room_code) {
+                    match game.discard_card(player_id, &card_id) {
+                        Ok(_) => {
+                            // 獲取實際手牌數量並廣播變化
+                            let hand_count = game
+                                .state
+                                .get_player(player_id)
+                                .map(|p| p.hand.count())
+                                .unwrap_or(0) as u32;
+                            let _ = state
+                                .ws_hub
+                                .broadcast_to_room(
+                                    &room_code,
+                                    ServerMessage::PlayerHandCountChanged {
+                                        player_id,
+                                        card_count: hand_count,
+                                    },
+                                )
+                                .await;
+
+                            // 棄牌成功，只需要更新遊戲狀態即可
+
+                            // TODO: 發送更新的遊戲狀態（需要實現 GameStateUpdated ServerMessage）
+                        }
+                        Err(e) => {
+                            let _ = sender.send(ServerMessage::Error {
+                                code: "DISCARD_CARD_FAILED".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = sender.send(ServerMessage::Error {
+                        code: "GAME_NOT_FOUND".to_string(),
+                        message: "遊戲不存在".to_string(),
+                    });
+                }
+            }
         }
     }
 

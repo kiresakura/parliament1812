@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::actions::GameAction;
+use crate::domain::card::{GameCard, PlayerHand};
 use crate::domain::{CharacterType, GamePhase, VoteChoice};
 
 /// 遊戲狀態
@@ -31,6 +32,10 @@ pub struct GameState {
     pub action_log: Vec<GameAction>,
     /// 待處理的質詢
     pub pending_challenge: Option<PendingChallenge>,
+    /// 公共卡牌池
+    pub card_pool: Vec<GameCard>,
+    /// 棄牌堆
+    pub discard_pile: Vec<GameCard>,
 }
 
 /// 待處理的質詢
@@ -62,6 +67,8 @@ impl GameState {
             alliances: Vec::new(),
             action_log: Vec::new(),
             pending_challenge: None,
+            card_pool: Vec::new(),
+            discard_pile: Vec::new(),
         }
     }
 
@@ -141,6 +148,35 @@ impl GameState {
     pub fn finish_game(&mut self) {
         self.phase = GamePhase::Finished;
     }
+
+    /// 初始化卡牌池
+    pub fn initialize_card_pool(&mut self) {
+        use super::cards::get_common_cards;
+        self.card_pool = get_common_cards();
+        // 洗牌
+        use rand::seq::SliceRandom;
+        let mut rng = rand::thread_rng();
+        self.card_pool.shuffle(&mut rng);
+    }
+
+    /// 從卡牌池抽取卡牌
+    pub fn draw_card_from_pool(&mut self) -> Option<GameCard> {
+        if self.card_pool.is_empty() {
+            // 如果卡牌池空了，將棄牌堆洗牌後重新加入
+            if !self.discard_pile.is_empty() {
+                self.card_pool.append(&mut self.discard_pile);
+                use rand::seq::SliceRandom;
+                let mut rng = rand::thread_rng();
+                self.card_pool.shuffle(&mut rng);
+            }
+        }
+        self.card_pool.pop()
+    }
+
+    /// 將卡牌加入棄牌堆
+    pub fn discard_card(&mut self, card: GameCard) {
+        self.discard_pile.push(card);
+    }
 }
 
 /// 玩家狀態
@@ -156,6 +192,10 @@ pub struct PlayerState {
     pub reputation: i32,
     /// 金幣
     pub gold: i32,
+    /// 手牌
+    pub hand: PlayerHand,
+    /// 影響力
+    pub influence: i32,
     /// 是否政治死亡
     pub is_politically_dead: bool,
     /// 是否已使用技能
@@ -176,6 +216,8 @@ impl PlayerState {
             character,
             reputation,
             gold,
+            hand: PlayerHand::new(),
+            influence: 10, // 初始影響力
             is_politically_dead: false,
             has_used_skill: false,
             is_silenced: false,
@@ -245,6 +287,45 @@ impl PlayerState {
     /// 檢查是否可以使用技能
     pub fn can_use_skill(&self) -> bool {
         self.can_act() && !self.has_used_skill
+    }
+
+    /// 檢查是否有足夠的影響力
+    pub fn has_influence(&self, cost: i32) -> bool {
+        self.influence >= cost
+    }
+
+    /// 消耗影響力
+    pub fn spend_influence(&mut self, cost: i32) -> bool {
+        if self.has_influence(cost) {
+            self.influence -= cost;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 恢復影響力（回合結束時）
+    pub fn restore_influence(&mut self, amount: i32) {
+        self.influence += amount;
+        self.influence = self.influence.min(15); // 最大影響力
+    }
+
+    /// 添加卡牌到手牌
+    pub fn add_card_to_hand(&mut self, card: crate::domain::card::GameCard) -> bool {
+        self.hand.add_card(card)
+    }
+
+    /// 從手牌移除卡牌
+    pub fn remove_card_from_hand(
+        &mut self,
+        card_id: &str,
+    ) -> Option<crate::domain::card::GameCard> {
+        self.hand.remove_card(card_id)
+    }
+
+    /// 檢查手牌中是否有指定卡牌
+    pub fn has_card(&self, card_id: &str) -> bool {
+        self.hand.cards.iter().any(|c| c.id == card_id)
     }
 }
 

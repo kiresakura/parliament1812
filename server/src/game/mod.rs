@@ -8,6 +8,7 @@
 //! - 卡牌系統
 
 pub mod actions;
+pub mod ai;
 pub mod cards;
 pub mod characters;
 pub mod engine;

@@ -8,7 +8,7 @@ use crate::domain::card::{CardRarity, CardType, GameCard, PlayerHand, TargetType
 pub fn get_mvp_cards() -> Vec<GameCard> {
     vec![
         // === 通用對策卡 ===
-        
+
         // 質詢 - 基礎攻擊卡
         GameCard {
             id: "common_interrogate".to_string(),
@@ -22,7 +22,6 @@ pub fn get_mvp_cards() -> Vec<GameCard> {
             base_value: 15,
             role_id: None,
         },
-        
         // 反駁 - 基礎防禦卡
         GameCard {
             id: "common_rebut".to_string(),
@@ -36,7 +35,6 @@ pub fn get_mvp_cards() -> Vec<GameCard> {
             base_value: 0,
             role_id: None,
         },
-        
         // 揭露醜聞 - 強力攻擊卡
         GameCard {
             id: "common_expose_scandal".to_string(),
@@ -50,7 +48,6 @@ pub fn get_mvp_cards() -> Vec<GameCard> {
             base_value: 25,
             role_id: None,
         },
-        
         // 背書 - 治療/復活卡
         GameCard {
             id: "common_endorse".to_string(),
@@ -64,9 +61,8 @@ pub fn get_mvp_cards() -> Vec<GameCard> {
             base_value: 20,
             role_id: None,
         },
-        
         // === 角色專屬卡 ===
-        
+
         // 工人湯瑪斯 - 團結
         GameCard {
             id: "thomas_unity".to_string(),
@@ -80,7 +76,6 @@ pub fn get_mvp_cards() -> Vec<GameCard> {
             base_value: 10,
             role_id: Some("thomas".to_string()),
         },
-        
         // 工廠主理查 - 收買
         GameCard {
             id: "richard_bribe".to_string(),
@@ -94,7 +89,6 @@ pub fn get_mvp_cards() -> Vec<GameCard> {
             base_value: 0,
             role_id: Some("richard".to_string()),
         },
-        
         // 記者愛德華 - 爆料
         GameCard {
             id: "edward_scoop".to_string(),
@@ -108,7 +102,6 @@ pub fn get_mvp_cards() -> Vec<GameCard> {
             base_value: 0,
             role_id: Some("edward".to_string()),
         },
-        
         // 盧德派喬治 - 怒火
         GameCard {
             id: "george_fury".to_string(),
@@ -149,42 +142,42 @@ pub fn get_card_by_id(card_id: &str) -> Option<GameCard> {
 /// 建立初始手牌
 pub fn create_starting_hand(role_id: &str) -> PlayerHand {
     let mut hand = PlayerHand::new();
-    
+
     // 2 張質詢
     if let Some(card) = get_card_by_id("common_interrogate") {
         let mut card1 = card.clone();
         card1.id = format!("{}_1", card.id);
         hand.add_card(card1);
-        
+
         let mut card2 = card;
         card2.id = format!("{}_2", card2.id);
         hand.add_card(card2);
     }
-    
+
     // 2 張反駁
     if let Some(card) = get_card_by_id("common_rebut") {
         let mut card1 = card.clone();
         card1.id = format!("{}_1", card.id);
         hand.add_card(card1);
-        
+
         let mut card2 = card;
         card2.id = format!("{}_2", card2.id);
         hand.add_card(card2);
     }
-    
+
     // 1 張背書
     if let Some(mut card) = get_card_by_id("common_endorse") {
         card.id = format!("{}_1", card.id);
         hand.add_card(card);
     }
-    
+
     // 1 張角色專屬卡
     let signature_cards = get_signature_cards(role_id);
     if let Some(mut card) = signature_cards.into_iter().next() {
         card.id = format!("{}_1", card.id);
         hand.add_card(card);
     }
-    
+
     hand
 }
 
