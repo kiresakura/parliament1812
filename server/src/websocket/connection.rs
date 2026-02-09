@@ -29,6 +29,9 @@ pub async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     // 向 Hub 註冊連線
     let conn_id = state.ws_hub.register(user_id, tx.clone()).await;
 
+    // 更新在線狀態
+    crate::services::FriendService::user_came_online(&state, user_id).await;
+
     tracing::info!(
         conn_id = %conn_id,
         user_id = %user_id,
@@ -158,6 +161,11 @@ pub async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
 
     // 取消註冊連線
     state.ws_hub.unregister(conn_id).await;
+
+    // 更新離線狀態（只在沒有其他連線時）
+    if !state.ws_hub.is_user_connected(user_id).await {
+        crate::services::FriendService::user_went_offline(&state, user_id).await;
+    }
 
     tracing::info!(conn_id = %conn_id, "WebSocket 連線已關閉");
 }

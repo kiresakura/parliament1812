@@ -14,6 +14,7 @@ import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/codex/codex_screen.dart';
 import 'screens/quests/daily_quests_screen.dart';
+import 'screens/friends/friends_screen.dart';
 import 'screens/rankings/leaderboard_screen.dart';
 import 'providers/game_provider.dart';
 
@@ -60,6 +61,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/codex',
         name: 'codex',
         builder: (context, state) => const CodexScreen(),
+      ),
+      GoRoute(
+        path: '/friends',
+        name: 'friends',
+        builder: (context, state) => const FriendsScreen(),
       ),
       GoRoute(
         path: '/rooms',

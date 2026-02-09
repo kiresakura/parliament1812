@@ -4,6 +4,7 @@
 
 pub mod auth;
 pub mod codex;
+pub mod friends;
 pub mod health;
 pub mod quests;
 pub mod rankings;

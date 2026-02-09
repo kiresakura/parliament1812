@@ -27,6 +27,7 @@ pub mod db;
 pub mod domain;
 pub mod error;
 pub mod game;
+pub mod i18n;
 pub mod repository;
 pub mod services;
 pub mod state;
@@ -73,7 +74,7 @@ pub use game::{
 pub use repository::{FullUserRecord, PlayerRepository, RoomRepository, UserRepository};
 pub use services::{
     room_service::{LeaveRoomResult, StartGameResult},
-    GameService, RoomService,
+    FriendService, GameService, RoomService,
 };
 pub use state::{AppState, GameStore};
 pub use websocket::{

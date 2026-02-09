@@ -8,6 +8,7 @@ use axum::{
     routing::{any, delete, get, post},
     Router,
 };
+
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
@@ -140,6 +141,30 @@ pub fn create_router(state: AppState) -> Router {
             auth_middleware,
         ));
 
+    // 好友路由（全部需要認證）
+    let friend_routes = Router::new()
+        .route("/", get(handlers::friends::get_friends))
+        .route("/pending", get(handlers::friends::get_pending_requests))
+        .route("/request", post(handlers::friends::send_friend_request))
+        .route("/accept", post(handlers::friends::accept_friend_request))
+        .route("/reject", post(handlers::friends::reject_friend_request))
+        .route("/:user_id", delete(handlers::friends::remove_friend))
+        .route("/block", post(handlers::friends::block_user))
+        .route("/unblock", post(handlers::friends::unblock_user))
+        .route("/invite-game", post(handlers::friends::invite_game))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 用戶搜尋路由（需要認證）
+    let user_routes = Router::new()
+        .route("/search", get(handlers::friends::search_users))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
     // 圖鑑路由（全部需要認證）
     let codex_routes = Router::new()
         .route("/cards", get(handlers::codex::get_codex_cards))
@@ -160,7 +185,9 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/auth", auth_routes)
         .nest("/rooms", room_routes)
         .nest("/rankings", ranking_routes)
-        .nest("/quests", quest_routes);
+        .nest("/quests", quest_routes)
+        .nest("/friends", friend_routes)
+        .nest("/users", user_routes);
 
     // 組合所有路由
     Router::new()

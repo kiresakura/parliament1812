@@ -2,8 +2,10 @@
 //!
 //! 提供房間管理、遊戲邏輯等業務服務
 
+pub mod friend_service;
 pub mod game_service;
 pub mod room_service;
 
+pub use friend_service::FriendService;
 pub use game_service::GameService;
 pub use room_service::RoomService;

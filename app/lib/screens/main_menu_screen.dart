@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/friends_provider.dart';
 import '../providers/quests_provider.dart';
 import '../services/audio_service.dart';
 
@@ -104,6 +105,8 @@ class MainMenuScreen extends ConsumerWidget {
                           subtitle: '收藏圖鑑與成就系統',
                           onPressed: () => context.go('/codex'),
                         ),
+                        const SizedBox(height: 12),
+                        _FriendsMenuButton(ref: ref),
                         const SizedBox(height: 12),
                         _MenuButton(
                           icon: Icons.school,
@@ -273,6 +276,78 @@ class _QuestMenuButton extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4CAF50),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$pendingCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              else
+                Icon(Icons.arrow_forward_ios, color: theme.colorScheme.onSurface.withValues(alpha: 0.4), size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Friends Menu Button (with badge)
+// ============================================================
+
+class _FriendsMenuButton extends ConsumerWidget {
+  final WidgetRef ref;
+
+  const _FriendsMenuButton({required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final pendingCount = ref.watch(pendingFriendCountProvider);
+
+    return Card(
+      child: InkWell(
+        onTap: () => GoRouter.of(context).go('/friends'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.people, color: theme.colorScheme.primary, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('好友', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                      '管理好友與對戰邀請',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (pendingCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4AF37),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
