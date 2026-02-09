@@ -125,11 +125,7 @@ class MainMenuScreen extends ConsumerWidget {
                         // 設定
                         Center(
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('設定功能將在後續版本推出')),
-                              );
-                            },
+                            onPressed: () => context.go('/settings'),
                             icon: const Icon(Icons.settings),
                             label: const Text('設定'),
                           ),

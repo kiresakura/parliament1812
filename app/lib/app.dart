@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'l10n/app_localizations.dart';
 
 import 'config/theme.dart';
+import 'providers/locale_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_menu_screen.dart';
 import 'screens/room_list_screen.dart';
@@ -16,6 +18,7 @@ import 'screens/codex/codex_screen.dart';
 import 'screens/quests/daily_quests_screen.dart';
 import 'screens/friends/friends_screen.dart';
 import 'screens/rankings/leaderboard_screen.dart';
+import 'screens/settings/settings_screen.dart';
 import 'providers/game_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -66,6 +69,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/friends',
         name: 'friends',
         builder: (context, state) => const FriendsScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/rooms',
@@ -124,12 +132,18 @@ class Parliament1812App extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final locale = ref.watch(localeProvider);
 
     return MaterialApp.router(
       title: 'Parliament 1812',
       theme: Parliament1812Theme.darkTheme,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+
+      // i18n 設定
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: locale,
     );
   }
 }
