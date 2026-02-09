@@ -4,6 +4,7 @@
 
 use uuid::Uuid;
 
+use crate::db::games::GameDb;
 use crate::domain::{GamePhase, VoteChoice};
 use crate::error::AppError;
 use crate::game::{ActionResult, GameEngine, GameResult, GameState};
@@ -60,6 +61,9 @@ impl GameService {
 
         let game_state = engine.state.clone();
 
+        // 持久化到 DB（非阻塞，失敗不影響遊戲）
+        let db_game_id = Self::persist_game_start(state, room_code, &engine).await;
+
         // 儲存遊戲引擎
         {
             let mut games = state.games.write().await;
@@ -78,6 +82,7 @@ impl GameService {
         tracing::info!(
             room_code = %room_code,
             phase = ?game_state.phase,
+            db_game_id = ?db_game_id,
             "遊戲已開始"
         );
 
@@ -562,6 +567,172 @@ impl GameService {
         });
     }
 
+    // ==================== DB 持久化 ====================
+
+    /// 遊戲開始時持久化到 DB
+    ///
+    /// 建立 games 記錄和 game_players 記錄。
+    /// 失敗時只記錄警告，不影響遊戲進行。
+    async fn persist_game_start(
+        state: &AppState,
+        room_code: &str,
+        engine: &GameEngine,
+    ) -> Option<uuid::Uuid> {
+        // 嘗試建立 games 記錄
+        let game_record = match GameDb::create_game(&state.db, room_code, "casual", 5).await {
+            Ok(record) => record,
+            Err(e) => {
+                tracing::warn!(
+                    room_code = %room_code,
+                    error = %e,
+                    "無法持久化遊戲開始到 DB（遊戲繼續進行）"
+                );
+                return None;
+            }
+        };
+
+        let game_id = game_record.id;
+
+        // 為每個玩家建立 game_players 記錄
+        for player_state in engine.state.players.values() {
+            let character_str = format!("{:?}", player_state.character).to_lowercase();
+            if let Err(e) =
+                GameDb::add_game_player(&state.db, game_id, player_state.id, &character_str).await
+            {
+                tracing::warn!(
+                    game_id = %game_id,
+                    player_id = %player_state.id,
+                    error = %e,
+                    "無法寫入 game_player 記錄"
+                );
+            }
+        }
+
+        tracing::debug!(game_id = %game_id, room_code = %room_code, "遊戲已持久化到 DB");
+        Some(game_id)
+    }
+
+    /// 遊戲結束時持久化結果到 DB
+    ///
+    /// 寫入遊戲結果、玩家排名、更新使用者統計。
+    /// 使用事務確保資料一致性。
+    async fn persist_game_result_to_db(state: &AppState, room_code: &str) {
+        // 查找 DB 中的遊戲記錄
+        let game_record = match GameDb::find_by_room_code(&state.db, room_code).await {
+            Ok(Some(record)) => record,
+            Ok(None) => {
+                tracing::debug!(room_code = %room_code, "DB 中找不到遊戲記錄，跳過持久化");
+                return;
+            }
+            Err(e) => {
+                tracing::warn!(room_code = %room_code, error = %e, "查詢遊戲記錄失敗");
+                return;
+            }
+        };
+
+        // 計算結果
+        let (result, round_count, game_state_json) = {
+            let games = state.games.read().await;
+            match games.get(room_code) {
+                Some(engine) => {
+                    let result = engine.calculate_results();
+                    let round_count = engine.state.current_round;
+                    // 序列化遊戲狀態快照
+                    let game_data =
+                        serde_json::to_value(&engine.state).unwrap_or(serde_json::Value::Null);
+                    (result, round_count, game_data)
+                }
+                None => {
+                    tracing::debug!(room_code = %room_code, "記憶體中找不到遊戲引擎，跳過持久化");
+                    return;
+                }
+            }
+        };
+
+        // 確定贏家（得分最高的存活玩家）
+        let winner_id = result
+            .player_scores
+            .iter()
+            .filter(|ps| ps.is_alive)
+            .max_by_key(|ps| ps.total_score)
+            .map(|ps| ps.player_id);
+
+        // 建構玩家結果
+        let mut player_results: Vec<(uuid::Uuid, i32, i32, i32, bool)> = result
+            .player_scores
+            .iter()
+            .enumerate()
+            .map(|(idx, ps)| {
+                let is_mvp = winner_id == Some(ps.player_id);
+                (
+                    ps.player_id,
+                    ps.final_reputation,
+                    ps.final_gold,
+                    (idx as i32) + 1, // placement
+                    is_mvp,
+                )
+            })
+            .collect();
+
+        // 按分數排序確定正確名次
+        player_results.sort_by(|a, b| {
+            let score_a = result
+                .player_scores
+                .iter()
+                .find(|ps| ps.player_id == a.0)
+                .map(|ps| ps.total_score)
+                .unwrap_or(0);
+            let score_b = result
+                .player_scores
+                .iter()
+                .find(|ps| ps.player_id == b.0)
+                .map(|ps| ps.total_score)
+                .unwrap_or(0);
+            score_b.cmp(&score_a)
+        });
+        // 重新分配名次
+        let player_results: Vec<(uuid::Uuid, i32, i32, i32, bool)> = player_results
+            .into_iter()
+            .enumerate()
+            .map(|(idx, (uid, rep, gold, _, is_mvp))| (uid, rep, gold, (idx as i32) + 1, is_mvp))
+            .collect();
+
+        // 寫入 DB
+        let game_data_ref = if game_state_json.is_null() {
+            None
+        } else {
+            Some(&game_state_json)
+        };
+
+        match GameDb::persist_game_result(
+            &state.db,
+            game_record.id,
+            winner_id,
+            round_count,
+            game_data_ref,
+            &player_results,
+        )
+        .await
+        {
+            Ok(()) => {
+                tracing::info!(
+                    game_id = %game_record.id,
+                    room_code = %room_code,
+                    winner_id = ?winner_id,
+                    "遊戲結果已持久化到 DB"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    game_id = %game_record.id,
+                    room_code = %room_code,
+                    error = %e,
+                    "持久化遊戲結果失敗"
+                );
+            }
+        }
+    }
+
     /// 廣播階段變更
     async fn broadcast_phase_change(state: &AppState, room_code: &str, new_phase: GamePhase) {
         use crate::websocket::ServerMessage;
@@ -600,6 +771,9 @@ impl GameService {
     async fn handle_game_result(state: &AppState, room_code: &str) {
         use crate::websocket::{PlayerRanking, ServerMessage};
         use std::collections::HashMap;
+
+        // 持久化到 DB
+        Self::persist_game_result_to_db(state, room_code).await;
 
         // 計算遊戲結果
         let result = {
