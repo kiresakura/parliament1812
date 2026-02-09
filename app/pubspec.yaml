@@ -1,5 +1,5 @@
 name: parliament1812
-description: "Parliament 1812 - A political social deduction game with card mechanics."
+description: "1812 國會風雲 | Parliament 1812 — A political card strategy game blending debate, alliances, and voting in the 19th-century parliament."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

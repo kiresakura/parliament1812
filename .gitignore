@@ -57,8 +57,10 @@ Pods/
 local.properties
 *.hprof
 
-# 文檔
+# 文檔（AI 生成的暫存文件忽略，但保留上架文件）
 docs/
+!docs/appstore/
+!docs/steam/
 target/
 server/target/
 app/.dart_tool/
