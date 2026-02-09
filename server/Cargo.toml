@@ -27,6 +27,10 @@ redis = { version = "0.24", features = ["tokio-comp"] }
 # 驗證
 jsonwebtoken = "9"
 argon2 = "0.5"
+bcrypt = "0.15"
+
+# HTTP 客戶端 (for OAuth token verification)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # 工具
 uuid = { version = "1", features = ["v4", "serde"] }

@@ -7,7 +7,13 @@ pub mod health;
 pub mod rooms;
 pub mod websocket;
 
-pub use auth::{login, me, register};
+pub use auth::{
+    delete_account, forgot_password, login, me, oauth_apple, oauth_google, refresh_token, register,
+    reset_password,
+};
 pub use health::{db_health_check, full_health_check, health_check, redis_health_check};
-pub use rooms::{create_room, get_room, join_room, leave_room, list_rooms, quick_match, spectate_room, RoomDetailResponse};
+pub use rooms::{
+    create_room, get_room, join_room, leave_room, list_rooms, quick_match, spectate_room,
+    RoomDetailResponse,
+};
 pub use websocket::{ws_handler, ws_handler_general};

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../config/constants.dart';
 
@@ -8,168 +9,228 @@ import '../config/constants.dart';
 class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
-  final AuthInfo? authInfo;
+  final bool isGuest;
+  final AuthUser? user;
   final String? error;
 
   const AuthState({
     this.isAuthenticated = false,
     this.isLoading = false,
-    this.authInfo,
+    this.isGuest = false,
+    this.user,
     this.error,
   });
 
   AuthState copyWith({
     bool? isAuthenticated,
     bool? isLoading,
-    AuthInfo? authInfo,
+    bool? isGuest,
+    AuthUser? user,
     String? error,
+    bool clearError = false,
+    bool clearUser = false,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isLoading: isLoading ?? this.isLoading,
-      authInfo: authInfo ?? this.authInfo,
-      error: error ?? this.error,
+      isGuest: isGuest ?? this.isGuest,
+      user: clearUser ? null : (user ?? this.user),
+      error: clearError ? null : (error ?? this.error),
     );
   }
 
-  String? get playerId => authInfo?.playerId;
-  String? get playerName => authInfo?.playerName;
-  String? get token => authInfo?.token;
+  // 向後兼容
+  String? get playerId => user?.id;
+  String? get playerName => user?.displayName ?? user?.username;
+  String? get token => null; // 由 AuthService 管理
 }
 
 /// 認證狀態通知器
 class AuthNotifier extends StateNotifier<AuthState> {
-  final ApiService _apiService;
+  final AuthService _authService;
   final SharedPreferences _prefs;
 
-  AuthNotifier(this._apiService, this._prefs) : super(const AuthState()) {
-    _loadSavedAuth();
+  AuthNotifier(this._authService, this._prefs) : super(const AuthState()) {
+    _tryAutoLogin();
   }
 
-  /// 載入已保存的認證資訊
-  Future<void> _loadSavedAuth() async {
+  /// 嘗試自動登入
+  Future<void> _tryAutoLogin() async {
+    if (!_authService.hasStoredTokens) return;
+
+    state = state.copyWith(isLoading: true, clearError: true);
+
     try {
-      final playerName = _prefs.getString(AppConstants.playerNameKey);
-      final playerId = _prefs.getString(AppConstants.playerIdKey);
-      
-      if (playerName != null && playerId != null) {
-        // 嘗試自動登入
-        await authenticate(playerName, silent: true);
+      final success = await _authService.tryAutoLogin();
+      if (success) {
+        final meResult = await _authService.getMe();
+        if (meResult.success && meResult.data != null) {
+          state = state.copyWith(
+            isAuthenticated: true,
+            isLoading: false,
+            user: meResult.data,
+            clearError: true,
+          );
+          return;
+        }
       }
     } catch (e) {
-      print('Failed to load saved auth: $e');
+      // 自動登入失敗，靜默處理
     }
+
+    state = state.copyWith(isLoading: false);
   }
 
-  /// 認證（登入）
+  /// Email + Password 登入
+  Future<bool> loginWithEmailPassword({
+    required String emailOrUsername,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.login(
+      emailOrUsername: emailOrUsername,
+      password: password,
+    );
+
+    if (result.success && result.data != null) {
+      state = state.copyWith(
+        isAuthenticated: true,
+        isLoading: false,
+        isGuest: false,
+        user: result.data!.user,
+        clearError: true,
+      );
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? '登入失敗',
+    );
+    return false;
+  }
+
+  /// 註冊
+  Future<bool> registerAccount({
+    required String username,
+    required String email,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.register(
+      username: username,
+      email: email,
+      password: password,
+    );
+
+    if (result.success && result.data != null) {
+      state = state.copyWith(
+        isAuthenticated: true,
+        isLoading: false,
+        isGuest: false,
+        user: result.data!.user,
+        clearError: true,
+      );
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? '註冊失敗',
+    );
+    return false;
+  }
+
+  /// Google OAuth 登入
+  Future<bool> loginWithGoogleToken(String idToken) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.loginWithGoogle(idToken);
+
+    if (result.success && result.data != null) {
+      state = state.copyWith(
+        isAuthenticated: true,
+        isLoading: false,
+        isGuest: false,
+        user: result.data!.user,
+        clearError: true,
+      );
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? 'Google 登入失敗',
+    );
+    return false;
+  }
+
+  /// Apple Sign-In 登入
+  Future<bool> loginWithAppleToken(String identityToken,
+      {String? displayName}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.loginWithApple(
+      identityToken: identityToken,
+      displayName: displayName,
+    );
+
+    if (result.success && result.data != null) {
+      state = state.copyWith(
+        isAuthenticated: true,
+        isLoading: false,
+        isGuest: false,
+        user: result.data!.user,
+        clearError: true,
+      );
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? 'Apple 登入失敗',
+    );
+    return false;
+  }
+
+  /// 忘記密碼
+  Future<bool> forgotPassword(String email) async {
+    final result = await _authService.forgotPassword(email);
+    return result.success;
+  }
+
+  /// 登出
+  Future<void> logout() async {
+    await _authService.logout();
+    state = const AuthState();
+  }
+
+  /// 清除錯誤
+  void clearError() {
+    state = state.copyWith(clearError: true);
+  }
+
+  /// 向後兼容：簡單玩家名稱認證
   Future<bool> authenticate(String playerName, {bool silent = false}) async {
     if (playerName.trim().isEmpty) {
       state = state.copyWith(error: '請輸入玩家名稱');
       return false;
     }
-
-    if (!silent) {
-      state = state.copyWith(isLoading: true, error: null);
-    }
-
-    try {
-      final result = await _apiService.authenticate(playerName);
-      
-      if (result.success && result.data != null) {
-        final authInfo = result.data!;
-        
-        // 檢查 token 是否過期
-        if (authInfo.isExpired) {
-          state = state.copyWith(
-            isLoading: false,
-            error: '認證已過期，請重新登入',
-          );
-          await logout();
-          return false;
-        }
-
-        // 保存認證資訊
-        await _saveAuthInfo(authInfo);
-        
-        state = state.copyWith(
-          isAuthenticated: true,
-          isLoading: false,
-          authInfo: authInfo,
-          error: null,
-        );
-        
-        return true;
-      } else {
-        state = state.copyWith(
-          isAuthenticated: false,
-          isLoading: false,
-          error: result.error ?? '認證失敗',
-        );
-        return false;
-      }
-    } catch (e) {
-      state = state.copyWith(
-        isAuthenticated: false,
-        isLoading: false,
-        error: '認證失敗: $e',
-      );
-      return false;
-    }
-  }
-
-  /// 登出
-  Future<void> logout() async {
-    try {
-      // 清除保存的認證資訊
-      await _prefs.remove(AppConstants.playerNameKey);
-      await _prefs.remove(AppConstants.playerIdKey);
-      
-      // 清除 API 服務的 token
-      _apiService.setAuthToken(null);
-      
-      state = const AuthState();
-    } catch (e) {
-      print('Failed to logout: $e');
-    }
-  }
-
-  /// 更新玩家名稱
-  Future<bool> updatePlayerName(String newName) async {
-    if (newName.trim().isEmpty) {
-      state = state.copyWith(error: '玩家名稱不能為空');
-      return false;
-    }
-
-    // 使用新名稱重新認證
-    return authenticate(newName);
+    // 在 guest 模式下，只設定名稱，不走後端
+    state = state.copyWith(
+      isAuthenticated: false,
+      isGuest: true,
+      clearError: true,
+    );
+    await _prefs.setString(AppConstants.playerNameKey, playerName);
+    return true;
   }
 
   /// 檢查認證狀態
   bool checkAuthStatus() {
-    final authInfo = state.authInfo;
-    if (authInfo == null) return false;
-    
-    if (authInfo.isExpired) {
-      // Token 已過期，需要重新登入
-      logout();
-      return false;
-    }
-    
     return state.isAuthenticated;
-  }
-
-  /// 清除錯誤
-  void clearError() {
-    state = state.copyWith(error: null);
-  }
-
-  /// 保存認證資訊到本地
-  Future<void> _saveAuthInfo(AuthInfo authInfo) async {
-    await _prefs.setString(AppConstants.playerNameKey, authInfo.playerName);
-    await _prefs.setString(AppConstants.playerIdKey, authInfo.playerId);
-    
-    // 設定 API 服務的 token
-    _apiService.setAuthToken(authInfo.token);
   }
 }
 
@@ -178,7 +239,13 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('SharedPreferences must be overridden');
 });
 
-/// API 服務提供者
+/// AuthService 提供者
+final authServiceProvider = Provider<AuthService>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return AuthService(prefs);
+});
+
+/// API 服務提供者（向後兼容，供 room_provider 等使用）
 final apiServiceProvider = Provider<ApiService>((ref) {
   final apiService = ApiService();
   apiService.init();
@@ -187,9 +254,9 @@ final apiServiceProvider = Provider<ApiService>((ref) {
 
 /// 認證狀態提供者
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final apiService = ref.watch(apiServiceProvider);
+  final authService = ref.watch(authServiceProvider);
   final prefs = ref.watch(sharedPreferencesProvider);
-  return AuthNotifier(apiService, prefs);
+  return AuthNotifier(authService, prefs);
 });
 
 /// 便捷提供者：是否已登入
@@ -217,8 +284,10 @@ class PlayerPreferencesNotifier extends StateNotifier<PlayerPreferences> {
 
   void _loadPreferences() {
     final soundEnabled = _prefs.getBool(AppConstants.soundEnabledKey) ?? true;
-    final notificationsEnabled = _prefs.getBool(AppConstants.notificationsEnabledKey) ?? true;
-    final preferredCharacter = _prefs.getString(AppConstants.preferredCharacterKey);
+    final notificationsEnabled =
+        _prefs.getBool(AppConstants.notificationsEnabledKey) ?? true;
+    final preferredCharacter =
+        _prefs.getString(AppConstants.preferredCharacterKey);
 
     state = PlayerPreferences(
       soundEnabled: soundEnabled,
@@ -273,7 +342,8 @@ class PlayerPreferences {
 }
 
 /// 玩家偏好設定提供者
-final playerPreferencesProvider = StateNotifierProvider<PlayerPreferencesNotifier, PlayerPreferences>((ref) {
+final playerPreferencesProvider =
+    StateNotifierProvider<PlayerPreferencesNotifier, PlayerPreferences>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return PlayerPreferencesNotifier(prefs);
 });
@@ -281,12 +351,12 @@ final playerPreferencesProvider = StateNotifierProvider<PlayerPreferencesNotifie
 /// 認證守衛 - 檢查是否需要登入
 final authGuardProvider = Provider<bool>((ref) {
   final authState = ref.watch(authProvider);
-  
-  // 如果正在載入或已認證，則通過
-  if (authState.isLoading || authState.isAuthenticated) {
+
+  // 如果正在載入、已認證或 guest 模式，則通過
+  if (authState.isLoading || authState.isAuthenticated || authState.isGuest) {
     return true;
   }
-  
+
   // 需要登入
   return false;
 });

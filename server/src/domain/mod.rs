@@ -19,4 +19,7 @@ pub use player::{
 pub use room::{
     CreateRoomRequest, JoinRoomRequest, Room, RoomCodeRequest, RoomResponse, RoomStatus,
 };
-pub use user::{CreateUserRequest, LoginRequest, TokenResponse, User, UserResponse};
+pub use user::{
+    CreateUserRequest, ForgotPasswordRequest, LoginRequest, MessageResponse, OAuthLoginRequest,
+    RefreshTokenRequest, ResetPasswordRequest, TokenResponse, User, UserResponse,
+};

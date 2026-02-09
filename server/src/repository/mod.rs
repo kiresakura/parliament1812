@@ -8,4 +8,4 @@ pub mod user_repo;
 
 pub use player_repo::PlayerRepository;
 pub use room_repo::RoomRepository;
-pub use user_repo::UserRepository;
+pub use user_repo::{FullUserRecord, UserRepository};

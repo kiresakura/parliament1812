@@ -35,18 +35,20 @@ pub mod websocket;
 // 重新匯出常用類型
 pub use api::{create_health_only_router, create_router};
 pub use auth::{
-    auth_middleware, optional_auth_middleware, AuthError, AuthUser, Claims, JwtManager,
-    OptionalAuthUser,
+    auth_middleware, hash_password, optional_auth_middleware, validate_password_strength,
+    verify_apple_token, verify_google_token, verify_password, AuthError, AuthUser, Claims,
+    JwtManager, OAuthResult, OptionalAuthUser, TokenPair, TokenType,
 };
 pub use cache::GameCache;
 pub use config::{
     DatabaseSettings, JwtSettings, RedisSettings, ServerSettings, Settings, SettingsError,
 };
 pub use domain::{
-    ActionType, CharacterType, CreateRoomRequest, CreateUserRequest, GameAction, GameEvent,
-    GamePhase, GameResponse, GameState, JoinRoomRequest, LoginRequest, Player, PlayerResponse,
-    Room, RoomResponse, RoomStatus, TokenResponse, User, UserResponse, Vote, VoteChoice,
-    VoteRequest, VoteResult,
+    ActionType, CharacterType, CreateRoomRequest, CreateUserRequest, ForgotPasswordRequest,
+    GameAction, GameEvent, GamePhase, GameResponse, GameState, JoinRoomRequest, LoginRequest,
+    MessageResponse, OAuthLoginRequest, Player, PlayerResponse, RefreshTokenRequest,
+    ResetPasswordRequest, Room, RoomResponse, RoomStatus, TokenResponse, User, UserResponse, Vote,
+    VoteChoice, VoteRequest, VoteResult,
 };
 pub use error::{AppError, AppResult, ErrorResponse};
 pub use game::{
@@ -68,7 +70,7 @@ pub use game::{
     PlayerState as EnginePlayerState,
     VoteCounts,
 };
-pub use repository::{PlayerRepository, RoomRepository, UserRepository};
+pub use repository::{FullUserRecord, PlayerRepository, RoomRepository, UserRepository};
 pub use services::{
     room_service::{LeaveRoomResult, StartGameResult},
     GameService, RoomService,

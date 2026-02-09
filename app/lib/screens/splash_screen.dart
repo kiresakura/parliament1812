@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/auth_provider.dart';
+
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -46,11 +48,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void _startAnimation() async {
     await _animationController.forward();
     
-    // 等待 2 秒後跳轉到主選單
-    await Future.delayed(const Duration(seconds: 2));
+    // 等待動畫完成 + 額外延遲
+    await Future.delayed(const Duration(seconds: 1));
     
     if (mounted) {
-      context.go('/menu');
+      // 檢查認證狀態決定導向
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated) {
+        context.go('/menu');
+      } else {
+        // 導向登入頁面（用戶可選擇 guest mode）
+        context.go('/login');
+      }
     }
   }
 

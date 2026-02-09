@@ -134,7 +134,7 @@ class MainMenuScreen extends ConsumerWidget {
                           child: Padding(
                             padding: const EdgeInsets.only(top: 16, bottom: 8),
                             child: Text(
-                              'Parliament 1812 v1.0.0 — M5',
+                              'Parliament 1812 v1.0.0 — M6',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                               ),

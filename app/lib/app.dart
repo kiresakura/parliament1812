@@ -9,6 +9,9 @@ import 'screens/room_list_screen.dart';
 import 'screens/room_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/game_result_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
+import 'screens/auth/forgot_password_screen.dart';
 import 'providers/game_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -19,6 +22,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/',
         name: 'splash',
         builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot_password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/menu',

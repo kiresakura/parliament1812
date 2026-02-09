@@ -5,7 +5,7 @@
 use axum::{
     http::{header, Method},
     middleware,
-    routing::{any, get, post},
+    routing::{any, delete, get, post},
     Router,
 };
 use tower_http::{
@@ -67,16 +67,21 @@ pub fn create_router(state: AppState) -> Router {
     // 公開認證路由（不需要驗證）
     let public_auth_routes = Router::new()
         .route("/register", post(handlers::register))
-        .route("/login", post(handlers::login));
+        .route("/login", post(handlers::login))
+        .route("/refresh", post(handlers::refresh_token))
+        .route("/oauth/google", post(handlers::oauth_google))
+        .route("/oauth/apple", post(handlers::oauth_apple))
+        .route("/forgot-password", post(handlers::forgot_password))
+        .route("/reset-password", post(handlers::reset_password));
 
     // 受保護的認證路由（需要驗證）
-    let protected_auth_routes =
-        Router::new()
-            .route("/me", get(handlers::me))
-            .route_layer(middleware::from_fn_with_state(
-                state.clone(),
-                auth_middleware,
-            ));
+    let protected_auth_routes = Router::new()
+        .route("/me", get(handlers::me))
+        .route("/account", delete(handlers::delete_account))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
 
     // 房間路由
     // 公開路由
