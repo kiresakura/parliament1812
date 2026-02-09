@@ -7,6 +7,7 @@
 //! - `repository/` 處理基礎 CRUD（users, rooms, players）
 //! - `db/` 處理擴展功能（遊戲持久化、排行榜、社交、交易）
 
+pub mod codex;
 pub mod games;
 pub mod migrations;
 pub mod rankings;

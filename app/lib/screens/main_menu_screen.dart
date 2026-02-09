@@ -99,15 +99,10 @@ class MainMenuScreen extends ConsumerWidget {
                         _QuestMenuButton(ref: ref),
                         const SizedBox(height: 12),
                         _MenuButton(
-                          icon: Icons.casino,
-                          title: '卡牌圖鑒',
-                          subtitle: '瀏覽所有卡牌效果',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const CardCatalogScreen()),
-                            );
-                          },
+                          icon: Icons.collections_bookmark,
+                          title: '卡牌圖鑑',
+                          subtitle: '收藏圖鑑與成就系統',
+                          onPressed: () => context.go('/codex'),
                         ),
                         const SizedBox(height: 12),
                         _MenuButton(
