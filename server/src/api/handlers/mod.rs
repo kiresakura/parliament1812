@@ -3,6 +3,7 @@
 //! 包含所有 HTTP 端點的處理器
 
 pub mod auth;
+pub mod codex;
 pub mod health;
 pub mod quests;
 pub mod rankings;

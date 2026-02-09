@@ -140,6 +140,21 @@ pub fn create_router(state: AppState) -> Router {
             auth_middleware,
         ));
 
+    // 圖鑑路由（全部需要認證）
+    let codex_routes = Router::new()
+        .route("/cards", get(handlers::codex::get_codex_cards))
+        .route("/collection", get(handlers::codex::get_collection))
+        .route("/achievements", get(handlers::codex::get_achievements))
+        .route("/stats", get(handlers::codex::get_codex_stats))
+        .route(
+            "/achievements/claim",
+            post(handlers::codex::claim_achievement),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
     // API v1 路由
     let api_v1_routes = Router::new()
         .nest("/auth", auth_routes)
@@ -157,6 +172,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/ws/:room_code", any(handlers::ws_handler))
         .nest("/health", health_routes)
         .nest("/api/v1", api_v1_routes)
+        .nest("/api/codex", codex_routes)
         // 套用中間件
         .layer(compression)
         .layer(trace_layer)

@@ -227,6 +227,79 @@ class _MenuButton extends StatelessWidget {
 }
 
 // ============================================================
+// Quest Menu Button (with badge)
+// ============================================================
+
+class _QuestMenuButton extends ConsumerWidget {
+  final WidgetRef ref;
+
+  const _QuestMenuButton({required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final questState = ref.watch(questsProvider);
+    final pendingCount = questState.pendingCount;
+
+    return Card(
+      child: InkWell(
+        onTap: () => GoRouter.of(context).go('/quests'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.assignment, color: theme.colorScheme.primary, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('每日任務', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                      '完成任務獲取獎勵',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (pendingCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$pendingCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              else
+                Icon(Icons.arrow_forward_ios, color: theme.colorScheme.onSurface.withValues(alpha: 0.4), size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
 // Card Catalog Screen (卡牌圖鑒)
 // ============================================================
 
