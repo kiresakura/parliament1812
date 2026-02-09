@@ -111,10 +111,41 @@ pub fn create_router(state: AppState) -> Router {
         .merge(public_auth_routes)
         .merge(protected_auth_routes);
 
+    // 排行榜路由
+    // 公開路由
+    let public_ranking_routes = Router::new()
+        .route("/global", get(handlers::global_rankings))
+        .route("/seasons", get(handlers::list_seasons));
+
+    // 受保護的排行榜路由
+    let protected_ranking_routes = Router::new()
+        .route("/me", get(handlers::my_ranking))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 合併排行榜路由
+    let ranking_routes = Router::new()
+        .merge(public_ranking_routes)
+        .merge(protected_ranking_routes);
+
+    // 每日任務路由（全部需要認證）
+    let quest_routes = Router::new()
+        .route("/daily", get(handlers::quests::get_daily_quests))
+        .route("/claim/:quest_id", post(handlers::quests::claim_quest_reward))
+        .route("/history", get(handlers::quests::get_quest_history))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
     // API v1 路由
     let api_v1_routes = Router::new()
         .nest("/auth", auth_routes)
-        .nest("/rooms", room_routes);
+        .nest("/rooms", room_routes)
+        .nest("/rankings", ranking_routes)
+        .nest("/quests", quest_routes);
 
     // 組合所有路由
     Router::new()

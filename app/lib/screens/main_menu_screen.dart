@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/quests_provider.dart';
 import '../services/audio_service.dart';
 
 class MainMenuScreen extends ConsumerWidget {
@@ -87,6 +88,15 @@ class MainMenuScreen extends ConsumerWidget {
                           subtitle: '加入或創建房間',
                           onPressed: () => context.go('/rooms'),
                         ),
+                        const SizedBox(height: 12),
+                        _MenuButton(
+                          icon: Icons.leaderboard,
+                          title: '排行榜',
+                          subtitle: '查看全球排名與 ELO 評分',
+                          onPressed: () => context.go('/rankings'),
+                        ),
+                        const SizedBox(height: 12),
+                        _QuestMenuButton(ref: ref),
                         const SizedBox(height: 12),
                         _MenuButton(
                           icon: Icons.casino,

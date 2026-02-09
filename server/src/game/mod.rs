@@ -6,14 +6,24 @@
 //! - 遊戲行動處理
 //! - 遊戲流程控制
 //! - 卡牌系統
+//! - ELO 評分引擎
+//! - 賽季系統
+//! - 防作弊系統
 
+pub mod achievements;
 pub mod actions;
 pub mod ai;
 pub mod alliance;
+pub mod anti_cheat;
 pub mod bills;
+pub mod card_codex;
 pub mod cards;
 pub mod characters;
+pub mod elo;
 pub mod engine;
+pub mod quest_system;
+pub mod quests;
+pub mod season;
 pub mod state;
 
 // 重新匯出常用類型

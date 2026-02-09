@@ -4,6 +4,8 @@
 
 pub mod auth;
 pub mod health;
+pub mod quests;
+pub mod rankings;
 pub mod rooms;
 pub mod websocket;
 
@@ -12,6 +14,7 @@ pub use auth::{
     reset_password,
 };
 pub use health::{db_health_check, full_health_check, health_check, redis_health_check};
+pub use rankings::{global_rankings, list_seasons, my_ranking};
 pub use rooms::{
     create_room, get_room, join_room, leave_room, list_rooms, quick_match, spectate_room,
     RoomDetailResponse,

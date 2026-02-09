@@ -5,8 +5,12 @@
 use uuid::Uuid;
 
 use crate::db::games::GameDb;
+use crate::db::rankings::RankingDb;
+use crate::db::users::UserDb;
 use crate::domain::{GamePhase, VoteChoice};
 use crate::error::AppError;
+use crate::game::elo::{self, MultiPlayerInfo};
+use crate::game::season;
 use crate::game::{ActionResult, GameEngine, GameResult, GameState};
 use crate::AppState;
 
@@ -768,12 +772,20 @@ impl GameService {
     }
 
     /// 處理遊戲結果
+    ///
+    /// 在 ranked mode 下：
+    /// 1. 持久化遊戲結果到 DB
+    /// 2. 計算 ELO 變化並更新 rankings
+    /// 3. 廣播遊戲結果
     async fn handle_game_result(state: &AppState, room_code: &str) {
         use crate::websocket::{PlayerRanking, ServerMessage};
         use std::collections::HashMap;
 
         // 持久化到 DB
         Self::persist_game_result_to_db(state, room_code).await;
+
+        // 計算 ELO 並更新排名（ranked mode only）
+        Self::update_elo_rankings(state, room_code).await;
 
         // 計算遊戲結果
         let result = {
@@ -861,6 +873,103 @@ impl GameService {
         Self::sync_to_redis(state, room_code, &game_state).await;
 
         Ok(Some(result))
+    }
+
+    /// 更新 ELO 排名
+    ///
+    /// 在遊戲結束後計算 ELO 變化並更新 rankings 表。
+    /// 只在 ranked mode 下生效。
+    async fn update_elo_rankings(state: &AppState, room_code: &str) {
+        // 取得遊戲結果
+        let result = {
+            let games = state.games.read().await;
+            match games.get(room_code) {
+                Some(engine) => engine.calculate_results(),
+                None => return,
+            }
+        };
+
+        // 取得當前賽季
+        let current_season = match season::get_current_season(&state.db).await {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                tracing::debug!(room_code = %room_code, "沒有活躍賽季，跳過 ELO 更新");
+                return;
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "查詢當前賽季失敗");
+                return;
+            }
+        };
+
+        // 收集玩家資訊
+        let mut player_infos: Vec<(Uuid, MultiPlayerInfo)> = Vec::new();
+
+        for (idx, ps) in result.player_scores.iter().enumerate() {
+            // 取得玩家的 DB 資訊
+            let user = match UserDb::find_extended_by_id(&state.db, ps.player_id).await {
+                Ok(Some(u)) => u,
+                _ => continue,
+            };
+
+            player_infos.push((
+                ps.player_id,
+                MultiPlayerInfo {
+                    index: idx,
+                    rating: user.elo_rating.unwrap_or(1000),
+                    games_played: user.total_games.unwrap_or(0),
+                    placement: (idx as u32) + 1,
+                },
+            ));
+        }
+
+        if player_infos.len() < 2 {
+            return;
+        }
+
+        // 計算多人 ELO
+        let multi_infos: Vec<MultiPlayerInfo> =
+            player_infos.iter().map(|(_, info)| info.clone()).collect();
+        let elo_changes = elo::calculate_multiplayer(&multi_infos);
+
+        // 更新每個玩家
+        for change in &elo_changes {
+            let (user_id, _) = &player_infos[change.index];
+            let is_win = multi_infos[change.index].placement == 1;
+
+            // 更新 users 表
+            if let Err(e) = UserDb::update_elo(&state.db, *user_id, change.new_rating).await {
+                tracing::warn!(user_id = %user_id, error = %e, "更新使用者 ELO 失敗");
+            }
+            if let Err(e) = UserDb::increment_game_stats(&state.db, *user_id, is_win).await {
+                tracing::warn!(user_id = %user_id, error = %e, "更新遊戲統計失敗");
+            }
+
+            // 更新 rankings 表（upsert）
+            if let Err(e) = RankingDb::upsert_ranking(
+                &state.db,
+                *user_id,
+                current_season.id,
+                change.new_rating,
+                is_win,
+            )
+            .await
+            {
+                tracing::warn!(user_id = %user_id, error = %e, "更新排名失敗");
+            }
+        }
+
+        // 重新計算排名位置
+        if let Err(e) = RankingDb::recalculate_positions(&state.db, current_season.id).await {
+            tracing::warn!(error = %e, "重新計算排名位置失敗");
+        }
+
+        tracing::info!(
+            room_code = %room_code,
+            season_id = current_season.id,
+            players = elo_changes.len(),
+            "ELO 排名已更新"
+        );
     }
 
     /// 清理遊戲
