@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM rust:1.85-slim-bookworm AS builder
+FROM rust:1.93-slim AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -8,9 +8,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Cache dependencies
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && rm -rf src
 
+# Build actual source
 COPY src ./src
 COPY migrations ./migrations
 RUN touch src/main.rs && cargo build --release

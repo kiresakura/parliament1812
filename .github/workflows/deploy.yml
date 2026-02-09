@@ -1,0 +1,15 @@
+name: Deploy
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and tag
+        run: |
+          docker build -t parliament1812-server:${{ github.ref_name }} ./server
+          echo "Ready for deployment to staging/production"
+      # TODO: Add actual deployment (Railway/Fly.io/AWS)

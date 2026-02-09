@@ -59,6 +59,7 @@ local.properties
 
 # 文檔
 docs/
+target/
 server/target/
 app/.dart_tool/
 app/build/

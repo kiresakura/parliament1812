@@ -1,0 +1,40 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  rust-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - name: Run tests
+        working-directory: server
+        run: cargo test --all
+
+  flutter-analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.0'
+      - name: Analyze
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter analyze
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [rust-test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker
+        run: docker build -t parliament1812-server ./server

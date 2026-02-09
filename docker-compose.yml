@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: parliament1812
+      POSTGRES_USER: parliament
+      POSTGRES_PASSWORD: parliament_dev
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  server:
+    build: ./server
+    environment:
+      DATABASE_URL: postgres://parliament:parliament_dev@db:5432/parliament1812
+      RUST_LOG: info
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

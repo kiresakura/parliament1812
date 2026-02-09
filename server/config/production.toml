@@ -1,0 +1,16 @@
+# 1812 國會風雲 - Production Configuration
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+# Set via DATABASE_URL env var
+max_connections = 20
+
+[logging]
+level = "warn"
+format = "json"
+
+[auth]
+jwt_expiration_hours = 24

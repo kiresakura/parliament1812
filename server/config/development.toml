@@ -1,0 +1,16 @@
+# 1812 國會風雲 - Local Development Configuration
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[database]
+url = "postgres://parliament:parliament_dev@localhost:5432/parliament1812"
+max_connections = 5
+
+[logging]
+level = "debug"
+format = "pretty"
+
+[auth]
+jwt_expiration_hours = 72
