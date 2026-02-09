@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../services/audio_service.dart';
+
 class MainMenuScreen extends ConsumerWidget {
   const MainMenuScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+
+    // 播放主選單 BGM
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(audioServiceProvider).playBgm(BgmType.menu);
+    });
 
     return Scaffold(
       body: Container(
@@ -127,7 +134,7 @@ class MainMenuScreen extends ConsumerWidget {
                           child: Padding(
                             padding: const EdgeInsets.only(top: 16, bottom: 8),
                             child: Text(
-                              'Parliament 1812 v1.0.0 — M2',
+                              'Parliament 1812 v1.0.0 — M5',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                               ),

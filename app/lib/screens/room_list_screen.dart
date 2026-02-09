@@ -178,7 +178,7 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
           Icon(
             Icons.meeting_room_outlined,
             size: 80,
-            color: theme.colorScheme.onSurface.withOpacity(0.3),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           
           const SizedBox(height: 16),
@@ -186,7 +186,7 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
           Text(
             '尚無可用房間',
             style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           
@@ -195,7 +195,7 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
           Text(
             '創建一個新房間開始遊戲吧！',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
           

@@ -279,7 +279,7 @@ class _ConnectionDetailsSheet extends ConsumerWidget {
           if (latency != null && status == ConnectionStatus.connected)
             _DetailItem(
               label: '延遲',
-              value: '${latency} ms',
+              value: '$latency ms',
               valueColor: _getLatencyColor(latency!),
               icon: Icons.speed,
               iconColor: _getLatencyColor(latency!),
@@ -301,10 +301,10 @@ class _ConnectionDetailsSheet extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: status.color.withOpacity(0.1),
+              color: status.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: status.color.withOpacity(0.3),
+                color: status.color.withValues(alpha: 0.3),
               ),
             ),
             child: Text(
@@ -374,7 +374,7 @@ class _DetailItem extends StatelessWidget {
           Icon(
             icon!,
             size: 20,
-            color: iconColor ?? theme.colorScheme.onSurface.withOpacity(0.6),
+            color: iconColor ?? theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
           
           const SizedBox(width: 12),
@@ -384,7 +384,7 @@ class _DetailItem extends StatelessWidget {
           child: Text(
             label,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ),

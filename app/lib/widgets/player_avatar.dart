@@ -33,7 +33,7 @@ class PlayerAvatar extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDead 
                 ? Colors.grey.shade300
-                : factionColor.withOpacity(0.1),
+                : factionColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
             border: showBorder
                 ? Border.all(
@@ -46,7 +46,7 @@ class PlayerAvatar extends StatelessWidget {
             boxShadow: showBorder
                 ? [
                     BoxShadow(
-                      color: (isDead ? Colors.grey : factionColor).withOpacity(0.2),
+                      color: (isDead ? Colors.grey : factionColor).withValues(alpha: 0.2),
                       blurRadius: size * 0.1,
                       spreadRadius: 1,
                     ),
@@ -69,7 +69,7 @@ class PlayerAvatar extends StatelessWidget {
               if (isDead)
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -218,7 +218,7 @@ class PlayerAvatarWithName extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: isDead 
-                  ? theme.colorScheme.onSurface.withOpacity(0.5)
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.5)
                   : null,
             ),
             textAlign: TextAlign.center,
@@ -234,8 +234,8 @@ class PlayerAvatarWithName extends StatelessWidget {
             character?.displayName ?? "?",
             style: theme.textTheme.bodySmall?.copyWith(
               color: isDead 
-                  ? theme.colorScheme.onSurface.withOpacity(0.4)
-                  : theme.colorScheme.onSurface.withOpacity(0.7),
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -251,13 +251,13 @@ class PlayerAvatarWithName extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: isDead 
-                  ? Colors.grey.withOpacity(0.1)
-                  : factionColor.withOpacity(0.1),
+                  ? Colors.grey.withValues(alpha: 0.1)
+                  : factionColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isDead 
-                    ? Colors.grey.withOpacity(0.3)
-                    : factionColor.withOpacity(0.3),
+                    ? Colors.grey.withValues(alpha: 0.3)
+                    : factionColor.withValues(alpha: 0.3),
               ),
             ),
             child: Text(

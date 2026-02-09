@@ -7,6 +7,10 @@ import '../models/game_state.dart';
 import '../models/player.dart';
 import '../models/room.dart';
 import '../models/card.dart';
+import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
+import '../widgets/game_card_widget.dart';
+import '../widgets/animations/reputation_change_animation.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   final String roomCode;
@@ -25,14 +29,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
   bool _isChatExpanded = false;
   late AnimationController _chatAnimationController;
   final TextEditingController _chatController = TextEditingController();
-  
+
   // 階段轉場動畫
   late AnimationController _phaseTransitionController;
   late Animation<double> _phaseTransitionOpacity;
   late Animation<double> _phaseTransitionScale;
   bool _isShowingPhaseTransition = false;
   GamePhase? _currentPhase;
-  
+
   // 預設快捷語
   final List<String> _quickMessages = [
     '好手段！',
@@ -42,7 +46,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     '有意思...',
     '我同意。',
   ];
-  
+
   @override
   void initState() {
     super.initState();
@@ -50,13 +54,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     // 階段轉場動畫初始化
     _phaseTransitionController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _phaseTransitionOpacity = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -64,7 +68,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       parent: _phaseTransitionController,
       curve: const Interval(0.0, 0.3, curve: Curves.easeIn),
     ));
-    
+
     _phaseTransitionScale = Tween<double>(
       begin: 0.8,
       end: 1.2,
@@ -72,8 +76,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       parent: _phaseTransitionController,
       curve: const Interval(0.2, 0.8, curve: Curves.elasticOut),
     ));
-    
-    // 動畫完成後自動隱藏轉場
+
     _phaseTransitionController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -85,6 +88,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
           }
         });
       }
+    });
+
+    // 播放遊戲 BGM
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(audioServiceProvider).playBgm(BgmType.game);
     });
   }
 
@@ -101,7 +109,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final gameState = ref.watch(gameStateProvider);
     final theme = Theme.of(context);
 
-    // 監聽遊戲結果，當有結果時導航到結算畫面
+    // 監聽遊戲結果
     ref.listen(gameStateProvider, (previous, next) {
       if (next?.result != null && previous?.result == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -110,7 +118,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           }
         });
       }
-      
+
       // 監聽階段變化，觸發轉場動畫
       if (next?.phase != previous?.phase && next?.phase != null) {
         _triggerPhaseTransition(next!.phase);
@@ -125,38 +133,25 @@ class _GameScreenState extends ConsumerState<GameScreen>
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // 主遊戲區域
           Column(
             children: [
-              // 頂部資訊列
               _buildTopInfoBar(gameState, theme),
-              
-              // 主遊戲區域
               Expanded(
                 child: Column(
                   children: [
-                    // 議案區域
-                    if (gameState.phase == GamePhase.voting || 
+                    if (gameState.phase == GamePhase.voting ||
                         gameState.phase == GamePhase.debate)
                       _buildBillArea(gameState, theme),
-                    
-                    // 遊戲區域
                     Expanded(
                       child: _buildGameArea(gameState, theme),
                     ),
                   ],
                 ),
               ),
-              
-              // 底部操作區
               _buildBottomActionArea(gameState, theme),
             ],
           ),
-          
-          // 聊天浮層
           _buildChatOverlay(gameState, theme),
-          
-          // 階段轉場動畫覆蓋層
           if (_isShowingPhaseTransition)
             _buildPhaseTransitionOverlay(theme),
         ],
@@ -171,14 +166,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              color: theme.colorScheme.primary,
-            ),
+            CircularProgressIndicator(color: theme.colorScheme.primary),
             const SizedBox(height: 16),
-            Text(
-              '載入遊戲中...',
-              style: theme.textTheme.titleMedium,
-            ),
+            Text('載入遊戲中...', style: theme.textTheme.titleMedium),
           ],
         ),
       ),
@@ -192,7 +182,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         color: theme.colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.3),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3),
             width: 1,
           ),
         ),
@@ -204,22 +194,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // 階段指示
               _buildPhaseIndicator(gameState.phase, theme),
-              
-              // 計時器
               _buildTimer(gameState.remainingSeconds, theme),
-              
-              // 回合數與設定
               Row(
                 children: [
                   _buildRoundIndicator(gameState.round, theme),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(
-                      Icons.settings,
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
-                    ),
+                    icon: Icon(Icons.settings,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
                     onPressed: () => _showGameSettings(context),
                   ),
                 ],
@@ -235,7 +218,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     String phaseText;
     IconData phaseIcon;
     Color phaseColor;
-    
+
     switch (phase) {
       case GamePhase.conspiracy:
         phaseText = '密謀階段';
@@ -267,29 +250,18 @@ class _GameScreenState extends ConsumerState<GameScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: phaseColor.withOpacity(0.15),
+        color: phaseColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: phaseColor.withOpacity(0.4),
-          width: 1,
-        ),
+        border: Border.all(color: phaseColor.withValues(alpha: 0.4), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            phaseIcon,
-            size: 16,
-            color: phaseColor,
-          ),
+          Icon(phaseIcon, size: 16, color: phaseColor),
           const SizedBox(width: 6),
-          Text(
-            phaseText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: phaseColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(phaseText,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: phaseColor, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -299,36 +271,34 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final minutes = remainingSeconds ~/ 60;
     final seconds = remainingSeconds % 60;
     final isUrgent = remainingSeconds <= 30;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: isUrgent 
-            ? theme.colorScheme.error.withOpacity(0.15)
+        color: isUrgent
+            ? theme.colorScheme.error.withValues(alpha: 0.15)
             : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isUrgent 
+          color: isUrgent
               ? theme.colorScheme.error
-              : theme.colorScheme.outline.withOpacity(0.4),
+              : theme.colorScheme.outline.withValues(alpha: 0.4),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.timer,
-            size: 18,
-            color: isUrgent 
-                ? theme.colorScheme.error
-                : theme.colorScheme.onSurface,
-          ),
+          Icon(Icons.timer,
+              size: 18,
+              color: isUrgent
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurface),
           const SizedBox(width: 6),
           Text(
             '$minutes:${seconds.toString().padLeft(2, '0')}',
             style: theme.textTheme.titleSmall?.copyWith(
-              color: isUrgent 
+              color: isUrgent
                   ? theme.colorScheme.error
                   : theme.colorScheme.onSurface,
               fontWeight: FontWeight.bold,
@@ -347,71 +317,48 @@ class _GameScreenState extends ConsumerState<GameScreen>
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.3),
-          width: 1,
-        ),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3), width: 1),
       ),
-      child: Text(
-        '第$round回合',
-        style: theme.textTheme.bodySmall?.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+      child: Text('第$round回合',
+          style:
+              theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
     );
   }
 
   Widget _buildGameArea(GameState gameState, ThemeData theme) {
     return Row(
       children: [
-        // 左側玩家
-        Expanded(
-          flex: 2,
-          child: _buildPlayersArea(gameState, theme),
-        ),
-        
-        // 中央區域
-        Expanded(
-          flex: 3,
-          child: _buildCentralArea(gameState, theme),
-        ),
+        Expanded(flex: 2, child: _buildPlayersArea(gameState, theme)),
+        Expanded(flex: 3, child: _buildCentralArea(gameState, theme)),
       ],
     );
   }
 
   Widget _buildPlayersArea(GameState gameState, ThemeData theme) {
     final players = gameState.room.players;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 上方玩家
           if (players.length > 1)
             Expanded(child: _buildPlayerCard(players[1], false, theme)),
-          
           const SizedBox(height: 16),
-          
-          // 中間：左右玩家
           Expanded(
             flex: 2,
             child: Row(
               children: [
-                // 左側玩家
                 if (players.length > 2)
-                  Expanded(child: _buildPlayerCard(players[2], false, theme)),
-                
+                  Expanded(
+                      child: _buildPlayerCard(players[2], false, theme)),
                 if (players.length > 3) const SizedBox(width: 16),
-                
-                // 右側玩家
                 if (players.length > 3)
-                  Expanded(child: _buildPlayerCard(players[3], false, theme)),
+                  Expanded(
+                      child: _buildPlayerCard(players[3], false, theme)),
               ],
             ),
           ),
-          
           const SizedBox(height: 16),
-          
-          // 下方玩家（自己）
           if (players.isNotEmpty)
             Expanded(child: _buildPlayerCard(players[0], true, theme)),
         ],
@@ -419,121 +366,71 @@ class _GameScreenState extends ConsumerState<GameScreen>
     );
   }
 
-  Widget _buildPlayerCard(Player player, bool isCurrentPlayer, ThemeData theme) {
-    final isActive = player.id == ''; // TODO: 取得當前活動玩家ID
-    
+  Widget _buildPlayerCard(
+      Player player, bool isCurrentPlayer, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive 
+          color: isCurrentPlayer
               ? theme.colorScheme.primary
-              : theme.colorScheme.outline.withOpacity(0.3),
-          width: isActive ? 2 : 1,
+              : theme.colorScheme.outline.withValues(alpha: 0.3),
+          width: isCurrentPlayer ? 2 : 1,
         ),
-        boxShadow: isCurrentPlayer ? [
-          BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ] : null,
+        boxShadow: isCurrentPlayer
+            ? [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 頭像
             CircleAvatar(
               radius: 24,
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
               child: Text(
-                player.character?.displayName ?? "".substring(0, 1),
+                player.name.isNotEmpty ? player.name.substring(0, 1) : '?',
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            
             const SizedBox(height: 8),
-            
-            // 玩家名稱
             Text(
               player.name,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            
-            // 角色
             Text(
-              player.character?.displayName ?? "",
+              player.character?.displayName ?? '',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
-              ),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            
             const SizedBox(height: 8),
-            
-            // 聲望條
-            _buildReputationBar(player.reputation, theme),
-            
+            // 使用動畫聲望條
+            AnimatedReputationBar(reputation: player.reputation),
             const SizedBox(height: 4),
-            
-            // 手牌數
             Text(
               '手牌: ${player.handCards.length}',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-              ),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildReputationBar(int reputation, ThemeData theme) {
-    final progress = reputation / 100.0;
-    
-    return Column(
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.favorite,
-              size: 12,
-              color: theme.colorScheme.error,
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: theme.colorScheme.outline.withOpacity(0.3),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  reputation > 30 
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.error,
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '$reputation',
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -542,19 +439,27 @@ class _GameScreenState extends ConsumerState<GameScreen>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 議案顯示區
           Expanded(
-            flex: 1,
-            child: _buildBillDisplay(gameState.currentBill, theme),
-          ),
-          
+              flex: 1,
+              child: _buildBillDisplay(gameState.currentBill, theme)),
           const SizedBox(height: 16),
-          
-          // 事件日誌
+
+          // 出牌目標區域（拖曳出牌）
+          if (gameState.phase == GamePhase.debate ||
+              gameState.phase == GamePhase.conspiracy)
+            SizedBox(
+              height: 80,
+              child: CardPlayZone(
+                onCardPlayed: (card) => _onCardPlayed(card),
+              ),
+            ),
+          if (gameState.phase == GamePhase.debate ||
+              gameState.phase == GamePhase.conspiracy)
+            const SizedBox(height: 16),
+
           Expanded(
-            flex: 2,
-            child: _buildEventLog(gameState.gameEvents, theme),
-          ),
+              flex: 2,
+              child: _buildEventLog(gameState.gameEvents, theme)),
         ],
       ),
     );
@@ -568,32 +473,23 @@ class _GameScreenState extends ConsumerState<GameScreen>
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.3),
-        ),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.article,
-                color: theme.colorScheme.secondary,
-                size: 20,
-              ),
+              Icon(Icons.article,
+                  color: theme.colorScheme.secondary, size: 20),
               const SizedBox(width: 8),
-              Text(
-                '當前議案',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.secondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text('當前議案',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
-          
           const SizedBox(height: 12),
-          
           Expanded(
             child: Text(
               currentBill ?? '暫無議案',
@@ -614,8 +510,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.3),
-        ),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,31 +519,22 @@ class _GameScreenState extends ConsumerState<GameScreen>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(
-                  Icons.history,
-                  color: theme.colorScheme.secondary,
-                  size: 20,
-                ),
+                Icon(Icons.history,
+                    color: theme.colorScheme.secondary, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  '事件日誌',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.secondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text('事件日誌',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.secondary,
+                        fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: events.length,
-              itemBuilder: (context, index) {
-                final event = events[index];
-                return _buildEventItem(event, theme);
-              },
+              itemBuilder: (context, index) =>
+                  _buildEventItem(events[index], theme),
             ),
           ),
         ],
@@ -659,7 +545,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   Widget _buildEventItem(GameEvent event, ThemeData theme) {
     IconData eventIcon;
     Color eventColor;
-    
+
     switch (event.type) {
       case GameEventType.challenge:
         eventIcon = Icons.gavel;
@@ -678,27 +564,19 @@ class _GameScreenState extends ConsumerState<GameScreen>
         eventColor = theme.colorScheme.onSurface;
         break;
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            eventIcon,
-            size: 16,
-            color: eventColor,
-          ),
-          
+          Icon(eventIcon, size: 16, color: eventColor),
           const SizedBox(width: 8),
-          
           Expanded(
-            child: Text(
-              event.description,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.8),
-              ),
-            ),
+            child: Text(event.description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color:
+                        theme.colorScheme.onSurface.withValues(alpha: 0.8))),
           ),
         ],
       ),
@@ -711,9 +589,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
         color: theme.colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.3),
-            width: 1,
-          ),
+              color: theme.colorScheme.outline.withValues(alpha: 0.3),
+              width: 1),
         ),
       ),
       child: SafeArea(
@@ -723,15 +600,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 手牌區
+              // 手牌區 — 使用新的 GameCardWidget
               SizedBox(
-                height: 120,
-                child: _buildHandCardsArea(gameState.hand, theme),
+                height: 130,
+                child: _buildHandCardsArea(gameState, theme),
               ),
-              
               const SizedBox(height: 16),
-              
-              // 動作按鈕區
               _buildActionButtons(gameState.phase, theme),
             ],
           ),
@@ -740,83 +614,54 @@ class _GameScreenState extends ConsumerState<GameScreen>
     );
   }
 
-  Widget _buildHandCardsArea(List<GameCard> handCards, ThemeData theme) {
+  Widget _buildHandCardsArea(GameState gameState, ThemeData theme) {
+    final handCards = gameState.hand;
+
     if (handCards.isEmpty) {
       return Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainer,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: theme.colorScheme.outline.withOpacity(0.3),
-          ),
+              color: theme.colorScheme.outline.withValues(alpha: 0.3)),
         ),
         child: Center(
-          child: Text(
-            '暫無手牌',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-            ),
-          ),
+          child: Text('暫無手牌',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  color:
+                      theme.colorScheme.onSurface.withValues(alpha: 0.6))),
         ),
       );
     }
-    
+
+    // 計算哪些牌可以出
+    final playableCards = gameState.playableCards;
+
     return ListView.builder(
       scrollDirection: Axis.horizontal,
       itemCount: handCards.length,
       itemBuilder: (context, index) {
         final card = handCards[index];
-        return _buildCardWidget(card, theme);
-      },
-    );
-  }
+        final isPlayable = playableCards.contains(card);
 
-  Widget _buildCardWidget(GameCard card, ThemeData theme) {
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.3),
-        ),
-      ),
-      child: InkWell(
-        onTap: () => _onCardTapped(card),
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                card.name,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              
-              Text(
-                '${card.influenceCost}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.secondary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: GameCardWidget(
+            card: card,
+            isPlayable: isPlayable,
+            width: 85,
+            height: 125,
+            onTap: isPlayable ? () => _onCardTapped(card) : null,
+            onDragCompleted: isPlayable ? _onCardPlayed : null,
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildActionButtons(GamePhase phase, ThemeData theme) {
     List<Widget> buttons = [];
-    
+
     switch (phase) {
       case GamePhase.conspiracy:
         buttons = [
@@ -834,9 +679,18 @@ class _GameScreenState extends ConsumerState<GameScreen>
         break;
       case GamePhase.voting:
         buttons = [
-          _buildActionButton('支持', Icons.thumb_up, theme, () {}),
-          _buildActionButton('反對', Icons.thumb_down, theme, () {}),
-          _buildActionButton('棄權', Icons.remove, theme, () {}),
+          _buildActionButton('支持', Icons.thumb_up, theme, () {
+            HapticService.voteConfirmed();
+            ref.read(audioServiceProvider).playSfx(SfxType.vote);
+          }),
+          _buildActionButton('反對', Icons.thumb_down, theme, () {
+            HapticService.voteConfirmed();
+            ref.read(audioServiceProvider).playSfx(SfxType.vote);
+          }),
+          _buildActionButton('棄權', Icons.remove, theme, () {
+            HapticService.voteConfirmed();
+            ref.read(audioServiceProvider).playSfx(SfxType.vote);
+          }),
         ];
         break;
       default:
@@ -845,7 +699,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         ];
         break;
     }
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: buttons,
@@ -853,22 +707,18 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   Widget _buildActionButton(
-    String label, 
-    IconData icon, 
-    ThemeData theme, 
-    VoidCallback? onPressed,
-  ) {
+      String label, IconData icon, ThemeData theme, VoidCallback? onPressed) {
     return ElevatedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: ElevatedButton.styleFrom(
-        backgroundColor: onPressed != null 
+        backgroundColor: onPressed != null
             ? theme.colorScheme.primary
             : theme.colorScheme.surface,
-        foregroundColor: onPressed != null 
+        foregroundColor: onPressed != null
             ? theme.colorScheme.onPrimary
-            : theme.colorScheme.onSurface.withOpacity(0.5),
+            : theme.colorScheme.onSurface.withValues(alpha: 0.5),
       ),
     );
   }
@@ -880,32 +730,24 @@ class _GameScreenState extends ConsumerState<GameScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // 聊天內容區
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             height: _isChatExpanded ? 400 : 0,
             width: _isChatExpanded ? 320 : 0,
-            child: _isChatExpanded 
+            child: _isChatExpanded
                 ? _buildChatContent(gameState.chatMessages, theme)
                 : const SizedBox.shrink(),
           ),
-          
           const SizedBox(height: 8),
-          
-          // 聊天按鈕
           Stack(
             children: [
               FloatingActionButton(
                 mini: true,
                 onPressed: _toggleChat,
                 backgroundColor: theme.colorScheme.secondary,
-                child: Icon(
-                  _isChatExpanded ? Icons.close : Icons.chat,
-                  color: theme.colorScheme.onSecondary,
-                ),
+                child: Icon(_isChatExpanded ? Icons.close : Icons.chat,
+                    color: theme.colorScheme.onSecondary),
               ),
-              
-              // 未讀數 Badge
               if (!_isChatExpanded && gameState.chatMessages.isNotEmpty)
                 Positioned(
                   right: 0,
@@ -916,10 +758,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
                       color: theme.colorScheme.error,
                       shape: BoxShape.circle,
                     ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
                     child: Text(
                       '${gameState.chatMessages.length > 9 ? '9+' : gameState.chatMessages.length}',
                       style: TextStyle(
@@ -944,11 +784,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.3),
-        ),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: theme.shadowColor.withOpacity(0.2),
+            color: theme.shadowColor.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -956,11 +795,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
       ),
       child: Column(
         children: [
-          // 聊天標題
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.secondary.withOpacity(0.1),
+              color: theme.colorScheme.secondary.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -968,46 +806,28 @@ class _GameScreenState extends ConsumerState<GameScreen>
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.chat,
-                  size: 16,
-                  color: theme.colorScheme.secondary,
-                ),
+                Icon(Icons.chat, size: 16, color: theme.colorScheme.secondary),
                 const SizedBox(width: 8),
-                Text(
-                  '聊天',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.secondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text('聊天',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.secondary,
+                        fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          
-          // 聊天訊息列表
           Expanded(
             flex: 3,
             child: ListView.builder(
               padding: const EdgeInsets.all(8),
               itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final message = messages[index];
-                return _buildChatMessage(message, theme);
-              },
+              itemBuilder: (context, index) =>
+                  _buildChatMessage(messages[index], theme),
             ),
           ),
-          
-          // 分隔線
           Divider(
-            height: 1,
-            color: theme.colorScheme.outline.withValues(alpha: 0.3),
-          ),
-          
-          // 快捷語按鈕
+              height: 1,
+              color: theme.colorScheme.outline.withValues(alpha: 0.3)),
           _buildQuickMessages(theme),
-          
-          // 輸入框
           _buildChatInput(theme),
         ],
       ),
@@ -1020,18 +840,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            message.fromName,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.secondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          
-          Text(
-            message.content,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text(message.fromName,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.w600)),
+          Text(message.content, style: theme.textTheme.bodySmall),
         ],
       ),
     );
@@ -1052,15 +865,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 color: theme.colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.3),
-                ),
+                    color:
+                        theme.colorScheme.secondary.withValues(alpha: 0.3)),
               ),
-              child: Text(
-                message,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.secondary,
-                ),
-              ),
+              child: Text(message,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.secondary)),
             ),
           );
         }).toList(),
@@ -1079,37 +889,30 @@ class _GameScreenState extends ConsumerState<GameScreen>
               style: theme.textTheme.bodySmall,
               decoration: InputDecoration(
                 hintText: '輸入訊息...',
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
                   borderSide: BorderSide(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
-                  ),
+                      color:
+                          theme.colorScheme.outline.withValues(alpha: 0.3)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
                   borderSide: BorderSide(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
-                  ),
+                      color:
+                          theme.colorScheme.outline.withValues(alpha: 0.3)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.secondary,
-                  ),
+                  borderSide:
+                      BorderSide(color: theme.colorScheme.secondary),
                 ),
               ),
-              onSubmitted: (text) {
-                _sendChatMessage(text);
-              },
+              onSubmitted: _sendChatMessage,
             ),
           ),
-          
           const SizedBox(width: 8),
-          
           InkWell(
             onTap: () => _sendChatMessage(_chatController.text),
             child: Container(
@@ -1118,11 +921,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 color: theme.colorScheme.secondary,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.send,
-                size: 16,
-                color: theme.colorScheme.onSecondary,
-              ),
+              child: Icon(Icons.send,
+                  size: 16, color: theme.colorScheme.onSecondary),
             ),
           ),
         ],
@@ -1131,35 +931,28 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   void _sendQuickMessage(String message) {
-    final gameActions = ref.read(gameActionsProvider);
-    gameActions.sendChat(message);
+    ref.read(gameActionsProvider).sendChat(message);
   }
 
   void _sendChatMessage(String text) {
     if (text.trim().isEmpty) return;
-    
-    final gameActions = ref.read(gameActionsProvider);
-    gameActions.sendChat(text.trim());
-    
+    ref.read(gameActionsProvider).sendChat(text.trim());
     _chatController.clear();
   }
 
   void _triggerPhaseTransition(GamePhase newPhase) {
     if (!mounted) return;
-    
     setState(() {
       _currentPhase = newPhase;
       _isShowingPhaseTransition = true;
     });
-    
     _phaseTransitionController.forward();
   }
 
   Widget _buildPhaseTransitionOverlay(ThemeData theme) {
     if (_currentPhase == null) return const SizedBox.shrink();
-    
     final phaseInfo = _getPhaseTransitionInfo(_currentPhase!);
-    
+
     return AnimatedBuilder(
       animation: _phaseTransitionController,
       builder: (context, child) {
@@ -1188,15 +981,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
                         color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        phaseInfo.icon,
-                        size: 60,
-                        color: Colors.white,
-                      ),
+                      child:
+                          Icon(phaseInfo.icon, size: 60, color: Colors.white),
                     ),
-                    
                     const SizedBox(height: 32),
-                    
                     Text(
                       phaseInfo.title,
                       style: theme.textTheme.displayMedium?.copyWith(
@@ -1204,27 +992,23 @@ class _GameScreenState extends ConsumerState<GameScreen>
                         fontWeight: FontWeight.bold,
                         shadows: [
                           Shadow(
-                            offset: const Offset(0, 2),
-                            blurRadius: 4,
-                            color: Colors.black.withValues(alpha: 0.3),
-                          ),
+                              offset: const Offset(0, 2),
+                              blurRadius: 4,
+                              color: Colors.black.withValues(alpha: 0.3)),
                         ],
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    
                     const SizedBox(height: 16),
-                    
                     Text(
                       phaseInfo.subtitle,
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.9),
                         shadows: [
                           Shadow(
-                            offset: const Offset(0, 1),
-                            blurRadius: 2,
-                            color: Colors.black.withValues(alpha: 0.3),
-                          ),
+                              offset: const Offset(0, 1),
+                              blurRadius: 2,
+                              color: Colors.black.withValues(alpha: 0.3)),
                         ],
                       ),
                       textAlign: TextAlign.center,
@@ -1251,7 +1035,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
             const Color(0xFF34495E).withValues(alpha: 0.9),
           ],
         );
-      
       case GamePhase.debate:
         return PhaseTransitionInfo(
           title: '辯論階段',
@@ -1262,7 +1045,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
             const Color(0xFFDC143C).withValues(alpha: 0.9),
           ],
         );
-      
       case GamePhase.voting:
         return PhaseTransitionInfo(
           title: '投票階段',
@@ -1273,7 +1055,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
             const Color(0xFFFFD700).withValues(alpha: 0.9),
           ],
         );
-      
       case GamePhase.result:
         return PhaseTransitionInfo(
           title: '結算中...',
@@ -1284,7 +1065,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
             const Color(0xFF7B68EE).withValues(alpha: 0.9),
           ],
         );
-      
       default:
         return PhaseTransitionInfo(
           title: '遊戲進行中',
@@ -1327,46 +1107,29 @@ class _GameScreenState extends ConsumerState<GameScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 議案標題
           Row(
             children: [
-              Icon(
-                Icons.gavel,
-                color: theme.colorScheme.secondary,
-                size: 24,
-              ),
+              Icon(Icons.gavel, color: theme.colorScheme.secondary, size: 24),
               const SizedBox(width: 8),
-              Text(
-                '當前議案',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.secondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text('當前議案',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
-          
           const SizedBox(height: 12),
-          
-          // 議案名稱（從 gameState 獲取）
           Text(
             gameState.currentBill ?? '等待議案',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: theme.textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
-          
           const SizedBox(height: 8),
-          
-          // 議案描述
           Text(
             _getBillDescription(gameState.currentBill),
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-            ),
+                color:
+                    theme.colorScheme.onSurface.withValues(alpha: 0.8)),
           ),
-          
-          // 投票階段時顯示效果預覽
           if (gameState.phase == GamePhase.voting) ...[
             const SizedBox(height: 16),
             _buildBillEffectPreview(gameState.currentBill, theme),
@@ -1378,47 +1141,37 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
   Widget _buildBillEffectPreview(String? billName, ThemeData theme) {
     final effects = _getBillEffects(billName);
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.3),
-        ),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '投票效果預覽',
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          
+          Text('投票效果預覽',
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          
           ...effects.map((effect) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 12,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.arrow_forward_ios,
+                        size: 12,
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.7)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child:
+                            Text(effect, style: theme.textTheme.bodySmall)),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    effect,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
@@ -1446,27 +1199,27 @@ class _GameScreenState extends ConsumerState<GameScreen>
       case '《工廠法案》':
         return [
           '通過：工人聲望 +10，工廠主聲望 -10',
-          '否決：工人聲望 -5，工廠主聲望 +5',
+          '否決：工人聲望 -5，工廠主聲望 +5'
         ];
       case '《新聞審查法》':
         return [
           '通過：記者聲望 -15，其他人聲望 +5',
-          '否決：記者聲望 +8，其他人聲望 -2',
+          '否決：記者聲望 +8，其他人聲望 -2'
         ];
       case '《穀物法廢除》':
         return [
           '通過：工廠主聲望 +10，工人聲望 +5',
-          '否決：工廠主聲望 -5，工人聲望 -3',
+          '否決：工廠主聲望 -5，工人聲望 -3'
         ];
       case '《結社自由法》':
         return [
           '通過：盧德派聲望 +15，工廠主聲望 -10',
-          '否決：盧德派聲望 -8，工廠主聲望 +5',
+          '否決：盧德派聲望 -8，工廠主聲望 +5'
         ];
       case '《選舉改革法》':
         return [
           '通過：全員聲望 +5，最高聲望者 -10',
-          '否決：全員聲望 -3',
+          '否決：全員聲望 -3'
         ];
       default:
         return ['投票效果將在議案確定後顯示'];
@@ -1474,16 +1227,22 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   void _toggleChat() {
-    setState(() {
-      _isChatExpanded = !_isChatExpanded;
-    });
+    setState(() => _isChatExpanded = !_isChatExpanded);
   }
 
   void _onCardTapped(GameCard card) {
-    // TODO: 實作卡牌使用邏輯
+    HapticService.cardPlayed();
+    ref.read(audioServiceProvider).playSfx(SfxType.cardPlay);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('使用卡牌: ${card.name}')),
     );
+  }
+
+  void _onCardPlayed(GameCard card) {
+    HapticService.cardPlayed();
+    ref.read(audioServiceProvider).playSfx(SfxType.cardPlay);
+    final gameActions = ref.read(gameActionsProvider);
+    gameActions.useCard(card);
   }
 
   void _showGameSettings(BuildContext context) {
@@ -1499,13 +1258,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
               title: const Text('音效'),
               trailing: Switch(value: true, onChanged: (value) {}),
             ),
-            
             ListTile(
               leading: const Icon(Icons.help),
               title: const Text('遊戲規則'),
               onTap: () {},
             ),
-            
             ListTile(
               leading: const Icon(Icons.exit_to_app),
               title: const Text('離開遊戲'),

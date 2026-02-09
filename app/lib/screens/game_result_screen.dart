@@ -5,16 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../config/theme.dart';
 import '../models/game_state.dart';
 import '../models/player.dart';
-
-// 私有顏色常量（從主題文件複製）
-const _darkRed = Color(0xFF8B0000);
-const _gold = Color(0xFFD4AF37);
-const _darkGold = Color(0xFFB8941C);
-const _cream = Color(0xFFFFF8DC);
-const _darkBrown = Color(0xFF3C1810);
-const _lightBrown = Color(0xFF8B4513);
-const _charcoal = Color(0xFF2F2F2F);
-const _slate = Color(0xFF1A1A1A);
+import '../services/audio_service.dart';
+import '../services/haptic_service.dart';
+import '../widgets/animations/ranking_reveal_animation.dart';
+import '../widgets/animations/reputation_change_animation.dart';
 
 /// 遊戲結算畫面
 class GameResultScreen extends ConsumerStatefulWidget {
@@ -41,7 +35,7 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
@@ -72,6 +66,18 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
     ));
 
     _animationController.forward();
+
+    // 播放結算 BGM + 震動
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final audio = ref.read(audioServiceProvider);
+      audio.playBgm(BgmType.result);
+      if (_isPlayerVictory()) {
+        audio.playSfx(SfxType.victory);
+        HapticService.victory();
+      } else {
+        audio.playSfx(SfxType.defeat);
+      }
+    });
   }
 
   @override
@@ -82,18 +88,17 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
 
   @override
   Widget build(BuildContext context) {
-    
     return Scaffold(
-      backgroundColor: _slate,
+      backgroundColor: Parliament1812Theme.slate,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _darkRed.withValues(alpha: 0.3),
-              _slate,
-              _slate.withValues(alpha: 0.8),
+              Parliament1812Theme.darkRed.withValues(alpha: 0.3),
+              Parliament1812Theme.slate,
+              Parliament1812Theme.slate.withValues(alpha: 0.8),
             ],
           ),
         ),
@@ -102,7 +107,7 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
             children: [
               // 結果標題
               _buildResultHeader(),
-              
+
               // 主要內容區域
               Expanded(
                 child: SingleChildScrollView(
@@ -110,17 +115,17 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
                   child: Column(
                     children: [
                       const SizedBox(height: 20),
-                      
-                      // 排名列表
+
+                      // 排名列表 — 使用逐條出現動畫
                       _buildRankingsList(),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // 統計資料
                       _buildGameStatistics(),
-                      
+
                       const SizedBox(height: 32),
-                      
+
                       // 操作按鈕
                       _buildActionButtons(),
                     ],
@@ -136,7 +141,7 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
 
   Widget _buildResultHeader() {
     final isVictory = _isPlayerVictory();
-    
+
     return AnimatedBuilder(
       animation: _fadeAnimation,
       builder: (context, child) {
@@ -148,8 +153,11 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isVictory
-                    ? [_gold, _darkGold]
-                    : [_darkRed, const Color(0xFF440000)],
+                    ? [Parliament1812Theme.gold, Parliament1812Theme.darkGold]
+                    : [
+                        Parliament1812Theme.darkRed,
+                        const Color(0xFF440000)
+                      ],
               ),
             ),
             child: Column(
@@ -162,35 +170,33 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
                       child: Icon(
                         isVictory ? Icons.emoji_events : Icons.trending_down,
                         size: 64,
-                        color: isVictory 
-                            ? _darkBrown 
-                            : _cream,
+                        color: isVictory
+                            ? Parliament1812Theme.darkBrown
+                            : Parliament1812Theme.cream,
                       ),
                     );
                   },
                 ),
-                
                 const SizedBox(height: 16),
-                
                 Text(
                   isVictory ? '大獲全勝！' : '政治失敗',
                   style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    color: isVictory 
-                        ? _darkBrown 
-                        : _cream,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: isVictory
+                            ? Parliament1812Theme.darkBrown
+                            : Parliament1812Theme.cream,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                
                 const SizedBox(height: 8),
-                
                 Text(
                   _getResultSubtitle(),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: isVictory 
-                        ? _darkBrown.withValues(alpha: 0.8)
-                        : _cream.withValues(alpha: 0.8),
-                  ),
+                        color: isVictory
+                            ? Parliament1812Theme.darkBrown
+                                .withValues(alpha: 0.8)
+                            : Parliament1812Theme.cream
+                                .withValues(alpha: 0.8),
+                      ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -202,6 +208,8 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
   }
 
   Widget _buildRankingsList() {
+    final rankings = widget.gameResult.rankings;
+
     return SlideTransition(
       position: _slideAnimation,
       child: Card(
@@ -212,28 +220,25 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.leaderboard,
-                    color: _gold,
-                    size: 24,
-                  ),
+                  Icon(Icons.leaderboard, color: Parliament1812Theme.gold, size: 24),
                   const SizedBox(width: 8),
-                  Text(
-                    '最終排名',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
+                  Text('最終排名',
+                      style: Theme.of(context).textTheme.headlineMedium),
                 ],
               ),
-              
               const SizedBox(height: 16),
-              
-              ...widget.gameResult.rankings.asMap().entries.map((entry) {
-                final index = entry.key;
-                final ranking = entry.value;
-                final isMvp = index == 0;
-                
-                return _buildRankingItem(ranking, isMvp);
-              }),
+
+              // 使用逐條出現動畫
+              RankingRevealAnimation(
+                rankingItems: rankings.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final ranking = entry.value;
+                  final isMvp = index == 0;
+                  return _buildRankingItem(ranking, isMvp);
+                }).toList(),
+                delayBetween: const Duration(milliseconds: 400),
+                itemDuration: const Duration(milliseconds: 600),
+              ),
             ],
           ),
         ),
@@ -246,14 +251,14 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isMvp 
-            ? _gold.withValues(alpha: 0.1)
-            : _charcoal.withValues(alpha: 0.3),
+        color: isMvp
+            ? Parliament1812Theme.gold.withValues(alpha: 0.1)
+            : Parliament1812Theme.charcoal.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
         border: isMvp
-            ? Border.all(color: _gold, width: 2)
+            ? Border.all(color: Parliament1812Theme.gold, width: 2)
             : Border.all(
-                color: _lightBrown.withValues(alpha: 0.3), 
+                color: Parliament1812Theme.lightBrown.withValues(alpha: 0.3),
                 width: 1,
               ),
       ),
@@ -271,15 +276,14 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
               child: Text(
                 '${ranking.rank}',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: _cream,
-                  fontWeight: FontWeight.bold,
-                ),
+                      color: Parliament1812Theme.cream,
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
             ),
           ),
-          
           const SizedBox(width: 16),
-          
+
           // 角色頭像
           Container(
             width: 48,
@@ -290,13 +294,12 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
             ),
             child: Icon(
               _getCharacterIcon(ranking.character),
-              color: _cream,
+              color: Parliament1812Theme.cream,
               size: 24,
             ),
           ),
-          
           const SizedBox(width: 16),
-          
+
           // 玩家資訊
           Expanded(
             child: Column(
@@ -307,24 +310,22 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
                     Text(
                       ranking.playerName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     if (isMvp) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _gold,
+                          color: Parliament1812Theme.gold,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           'MVP',
                           style: TextStyle(
-                            color: _darkBrown,
+                            color: Parliament1812Theme.darkBrown,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -333,33 +334,33 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
                     ],
                   ],
                 ),
-                
                 Text(
                   _getCharacterName(ranking.character),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: _cream.withValues(alpha: 0.7),
-                  ),
+                        color: Parliament1812Theme.cream.withValues(alpha: 0.7),
+                      ),
                 ),
               ],
             ),
           ),
-          
-          // 分數
+
+          // 分數 — 使用數字滾動動畫
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '${ranking.score}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: _gold,
-                  fontWeight: FontWeight.bold,
-                ),
+              ReputationChangeAnimation(
+                oldValue: 0,
+                newValue: ranking.score,
+                duration: const Duration(milliseconds: 1500),
+                textStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Parliament1812Theme.gold,
+                    ),
               ),
               Text(
                 '聲望: ${ranking.finalReputation}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _cream.withValues(alpha: 0.7),
-                ),
+                      color: Parliament1812Theme.cream.withValues(alpha: 0.7),
+                    ),
               ),
             ],
           ),
@@ -379,22 +380,13 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.bar_chart,
-                    color: _gold,
-                    size: 24,
-                  ),
+                  Icon(Icons.bar_chart, color: Parliament1812Theme.gold, size: 24),
                   const SizedBox(width: 8),
-                  Text(
-                    '遊戲統計',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
+                  Text('遊戲統計',
+                      style: Theme.of(context).textTheme.headlineMedium),
                 ],
               ),
-              
               const SizedBox(height: 16),
-              
-              // TODO: 這些統計數據需要從後端傳來
               _buildStatItem('使用卡牌數', '12 張'),
               _buildStatItem('造成傷害', '85 點'),
               _buildStatItem('受到傷害', '62 點'),
@@ -413,16 +405,13 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+          Text(label, style: Theme.of(context).textTheme.bodyLarge),
           Text(
             value,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: _gold,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: Parliament1812Theme.gold,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),
@@ -437,22 +426,15 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                // TODO: 重新開始遊戲邏輯
-                context.go('/room/${widget.roomCode}');
-              },
+              onPressed: () => context.go('/room/${widget.roomCode}'),
               child: const Text('再來一局'),
             ),
           ),
-          
           const SizedBox(height: 16),
-          
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {
-                context.go('/menu');
-              },
+              onPressed: () => context.go('/menu'),
               child: const Text('返回主選單'),
             ),
           ),
@@ -462,18 +444,13 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
   }
 
   bool _isPlayerVictory() {
-    // TODO: 根據當前玩家在排名中的位置判斷勝利
-    // 目前先假設前兩名算勝利
     final rankings = widget.gameResult.rankings;
     if (rankings.isEmpty) return false;
-    
-    // 需要當前玩家 ID 來判斷
     return rankings.take(2).any((r) => r.playerId == 'current_player_id');
   }
 
   String _getResultSubtitle() {
-    final isVictory = _isPlayerVictory();
-    if (isVictory) {
+    if (_isPlayerVictory()) {
       return '在這場政治角力中表現卓越！';
     } else {
       return '政治是一門藝術，下次會更好。';
@@ -483,13 +460,13 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
   Color _getRankColor(int rank) {
     switch (rank) {
       case 1:
-        return _gold;
+        return Parliament1812Theme.gold;
       case 2:
         return Colors.grey[400]!;
       case 3:
         return Colors.brown[400]!;
       default:
-        return _lightBrown;
+        return Parliament1812Theme.lightBrown;
     }
   }
 
@@ -511,13 +488,13 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
   IconData _getCharacterIcon(CharacterType character) {
     switch (character) {
       case CharacterType.thomasWorker:
-        return Icons.groups; // 勞工領袖
+        return Icons.groups;
       case CharacterType.richardFactory:
-        return Icons.business; // 工廠主
+        return Icons.business;
       case CharacterType.edwardJournalist:
-        return Icons.edit; // 記者
+        return Icons.edit;
       case CharacterType.georgeLuddite:
-        return Icons.balance; // 盧德派領袖
+        return Icons.balance;
       default:
         return Icons.person;
     }
@@ -539,7 +516,6 @@ class _GameResultScreenState extends ConsumerState<GameResultScreen>
   }
 
   String _getGameDuration() {
-    // TODO: 計算遊戲實際時長
     return '15:30';
   }
 }

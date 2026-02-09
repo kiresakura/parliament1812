@@ -10,7 +10,6 @@ import 'screens/room_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/game_result_screen.dart';
 import 'providers/game_provider.dart';
-import 'screens/game_result_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(

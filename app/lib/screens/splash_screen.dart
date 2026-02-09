@@ -101,7 +101,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               letterSpacing: 4,
                               shadows: [
                                 Shadow(
-                                  color: theme.colorScheme.primary.withOpacity(0.3),
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
                                   offset: const Offset(0, 4),
                                   blurRadius: 8,
                                 ),
@@ -127,7 +127,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           Text(
                             'PARLIAMENT CRISIS',
                             style: theme.textTheme.titleLarge?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                               letterSpacing: 2,
                               fontWeight: FontWeight.w300,
                             ),
@@ -145,7 +145,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     child: Text(
                       '卡牌與謊言的政治遊戲',
                       style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         fontStyle: FontStyle.italic,
                       ),
                     ),

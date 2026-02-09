@@ -263,7 +263,7 @@ class _RoomScreenState extends ConsumerState<RoomScreen> {
               color: theme.colorScheme.surfaceContainer,
               border: Border(
                 top: BorderSide(
-                  color: theme.colorScheme.outline.withOpacity(0.2),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -762,7 +762,7 @@ class _PlayerSlot extends StatelessWidget {
                       Text(
                         player.character?.displayName ?? "未選角色",
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -791,7 +791,7 @@ class _PlayerSlot extends StatelessWidget {
                   size: 16,
                   color: player.isReady 
                       ? theme.colorScheme.secondary 
-                      : theme.colorScheme.onSurface.withOpacity(0.5),
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
                 
                 const SizedBox(width: 4),
@@ -801,7 +801,7 @@ class _PlayerSlot extends StatelessWidget {
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: player.isReady 
                         ? theme.colorScheme.secondary 
-                        : theme.colorScheme.onSurface.withOpacity(0.5),
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ],
