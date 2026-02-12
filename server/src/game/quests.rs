@@ -108,7 +108,7 @@ impl QuestType {
     }
 
     /// 從字串解析任務類型
-    pub fn from_str(s: &str) -> Option<QuestType> {
+    pub fn parse(s: &str) -> Option<QuestType> {
         match s {
             "play_games" => Some(QuestType::PlayGames),
             "win_games" => Some(QuestType::WinGames),
@@ -223,7 +223,6 @@ pub fn all_quest_templates() -> Vec<QuestTemplate> {
             reward: QuestReward::Gold(40),
             weight: 12,
         },
-
         // --- 卡牌類 ---
         QuestTemplate {
             quest_type: QuestType::UseAttackCards,
@@ -257,7 +256,6 @@ pub fn all_quest_templates() -> Vec<QuestTemplate> {
             reward: QuestReward::Gold(30),
             weight: 8,
         },
-
         // --- 戰鬥類 ---
         QuestTemplate {
             quest_type: QuestType::InitiateChallenge,
@@ -291,7 +289,6 @@ pub fn all_quest_templates() -> Vec<QuestTemplate> {
             reward: QuestReward::Gold(40),
             weight: 6,
         },
-
         // --- 社交類 ---
         QuestTemplate {
             quest_type: QuestType::FormAlliance,
@@ -309,7 +306,6 @@ pub fn all_quest_templates() -> Vec<QuestTemplate> {
             reward: QuestReward::Gems(3),
             weight: 4,
         },
-
         // --- 技能類 ---
         QuestTemplate {
             quest_type: QuestType::UseCharacterSkill,
@@ -319,7 +315,6 @@ pub fn all_quest_templates() -> Vec<QuestTemplate> {
             reward: QuestReward::Gold(45),
             weight: 7,
         },
-
         // --- 挑戰類（低權重，高獎勵）---
         QuestTemplate {
             quest_type: QuestType::WinWithReputation,
@@ -345,7 +340,6 @@ pub fn all_quest_templates() -> Vec<QuestTemplate> {
             reward: QuestReward::Gold(45),
             weight: 8,
         },
-
         // --- 資源類 ---
         QuestTemplate {
             quest_type: QuestType::EarnGold,
@@ -355,7 +349,6 @@ pub fn all_quest_templates() -> Vec<QuestTemplate> {
             reward: QuestReward::Gems(5),
             weight: 6,
         },
-
         // --- 觀戰類 ---
         QuestTemplate {
             quest_type: QuestType::SpectateGames,
@@ -386,7 +379,7 @@ mod tests {
     fn test_quest_type_roundtrip() {
         for qt in QuestType::all() {
             let s = qt.as_str();
-            let parsed = QuestType::from_str(s).expect("should parse");
+            let parsed = QuestType::parse(s).expect("should parse");
             assert_eq!(*qt, parsed);
         }
     }

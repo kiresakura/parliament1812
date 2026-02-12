@@ -71,8 +71,8 @@ impl JwtManager {
     pub fn new(secret: String, expiration_hours: i64) -> Self {
         Self {
             secret,
-            access_token_minutes: 15,    // 15 分鐘
-            refresh_token_days: 30,      // 30 天
+            access_token_minutes: 15, // 15 分鐘
+            refresh_token_days: 30,   // 30 天
             expiration_hours,
         }
     }
@@ -161,9 +161,7 @@ impl JwtManager {
         let claims = self.validate_token(refresh_token)?;
 
         if claims.token_type != TokenType::Refresh {
-            return Err(AppError::Unauthorized(
-                "必須使用 refresh token".to_string(),
-            ));
+            return Err(AppError::Unauthorized("必須使用 refresh token".to_string()));
         }
 
         let user_id = claims.user_id()?;

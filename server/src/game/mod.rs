@@ -30,4 +30,4 @@ pub mod state;
 pub use actions::{ActionResult, GameAction, GameEffect, GameResult, PlayerScore, VoteCounts};
 pub use characters::{CharacterSkills, GameError};
 pub use engine::{GameConfig, GameEngine};
-pub use state::{GameState, PendingChallenge, PlayerState};
+pub use state::{EngineState, PendingChallenge, PlayerState};

@@ -33,7 +33,7 @@ impl FriendStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(FriendStatus::Pending),
             "accepted" => Some(FriendStatus::Accepted),
@@ -483,17 +483,17 @@ mod tests {
     #[test]
     fn test_friend_status_round_trip() {
         assert_eq!(
-            FriendStatus::from_str(FriendStatus::Pending.as_str()),
+            FriendStatus::parse(FriendStatus::Pending.as_str()),
             Some(FriendStatus::Pending)
         );
         assert_eq!(
-            FriendStatus::from_str(FriendStatus::Accepted.as_str()),
+            FriendStatus::parse(FriendStatus::Accepted.as_str()),
             Some(FriendStatus::Accepted)
         );
         assert_eq!(
-            FriendStatus::from_str(FriendStatus::Blocked.as_str()),
+            FriendStatus::parse(FriendStatus::Blocked.as_str()),
             Some(FriendStatus::Blocked)
         );
-        assert_eq!(FriendStatus::from_str("unknown"), None);
+        assert_eq!(FriendStatus::parse("unknown"), None);
     }
 }

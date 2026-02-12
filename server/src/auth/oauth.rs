@@ -115,12 +115,9 @@ pub async fn verify_apple_token(identity_token: &str) -> AppResult<OAuthResult> 
     // Apple 的 audience 是 app 的 bundle identifier
     validation.validate_aud = false; // 暫時跳過 audience 驗證
 
-    let token_data = jsonwebtoken::decode::<AppleTokenClaims>(
-        identity_token,
-        &decoding_key,
-        &validation,
-    )
-    .map_err(|e| AppError::Unauthorized(format!("Apple token 驗證失敗: {}", e)))?;
+    let token_data =
+        jsonwebtoken::decode::<AppleTokenClaims>(identity_token, &decoding_key, &validation)
+            .map_err(|e| AppError::Unauthorized(format!("Apple token 驗證失敗: {}", e)))?;
 
     Ok(OAuthResult {
         provider: "apple".to_string(),

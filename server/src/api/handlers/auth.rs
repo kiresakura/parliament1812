@@ -83,12 +83,15 @@ pub async fn register(
     {
         let user = crate::domain::User::new(req.username.clone(), password_hash);
         let mut users = state.users.write().await;
-        users.insert(user_record.id, crate::domain::User {
-            id: user_record.id,
-            username: user.username,
-            password_hash: user.password_hash,
-            created_at: user.created_at,
-        });
+        users.insert(
+            user_record.id,
+            crate::domain::User {
+                id: user_record.id,
+                username: user.username,
+                password_hash: user.password_hash,
+                created_at: user.created_at,
+            },
+        );
     }
 
     // 生成 token pair
@@ -140,9 +143,7 @@ pub async fn login(
             let users = state.users.read().await;
             if let Some(mem_user) = users.values().find(|u| u.username == req.username) {
                 if !verify_password(&req.password, &mem_user.password_hash)? {
-                    return Err(AppError::Unauthorized(
-                        "使用者名稱或密碼錯誤".to_string(),
-                    ));
+                    return Err(AppError::Unauthorized("使用者名稱或密碼錯誤".to_string()));
                 }
                 let token = state.jwt.generate_token(mem_user.id)?;
                 let expires_in = state.jwt.expiration_seconds();
@@ -153,8 +154,8 @@ pub async fn login(
         }
     };
 
-    let user_record = user_record
-        .ok_or_else(|| AppError::Unauthorized("使用者名稱或密碼錯誤".to_string()))?;
+    let user_record =
+        user_record.ok_or_else(|| AppError::Unauthorized("使用者名稱或密碼錯誤".to_string()))?;
 
     // 檢查是否被封禁
     if user_record.is_banned.unwrap_or(false) {
@@ -162,17 +163,12 @@ pub async fn login(
     }
 
     // 驗證密碼
-    let password_hash = user_record
-        .password_hash
-        .as_deref()
-        .ok_or_else(|| {
-            AppError::BadRequest("此帳號使用 OAuth 登入，請使用 Google/Apple 登入".to_string())
-        })?;
+    let password_hash = user_record.password_hash.as_deref().ok_or_else(|| {
+        AppError::BadRequest("此帳號使用 OAuth 登入，請使用 Google/Apple 登入".to_string())
+    })?;
 
     if !verify_password(&req.password, password_hash)? {
-        return Err(AppError::Unauthorized(
-            "使用者名稱或密碼錯誤".to_string(),
-        ));
+        return Err(AppError::Unauthorized("使用者名稱或密碼錯誤".to_string()));
     }
 
     // 更新最後登入時間
@@ -256,10 +252,8 @@ async fn handle_oauth_login(
         record
     } else {
         // 建立新帳號
-        let username = generate_oauth_username(
-            &oauth_result.provider,
-            &oauth_result.provider_user_id,
-        );
+        let username =
+            generate_oauth_username(&oauth_result.provider, &oauth_result.provider_user_id);
         let name = display_name
             .or(oauth_result.name)
             .unwrap_or_else(|| username.clone());

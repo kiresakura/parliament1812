@@ -134,7 +134,10 @@ pub fn create_router(state: AppState) -> Router {
     // 每日任務路由（全部需要認證）
     let quest_routes = Router::new()
         .route("/daily", get(handlers::quests::get_daily_quests))
-        .route("/claim/:quest_id", post(handlers::quests::claim_quest_reward))
+        .route(
+            "/claim/:quest_id",
+            post(handlers::quests::claim_quest_reward),
+        )
         .route("/history", get(handlers::quests::get_quest_history))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
@@ -180,6 +183,77 @@ pub fn create_router(state: AppState) -> Router {
             auth_middleware,
         ));
 
+    // IAP 內購路由（全部需要認證）
+    let iap_routes = Router::new()
+        .route("/verify/apple", post(handlers::iap::verify_apple))
+        .route("/verify/google", post(handlers::iap::verify_google))
+        .route("/balance", get(handlers::iap::get_balance))
+        .route("/spend", post(handlers::iap::spend_gems))
+        .route("/history", get(handlers::iap::get_history))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 單人模式路由（全部需要認證）
+    let single_player_routes = Router::new()
+        .route("/start", post(handlers::single_player::start_single_player))
+        .route(
+            "/action",
+            post(handlers::single_player::single_player_action),
+        )
+        .route(
+            "/state/:session_id",
+            get(handlers::single_player::get_single_player_state),
+        )
+        .route(
+            "/campaign/start",
+            post(handlers::single_player::start_campaign_chapter),
+        )
+        .route(
+            "/campaign/progress",
+            get(handlers::single_player::get_campaign_progress),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 教學路由
+    let tutorial_public_routes = Router::new().route("/steps", get(handlers::tutorial::get_steps));
+
+    let tutorial_protected_routes = Router::new()
+        .route("/progress", get(handlers::tutorial::get_progress))
+        .route("/complete", post(handlers::tutorial::complete_step))
+        .route("/reset", post(handlers::tutorial::reset_tutorial))
+        .route("/check", get(handlers::tutorial::check_needs_tutorial))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    let tutorial_routes = Router::new()
+        .merge(tutorial_public_routes)
+        .merge(tutorial_protected_routes);
+
+    // 故事戰役路由
+    let campaign_public_routes =
+        Router::new().route("/chapters", get(handlers::campaign::get_chapters));
+
+    let campaign_protected_routes = Router::new()
+        .route("/chapter/:id", get(handlers::campaign::get_chapter_detail))
+        .route("/progress", get(handlers::campaign::get_progress))
+        .route("/complete", post(handlers::campaign::complete_stage))
+        .route("/unlock", post(handlers::campaign::unlock_chapter))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    let campaign_routes = Router::new()
+        .merge(campaign_public_routes)
+        .merge(campaign_protected_routes);
+
     // API v1 路由
     let api_v1_routes = Router::new()
         .nest("/auth", auth_routes)
@@ -187,7 +261,11 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/rankings", ranking_routes)
         .nest("/quests", quest_routes)
         .nest("/friends", friend_routes)
-        .nest("/users", user_routes);
+        .nest("/users", user_routes)
+        .nest("/iap", iap_routes)
+        .nest("/single", single_player_routes)
+        .nest("/tutorial", tutorial_routes)
+        .nest("/campaign", campaign_routes);
 
     // 組合所有路由
     Router::new()

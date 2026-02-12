@@ -5,7 +5,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 圖鑑稀有度
+/// 圖鑑稀有度（收藏系統用）
+///
+/// 用於卡牌圖鑑的收藏品稀有度分級（Common / Uncommon / Rare / Legendary）。
+/// 注意：與 `CardRarity`（遊戲對局用）是不同概念。
+/// - `CodexRarity` → 圖鑑收藏品的稀有度分級，影響收集難度
+/// - `CardRarity` → 對局卡牌的強度分級（N / R / SR / SSR），影響卡牌效果
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CodexRarity {
@@ -75,6 +80,7 @@ pub struct CardCodexEntry {
 }
 
 /// 取得全部 56 張卡牌圖鑑
+#[allow(clippy::vec_init_then_push)]
 pub fn get_all_codex_entries() -> Vec<CardCodexEntry> {
     let mut entries = Vec::with_capacity(56);
 
@@ -599,7 +605,8 @@ pub fn get_all_codex_entries() -> Vec<CardCodexEntry> {
     entries.push(CardCodexEntry {
         id: "rare_public_trial".into(),
         name: "公開審判".into(),
-        description: "對目標進行公開審判，造成 20 點傷害。若目標本回合使用過攻擊卡，額外造成 20 點。".into(),
+        description:
+            "對目標進行公開審判，造成 20 點傷害。若目標本回合使用過攻擊卡，額外造成 20 點。".into(),
         card_type: CodexCardType::Attack,
         rarity: CodexRarity::Rare,
         character: None,
@@ -716,16 +723,30 @@ pub fn get_all_codex_entries() -> Vec<CardCodexEntry> {
 
 /// 根據 ID 取得圖鑑條目
 pub fn get_codex_entry(card_id: &str) -> Option<CardCodexEntry> {
-    get_all_codex_entries().into_iter().find(|e| e.id == card_id)
+    get_all_codex_entries()
+        .into_iter()
+        .find(|e| e.id == card_id)
 }
 
 /// 取得各稀有度數量統計
 pub fn get_rarity_counts() -> (usize, usize, usize, usize) {
     let entries = get_all_codex_entries();
-    let common = entries.iter().filter(|e| e.rarity == CodexRarity::Common).count();
-    let uncommon = entries.iter().filter(|e| e.rarity == CodexRarity::Uncommon).count();
-    let rare = entries.iter().filter(|e| e.rarity == CodexRarity::Rare).count();
-    let legendary = entries.iter().filter(|e| e.rarity == CodexRarity::Legendary).count();
+    let common = entries
+        .iter()
+        .filter(|e| e.rarity == CodexRarity::Common)
+        .count();
+    let uncommon = entries
+        .iter()
+        .filter(|e| e.rarity == CodexRarity::Uncommon)
+        .count();
+    let rare = entries
+        .iter()
+        .filter(|e| e.rarity == CodexRarity::Rare)
+        .count();
+    let legendary = entries
+        .iter()
+        .filter(|e| e.rarity == CodexRarity::Legendary)
+        .count();
     (common, uncommon, rare, legendary)
 }
 
@@ -774,7 +795,11 @@ mod tests {
         let entries = get_all_codex_entries();
         for entry in &entries {
             if entry.card_type == CodexCardType::Signature {
-                assert!(entry.character.is_some(), "專屬卡 {} 應有關聯角色", entry.id);
+                assert!(
+                    entry.character.is_some(),
+                    "專屬卡 {} 應有關聯角色",
+                    entry.id
+                );
             }
         }
     }

@@ -13,7 +13,7 @@ use crate::domain::{CharacterType, GamePhase, VoteChoice};
 
 /// 遊戲狀態
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameState {
+pub struct EngineState {
     /// 房間代碼
     pub room_code: String,
     /// 當前遊戲階段
@@ -53,7 +53,7 @@ pub struct PendingChallenge {
     pub timestamp: DateTime<Utc>,
 }
 
-impl GameState {
+impl EngineState {
     /// 建立新的遊戲狀態
     pub fn new(room_code: String, players: Vec<PlayerState>) -> Self {
         let player_map: HashMap<Uuid, PlayerState> =
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn test_game_state_creation() {
         let players = create_test_players();
-        let state = GameState::new("ABC123".to_string(), players);
+        let state = EngineState::new("ABC123".to_string(), players);
 
         assert_eq!(state.room_code, "ABC123");
         assert_eq!(state.phase, GamePhase::Waiting);
@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn test_alliance() {
         let players = create_test_players();
-        let mut state = GameState::new("ABC123".to_string(), players);
+        let mut state = EngineState::new("ABC123".to_string(), players);
 
         let player_ids: Vec<Uuid> = state.players.keys().cloned().collect();
         let player_a = player_ids[0];

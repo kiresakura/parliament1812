@@ -125,7 +125,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::PlayGames { target: 1 },
             rewards: vec![
                 AchievementReward::Gold { amount: 50 },
-                AchievementReward::UnlockCard { card_id: "common_brief_speech".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "common_brief_speech".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
@@ -139,7 +141,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::WinGames { target: 1 },
             rewards: vec![
                 AchievementReward::Gold { amount: 100 },
-                AchievementReward::UnlockCard { card_id: "common_filibuster".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "common_filibuster".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
@@ -153,7 +157,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::PlayGames { target: 10 },
             rewards: vec![
                 AchievementReward::Gold { amount: 200 },
-                AchievementReward::UnlockCard { card_id: "common_petition".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "common_petition".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
@@ -167,7 +173,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::CollectCards { target: 28 },
             rewards: vec![
                 AchievementReward::Gold { amount: 300 },
-                AchievementReward::Title { title: "收藏家".into() },
+                AchievementReward::Title {
+                    title: "收藏家".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
@@ -179,9 +187,7 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             name_en: "Deck Builder".into(),
             description: "收集 10 張不同卡牌".into(),
             condition: AchievementCondition::CollectCards { target: 10 },
-            rewards: vec![
-                AchievementReward::Gold { amount: 100 },
-            ],
+            rewards: vec![AchievementReward::Gold { amount: 100 }],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
             icon_hint: "卡牌堆疊".into(),
@@ -194,7 +200,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::FirstPurchase,
             rewards: vec![
                 AchievementReward::Gold { amount: 200 },
-                AchievementReward::Title { title: "贊助者".into() },
+                AchievementReward::Title {
+                    title: "贊助者".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
@@ -206,9 +214,7 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             name_en: "Political Alliance".into(),
             description: "首次加入多人房間".into(),
             condition: AchievementCondition::JoinMultiplayer,
-            rewards: vec![
-                AchievementReward::Gold { amount: 50 },
-            ],
+            rewards: vec![AchievementReward::Gold { amount: 50 }],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
             icon_hint: "握手".into(),
@@ -221,13 +227,14 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::CompleteTutorial,
             rewards: vec![
                 AchievementReward::Gold { amount: 100 },
-                AchievementReward::UnlockCard { card_id: "common_gather_intel".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "common_gather_intel".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Easy,
             is_hidden: false,
             icon_hint: "畢業帽".into(),
         },
-
         // ═══════════════════════════════════════════
         // 🟡 中等成就 (9)
         // ═══════════════════════════════════════════
@@ -239,7 +246,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::AttackStreak { target: 5 },
             rewards: vec![
                 AchievementReward::Gold { amount: 200 },
-                AchievementReward::UnlockCard { card_id: "uncommon_propaganda".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "uncommon_propaganda".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -253,8 +262,12 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::WinGames { target: 50 },
             rewards: vec![
                 AchievementReward::Gold { amount: 500 },
-                AchievementReward::Title { title: "資深議員".into() },
-                AchievementReward::UnlockCard { card_id: "rare_blockade".into() },
+                AchievementReward::Title {
+                    title: "資深議員".into(),
+                },
+                AchievementReward::UnlockCard {
+                    card_id: "rare_blockade".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -268,7 +281,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::TotalGold { target: 10000 },
             rewards: vec![
                 AchievementReward::Gold { amount: 1000 },
-                AchievementReward::UnlockCard { card_id: "uncommon_charity".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "uncommon_charity".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -282,7 +297,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::CollectCards { target: 45 },
             rewards: vec![
                 AchievementReward::Gold { amount: 500 },
-                AchievementReward::Title { title: "鑑賞家".into() },
+                AchievementReward::Title {
+                    title: "鑑賞家".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -296,7 +313,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::PerfectVote,
             rewards: vec![
                 AchievementReward::Gold { amount: 300 },
-                AchievementReward::UnlockCard { card_id: "uncommon_royal_favor".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "uncommon_royal_favor".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -310,7 +329,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::WinStreak { target: 5 },
             rewards: vec![
                 AchievementReward::Gold { amount: 500 },
-                AchievementReward::UnlockCard { card_id: "rare_no_confidence".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "rare_no_confidence".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -324,8 +345,12 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::WinWithAllCharacters,
             rewards: vec![
                 AchievementReward::Gold { amount: 500 },
-                AchievementReward::UnlockCard { card_id: "rare_reform_act".into() },
-                AchievementReward::Title { title: "百變議員".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "rare_reform_act".into(),
+                },
+                AchievementReward::Title {
+                    title: "百變議員".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -339,7 +364,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::DefenseMaster { target: 10 },
             rewards: vec![
                 AchievementReward::Gold { amount: 300 },
-                AchievementReward::UnlockCard { card_id: "rare_habeas_corpus".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "rare_habeas_corpus".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
@@ -351,14 +378,11 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             name_en: "Comeback King".into(),
             description: "在最後一回合逆轉勝".into(),
             condition: AchievementCondition::ComebackWin,
-            rewards: vec![
-                AchievementReward::Gold { amount: 300 },
-            ],
+            rewards: vec![AchievementReward::Gold { amount: 300 }],
             difficulty: AchievementDifficulty::Medium,
             is_hidden: false,
             icon_hint: "翻轉箭頭".into(),
         },
-
         // ═══════════════════════════════════════════
         // 🔴 困難成就 (5)
         // ═══════════════════════════════════════════
@@ -370,8 +394,12 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::WinGames { target: 100 },
             rewards: vec![
                 AchievementReward::Gold { amount: 1000 },
-                AchievementReward::Title { title: "人民之聲".into() },
-                AchievementReward::UnlockCard { card_id: "legendary_magna_carta".into() },
+                AchievementReward::Title {
+                    title: "人民之聲".into(),
+                },
+                AchievementReward::UnlockCard {
+                    card_id: "legendary_magna_carta".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hard,
             is_hidden: false,
@@ -385,7 +413,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::WinStreak { target: 10 },
             rewards: vec![
                 AchievementReward::Gold { amount: 1000 },
-                AchievementReward::Title { title: "議會霸主".into() },
+                AchievementReward::Title {
+                    title: "議會霸主".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hard,
             is_hidden: false,
@@ -399,8 +429,12 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::CollectCards { target: 56 },
             rewards: vec![
                 AchievementReward::Gold { amount: 2000 },
-                AchievementReward::Title { title: "全卡收藏家".into() },
-                AchievementReward::UnlockCard { card_id: "legendary_peterloo".into() },
+                AchievementReward::Title {
+                    title: "全卡收藏家".into(),
+                },
+                AchievementReward::UnlockCard {
+                    card_id: "legendary_peterloo".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hard,
             is_hidden: false,
@@ -414,7 +448,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::TotalGold { target: 100000 },
             rewards: vec![
                 AchievementReward::Gold { amount: 5000 },
-                AchievementReward::Title { title: "財閥".into() },
+                AchievementReward::Title {
+                    title: "財閥".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hard,
             is_hidden: false,
@@ -428,13 +464,14 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::TopLeaderboard,
             rewards: vec![
                 AchievementReward::Gold { amount: 2000 },
-                AchievementReward::Title { title: "議長".into() },
+                AchievementReward::Title {
+                    title: "議長".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hard,
             is_hidden: false,
             icon_hint: "議長木槌".into(),
         },
-
         // ═══════════════════════════════════════════
         // 🟣 隱藏成就 (3)
         // ═══════════════════════════════════════════
@@ -446,8 +483,12 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::Pacifist,
             rewards: vec![
                 AchievementReward::Gold { amount: 500 },
-                AchievementReward::UnlockCard { card_id: "uncommon_amnesty".into() },
-                AchievementReward::Title { title: "和平使者".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "uncommon_amnesty".into(),
+                },
+                AchievementReward::Title {
+                    title: "和平使者".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hidden,
             is_hidden: true,
@@ -461,8 +502,12 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::AllAttack,
             rewards: vec![
                 AchievementReward::Gold { amount: 500 },
-                AchievementReward::UnlockCard { card_id: "rare_political_assassination".into() },
-                AchievementReward::Title { title: "戰爭狂人".into() },
+                AchievementReward::UnlockCard {
+                    card_id: "rare_political_assassination".into(),
+                },
+                AchievementReward::Title {
+                    title: "戰爭狂人".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hidden,
             is_hidden: true,
@@ -476,7 +521,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
             condition: AchievementCondition::EasterEgg,
             rewards: vec![
                 AchievementReward::Gold { amount: 1000 },
-                AchievementReward::Title { title: "歷史學家".into() },
+                AchievementReward::Title {
+                    title: "歷史學家".into(),
+                },
             ],
             difficulty: AchievementDifficulty::Hidden,
             is_hidden: true,
@@ -487,7 +534,9 @@ pub fn get_all_achievements() -> Vec<AchievementDefinition> {
 
 /// 根據 ID 取得成就定義
 pub fn get_achievement(achievement_id: &str) -> Option<AchievementDefinition> {
-    get_all_achievements().into_iter().find(|a| a.id == achievement_id)
+    get_all_achievements()
+        .into_iter()
+        .find(|a| a.id == achievement_id)
 }
 
 /// 取得成就目標值（用於進度計算）
@@ -541,10 +590,22 @@ mod tests {
     #[test]
     fn test_difficulty_distribution() {
         let achievements = get_all_achievements();
-        let easy = achievements.iter().filter(|a| a.difficulty == AchievementDifficulty::Easy).count();
-        let medium = achievements.iter().filter(|a| a.difficulty == AchievementDifficulty::Medium).count();
-        let hard = achievements.iter().filter(|a| a.difficulty == AchievementDifficulty::Hard).count();
-        let hidden = achievements.iter().filter(|a| a.difficulty == AchievementDifficulty::Hidden).count();
+        let easy = achievements
+            .iter()
+            .filter(|a| a.difficulty == AchievementDifficulty::Easy)
+            .count();
+        let medium = achievements
+            .iter()
+            .filter(|a| a.difficulty == AchievementDifficulty::Medium)
+            .count();
+        let hard = achievements
+            .iter()
+            .filter(|a| a.difficulty == AchievementDifficulty::Hard)
+            .count();
+        let hidden = achievements
+            .iter()
+            .filter(|a| a.difficulty == AchievementDifficulty::Hidden)
+            .count();
         assert_eq!(easy, 8, "簡單成就應有 8 個");
         assert_eq!(medium, 9, "中等成就應有 9 個");
         assert_eq!(hard, 5, "困難成就應有 5 個");

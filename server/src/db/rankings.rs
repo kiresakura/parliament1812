@@ -110,10 +110,7 @@ impl RankingDb {
     }
 
     /// 重新計算排名位置（定期執行）
-    pub async fn recalculate_positions(
-        pool: &PgPool,
-        season: i32,
-    ) -> Result<u64, sqlx::Error> {
+    pub async fn recalculate_positions(pool: &PgPool, season: i32) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
             r#"
             UPDATE rankings r
@@ -160,10 +157,7 @@ impl RankingDb {
     }
 
     /// 取得排行榜總人數
-    pub async fn get_total_ranked(
-        pool: &PgPool,
-        season: i32,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn get_total_ranked(pool: &PgPool, season: i32) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(*) FROM rankings WHERE season = $1

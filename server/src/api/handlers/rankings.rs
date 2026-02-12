@@ -99,7 +99,7 @@ pub async fn global_rankings(
     State(state): State<AppState>,
     Query(query): Query<GlobalRankingsQuery>,
 ) -> Result<Json<LeaderboardResponse>, AppError> {
-    let limit = query.limit.unwrap_or(50).min(100).max(1);
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
 
     // 取得賽季
@@ -187,7 +187,10 @@ pub async fn list_seasons(
 // ============================================================
 
 /// 解析賽季 ID：指定了就用指定的，否則取當前活躍賽季
-async fn resolve_season(state: &AppState, season_id: Option<i32>) -> Result<(i32, String), AppError> {
+async fn resolve_season(
+    state: &AppState,
+    season_id: Option<i32>,
+) -> Result<(i32, String), AppError> {
     if let Some(id) = season_id {
         // 查詢指定賽季的名稱
         let season = sqlx::query_as::<_, season::Season>(

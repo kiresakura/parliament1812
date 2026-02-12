@@ -426,7 +426,10 @@ pub async fn process_message(
             handle_propose_alliance(conn_id, target_id, state, sender).await?;
         }
 
-        ClientMessage::RespondToAlliance { proposer_id, accept } => {
+        ClientMessage::RespondToAlliance {
+            proposer_id,
+            accept,
+        } => {
             handle_respond_to_alliance(conn_id, proposer_id, accept, state, sender).await?;
         }
 
@@ -953,10 +956,12 @@ async fn handle_propose_alliance(
     // 獲取玩家名稱
     let (proposer_name, target_name) = {
         let players = state.players.read().await;
-        let proposer_name = players.get(&player_id)
+        let proposer_name = players
+            .get(&player_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
-        let target_name = players.get(&target_id)
+        let target_name = players
+            .get(&target_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
         (proposer_name, target_name)
@@ -1025,10 +1030,12 @@ async fn handle_respond_to_alliance(
     // 獲取玩家名稱
     let (proposer_name, responder_name) = {
         let players = state.players.read().await;
-        let proposer_name = players.get(&proposer_id)
+        let proposer_name = players
+            .get(&proposer_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
-        let responder_name = players.get(&player_id)
+        let responder_name = players
+            .get(&player_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
         (proposer_name, responder_name)
@@ -1150,7 +1157,10 @@ async fn handle_message_reaction(
     };
 
     // 廣播表情反應到房間
-    state.ws_hub.broadcast_to_room_with_sequence(&room_code, reaction_msg).await;
+    state
+        .ws_hub
+        .broadcast_to_room_with_sequence(&room_code, reaction_msg)
+        .await;
 
     Ok(())
 }

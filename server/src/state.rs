@@ -9,6 +9,7 @@ use crate::domain::{Player, Room, User};
 use crate::error::AppError;
 use crate::game::GameEngine;
 use crate::repository::{PlayerRepository, RoomRepository, UserRepository};
+use crate::single_player::session::SinglePlayerSession;
 use crate::websocket::WebSocketHub;
 use deadpool_redis::{Config as RedisConfig, Pool as RedisPool, Runtime};
 use sqlx::postgres::PgPoolOptions;
@@ -33,6 +34,9 @@ pub type RoomPlayersStore = Arc<RwLock<HashMap<String, Vec<Uuid>>>>;
 /// 遊戲引擎儲存（room_code -> GameEngine）
 pub type GameStore = Arc<RwLock<HashMap<String, GameEngine>>>;
 
+/// 單人遊戲 Session 儲存
+pub type SinglePlayerStore = Arc<RwLock<HashMap<Uuid, SinglePlayerSession>>>;
+
 /// 應用程式狀態
 ///
 /// 包含所有共享資源，通過 Arc 實現克隆
@@ -56,6 +60,8 @@ pub struct AppState {
     pub room_players: RoomPlayersStore,
     /// 遊戲引擎儲存（room_code -> GameEngine）
     pub games: GameStore,
+    /// 單人遊戲 Session 儲存
+    pub single_player_sessions: SinglePlayerStore,
     /// WebSocket Hub
     pub ws_hub: Arc<WebSocketHub>,
 }
@@ -113,6 +119,7 @@ impl AppState {
             players: Arc::new(RwLock::new(HashMap::new())),
             room_players: Arc::new(RwLock::new(HashMap::new())),
             games: Arc::new(RwLock::new(HashMap::new())),
+            single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
         })
     }
@@ -149,6 +156,7 @@ impl AppState {
             players: Arc::new(RwLock::new(HashMap::new())),
             room_players: Arc::new(RwLock::new(HashMap::new())),
             games: Arc::new(RwLock::new(HashMap::new())),
+            single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
         })
     }
@@ -186,6 +194,7 @@ impl AppState {
             players: Arc::new(RwLock::new(HashMap::new())),
             room_players: Arc::new(RwLock::new(HashMap::new())),
             games: Arc::new(RwLock::new(HashMap::new())),
+            single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
         }
     }
@@ -270,6 +279,7 @@ impl std::fmt::Debug for AppState {
             .field("players", &"PlayerStore { ... }")
             .field("room_players", &"RoomPlayersStore { ... }")
             .field("games", &"GameStore { ... }")
+            .field("single_player_sessions", &"SinglePlayerStore { ... }")
             .field("ws_hub", &"WebSocketHub { ... }")
             .finish()
     }

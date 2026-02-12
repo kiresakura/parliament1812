@@ -7,7 +7,7 @@ use rand::seq::SliceRandom;
 use uuid::Uuid;
 
 // 移除未使用的導入
-use super::state::GameState;
+use super::state::EngineState;
 use crate::domain::{CharacterType, GamePhase, VoteChoice};
 
 /// AI 難度
@@ -19,6 +19,8 @@ pub enum AIDifficulty {
     Normal,
     /// 困難：進階策略
     Hard,
+    /// 專家：最佳化策略 + 預測 + 反制
+    Expert,
 }
 
 /// AI 行動類型
@@ -72,7 +74,7 @@ impl AIPlayer {
     }
 
     /// AI 決定行動（每回合呼叫一次）
-    pub fn decide_action(&self, state: &GameState) -> AIAction {
+    pub fn decide_action(&self, state: &EngineState) -> AIAction {
         // 檢查 AI 是否能行動
         if let Some(ai_player) = state.get_player(self.id) {
             if !ai_player.can_act() {
@@ -91,7 +93,7 @@ impl AIPlayer {
     }
 
     /// 密謀階段行動
-    fn conspiracy_action(&self, state: &GameState) -> AIAction {
+    fn conspiracy_action(&self, state: &EngineState) -> AIAction {
         let mut rng = StdRng::seed_from_u64(self.rng_seed);
 
         // 獲取其他存活玩家
@@ -171,11 +173,53 @@ impl AIPlayer {
                 }
                 AIAction::Wait
             }
+            AIDifficulty::Expert => {
+                // 專家 AI：預測對手行動 + 最佳化結盟策略
+                let my_reputation = state.get_player(self.id).map(|p| p.reputation).unwrap_or(0);
+                let _alive_count = state.alive_player_count();
+                let my_allies = state.get_allies(self.id);
+
+                // 計算每個玩家的威脅值
+                let mut threats: Vec<(Uuid, i32)> = other_players
+                    .iter()
+                    .map(|p| {
+                        let ally_count = state.get_allies(p.id).len() as i32;
+                        let threat = p.reputation * 2 + p.gold + ally_count * 20;
+                        (p.id, threat)
+                    })
+                    .collect();
+                threats.sort_by(|a, b| b.1.cmp(&a.1));
+
+                // 策略：維持恰好 1-2 個盟友，太多盟友會分散勝利
+                if my_allies.len() < 2 {
+                    // 與第二高威脅的玩家結盟（避免最強的）
+                    if threats.len() >= 2 {
+                        let target_id = threats[1].0;
+                        if !state.are_allies(self.id, target_id) {
+                            return AIAction::FormAlliance { target_id };
+                        }
+                    }
+                } else if my_reputation > 60 && my_allies.len() >= 2 {
+                    // 佔優勢時背叛最弱盟友以獨吞勝利
+                    let weakest_ally = my_allies
+                        .iter()
+                        .filter_map(|&aid| state.get_player(aid))
+                        .min_by_key(|p| p.reputation);
+                    if let Some(target) = weakest_ally {
+                        if rng.gen_bool(0.6) {
+                            return AIAction::Betray {
+                                target_id: target.id,
+                            };
+                        }
+                    }
+                }
+                AIAction::Wait
+            }
         }
     }
 
     /// 辯論階段行動
-    fn debate_action(&self, state: &GameState) -> AIAction {
+    fn debate_action(&self, state: &EngineState) -> AIAction {
         let mut rng = StdRng::seed_from_u64(self.rng_seed);
 
         let ai_player = match state.get_player(self.id) {
@@ -302,11 +346,83 @@ impl AIPlayer {
                     self.try_use_utility_card(ai_player)
                 }
             }
+            AIDifficulty::Expert => {
+                // 專家 AI：全局最佳化 + combo 策略
+                let my_reputation = ai_player.reputation;
+                let my_influence = ai_player.influence;
+
+                // 計算手牌中的 combo 潛力
+                let attack_cards: Vec<_> = ai_player
+                    .hand
+                    .cards
+                    .iter()
+                    .filter(|c| c.is_attack())
+                    .collect();
+                let defense_cards: Vec<_> = ai_player
+                    .hand
+                    .cards
+                    .iter()
+                    .filter(|c| c.is_defense())
+                    .collect();
+
+                // 策略 1：血量危險時，優先防禦 + 治療 combo
+                if my_reputation < 25 {
+                    if let Some(defense_card) = defense_cards.first() {
+                        return AIAction::UseCard {
+                            card_id: defense_card.id.clone(),
+                            target_id: None,
+                        };
+                    }
+                    // 使用技能自保
+                    if ai_player.can_use_skill() {
+                        return AIAction::UseSkill {
+                            target_id: Some(self.id),
+                        };
+                    }
+                }
+
+                // 策略 2：找到最有價值的目標（考慮對手手牌數）
+                let best_target = potential_targets.iter().max_by_key(|p| {
+                    let is_leader = if p.reputation >= 60 { 50 } else { 0 };
+                    let hand_threat = p.hand.cards.len() as i32 * 5;
+                    p.reputation + p.gold / 2 + is_leader + hand_threat
+                });
+
+                if let Some(target) = best_target {
+                    // 策略 3：連續攻擊 — 先用強攻擊卡，留弱的質詢
+                    if attack_cards.len() >= 2 && my_influence >= 6 {
+                        let strongest = attack_cards.iter().max_by_key(|c| c.base_value).unwrap();
+                        return AIAction::UseCard {
+                            card_id: strongest.id.clone(),
+                            target_id: Some(target.id),
+                        };
+                    }
+
+                    if let Some(attack_card) = attack_cards.first() {
+                        return AIAction::UseCard {
+                            card_id: attack_card.id.clone(),
+                            target_id: Some(target.id),
+                        };
+                    }
+
+                    // 質詢作為備案
+                    return AIAction::Challenge {
+                        target_id: target.id,
+                    };
+                }
+
+                // 策略 4：沒有敵人時用技能或功能卡
+                if ai_player.can_use_skill() && rng.gen_bool(0.5) {
+                    AIAction::UseSkill { target_id: None }
+                } else {
+                    self.try_use_utility_card(ai_player)
+                }
+            }
         }
     }
 
     /// 投票階段行動
-    fn voting_action(&self, state: &GameState) -> AIAction {
+    fn voting_action(&self, state: &EngineState) -> AIAction {
         let mut rng = StdRng::seed_from_u64(self.rng_seed);
 
         match self.difficulty {
@@ -334,7 +450,7 @@ impl AIPlayer {
                 // 困難 AI：複雜的投票邏輯
                 let my_reputation = state.get_player(self.id).map(|p| p.reputation).unwrap_or(0);
                 let allies = state.get_allies(self.id);
-                let alive_count = state.alive_player_count();
+                let _alive_count = state.alive_player_count();
 
                 // 如果自己血量高且盟友多，選擇 A（改革）
                 if my_reputation > 50 && allies.len() as f32 / alive_count as f32 > 0.4 {
@@ -353,6 +469,65 @@ impl AIPlayer {
                         choice: *choices.choose(&mut rng).unwrap(),
                     }
                 }
+            }
+            AIDifficulty::Expert => {
+                // 專家 AI：模擬投票結果，選擇對自己最有利的選項
+                let my_reputation = state.get_player(self.id).map(|p| p.reputation).unwrap_or(0);
+                let allies = state.get_allies(self.id);
+                let _alive_count = state.alive_player_count();
+                let ally_ratio = if alive_count > 0 {
+                    allies.len() as f32 / alive_count as f32
+                } else {
+                    0.0
+                };
+
+                // 分析角色特性來決定最佳投票
+                let choice = match self.character {
+                    CharacterType::Thomas => {
+                        // 工人：偏好勞工權益 A，但如果聯盟佔優勢則選 C 穩贏
+                        if ally_ratio > 0.5 {
+                            VoteChoice::C
+                        } else {
+                            VoteChoice::A
+                        }
+                    }
+                    CharacterType::Richard => {
+                        // 工廠主：偏好工業發展 B
+                        if my_reputation > 60 {
+                            VoteChoice::B
+                        } else {
+                            VoteChoice::C
+                        }
+                    }
+                    CharacterType::Edward => {
+                        // 記者：選能製造最大新聞的選項
+                        if ally_ratio < 0.3 {
+                            VoteChoice::A
+                        } else {
+                            VoteChoice::B
+                        }
+                    }
+                    CharacterType::George => {
+                        // 盧德派：極端選項
+                        if my_reputation < 40 {
+                            VoteChoice::A
+                        } else {
+                            VoteChoice::B
+                        }
+                    }
+                    _ => {
+                        // 其他角色：根據局勢最佳化
+                        if my_reputation > 50 && ally_ratio > 0.4 {
+                            VoteChoice::A
+                        } else if my_reputation < 30 {
+                            VoteChoice::B
+                        } else {
+                            VoteChoice::C
+                        }
+                    }
+                };
+
+                AIAction::Vote { choice }
             }
         }
     }
@@ -476,7 +651,7 @@ impl AIManager {
     }
 
     /// 取得所有 AI 玩家的行動
-    pub fn get_all_ai_actions(&self, state: &GameState) -> Vec<(Uuid, AIAction)> {
+    pub fn get_all_ai_actions(&self, state: &EngineState) -> Vec<(Uuid, AIAction)> {
         self.ai_players
             .iter()
             .map(|ai| (ai.id, ai.decide_action(state)))
@@ -496,7 +671,7 @@ mod tests {
     use crate::game::state::PlayerState;
     use std::collections::HashMap;
 
-    fn create_test_game_state() -> GameState {
+    fn create_test_game_state() -> EngineState {
         let players = vec![
             PlayerState::new(Uuid::new_v4(), "Human".to_string(), CharacterType::Thomas),
             PlayerState::new(Uuid::new_v4(), "AI1".to_string(), CharacterType::Richard),
@@ -504,7 +679,7 @@ mod tests {
             PlayerState::new(Uuid::new_v4(), "AI3".to_string(), CharacterType::George),
         ];
 
-        GameState::new("TEST".to_string(), players)
+        EngineState::new("TEST".to_string(), players)
     }
 
     #[test]

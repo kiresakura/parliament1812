@@ -12,14 +12,10 @@ use crate::error::{AppError, AppResult};
 /// - 最多 128 字元
 pub fn validate_password_strength(password: &str) -> AppResult<()> {
     if password.len() < 8 {
-        return Err(AppError::BadRequest(
-            "密碼至少需要 8 個字元".to_string(),
-        ));
+        return Err(AppError::BadRequest("密碼至少需要 8 個字元".to_string()));
     }
     if password.len() > 128 {
-        return Err(AppError::BadRequest(
-            "密碼不能超過 128 個字元".to_string(),
-        ));
+        return Err(AppError::BadRequest("密碼不能超過 128 個字元".to_string()));
     }
     Ok(())
 }

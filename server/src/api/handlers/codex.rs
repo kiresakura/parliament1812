@@ -176,7 +176,7 @@ pub async fn get_achievements(
                 id: def.id,
                 name: def.name,
                 name_en: def.name_en,
-                description: if def.is_hidden && record.map_or(true, |r| !r.completed) {
+                description: if def.is_hidden && record.is_none_or(|r| !r.completed) {
                     "???".into()
                 } else {
                     def.description
@@ -187,11 +187,9 @@ pub async fn get_achievements(
                 rewards: def.rewards,
                 progress: record.map_or(0, |r| r.progress),
                 target,
-                completed: record.map_or(false, |r| r.completed),
-                claimed: record.map_or(false, |r| r.claimed),
-                completed_at: record
-                    .and_then(|r| r.completed_at)
-                    .map(|t| t.to_rfc3339()),
+                completed: record.is_some_and(|r| r.completed),
+                claimed: record.is_some_and(|r| r.claimed),
+                completed_at: record.and_then(|r| r.completed_at).map(|t| t.to_rfc3339()),
             }
         })
         .collect();
@@ -278,9 +276,10 @@ pub async fn claim_achievement(
         .ok_or_else(|| AppError::NotFound("成就不存在".into()))?;
 
     // 檢查是否已完成
-    let record = AchievementDb::get_achievement_progress(&state.db, auth.user_id, &req.achievement_id)
-        .await?
-        .ok_or_else(|| AppError::BadRequest("成就尚未開始".into()))?;
+    let record =
+        AchievementDb::get_achievement_progress(&state.db, auth.user_id, &req.achievement_id)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("成就尚未開始".into()))?;
 
     if !record.completed {
         return Err(AppError::BadRequest("成就尚未完成".into()));

@@ -361,20 +361,19 @@ pub async fn quick_match(
     let suitable_room = {
         let rooms = state.rooms.read().await;
         let players = state.players.read().await;
-        
-        rooms.values()
+
+        rooms
+            .values()
             .filter(|room| {
                 // 房間必須是等待狀態
                 room.can_join() &&
                 // 檢查最大玩家數偏好
-                (req.preferred_max_players.is_none() || 
+                (req.preferred_max_players.is_none() ||
                  req.preferred_max_players == Some(room.max_players as u32))
             })
             .find(|room| {
                 // 檢查房間是否有空位
-                let current_count = players.values()
-                    .filter(|p| p.room_id == room.id)
-                    .count();
+                let current_count = players.values().filter(|p| p.room_id == room.id).count();
                 current_count < room.max_players as usize
             })
             .cloned()
@@ -491,13 +490,16 @@ pub async fn spectate_room(
     // 檢查房間是否可以觀戰
     let current_spectator_count = {
         let players = state.players.read().await;
-        players.values()
+        players
+            .values()
             .filter(|p| p.room_id == room.id && p.is_spectator)
             .count()
     };
 
     if !room.can_spectate(current_spectator_count) {
-        return Err(AppError::BadRequest("觀戰席已滿或房間不允許觀戰".to_string()));
+        return Err(AppError::BadRequest(
+            "觀戰席已滿或房間不允許觀戰".to_string(),
+        ));
     }
 
     // 創建觀戰者

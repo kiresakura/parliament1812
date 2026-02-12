@@ -30,6 +30,7 @@ pub mod game;
 pub mod i18n;
 pub mod repository;
 pub mod services;
+pub mod single_player;
 pub mod state;
 pub mod websocket;
 
@@ -46,7 +47,7 @@ pub use config::{
 };
 pub use domain::{
     ActionType, CharacterType, CreateRoomRequest, CreateUserRequest, ForgotPasswordRequest,
-    GameAction, GameEvent, GamePhase, GameResponse, GameState, JoinRoomRequest, LoginRequest,
+    GameActionRecord, GameEvent, GamePhase, GameResponse, GameState, JoinRoomRequest, LoginRequest,
     MessageResponse, OAuthLoginRequest, Player, PlayerResponse, RefreshTokenRequest,
     ResetPasswordRequest, Room, RoomResponse, RoomStatus, TokenResponse, User, UserResponse, Vote,
     VoteChoice, VoteRequest, VoteResult,
@@ -57,15 +58,14 @@ pub use game::{
     ActionResult,
     // Characters
     CharacterSkills,
-    GameAction as EngineGameAction,
     // Engine
+    EngineState,
+    GameAction,
     GameConfig,
     GameEffect,
     GameEngine,
     GameError,
-    GameResult as EngineGameResult,
-    // State
-    GameState as EngineGameState,
+    GameResult,
     PendingChallenge,
     PlayerScore,
     PlayerState as EnginePlayerState,
@@ -74,7 +74,8 @@ pub use game::{
 pub use repository::{FullUserRecord, PlayerRepository, RoomRepository, UserRepository};
 pub use services::{
     room_service::{LeaveRoomResult, StartGameResult},
-    FriendService, GameService, RoomService,
+    CampaignService, FriendService, GameService, IapService, RoomService, SinglePlayerService,
+    TutorialService,
 };
 pub use state::{AppState, GameStore};
 pub use websocket::{

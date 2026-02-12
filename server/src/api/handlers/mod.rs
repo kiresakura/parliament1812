@@ -3,12 +3,16 @@
 //! 包含所有 HTTP 端點的處理器
 
 pub mod auth;
+pub mod campaign;
 pub mod codex;
 pub mod friends;
 pub mod health;
+pub mod iap;
 pub mod quests;
 pub mod rankings;
 pub mod rooms;
+pub mod single_player;
+pub mod tutorial;
 pub mod websocket;
 
 pub use auth::{

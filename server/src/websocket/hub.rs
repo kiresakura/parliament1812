@@ -581,19 +581,25 @@ impl WebSocketHub {
     /// 廣播帶序列號的訊息到房間
     pub async fn broadcast_to_room_with_sequence(&self, room_code: &str, message: ServerMessage) {
         use super::messages::WrappedMessage;
-        
+
         let seq = self.get_next_sequence(room_code).await;
         let wrapped = WrappedMessage::new(seq, message);
-        
+
         // 發送到本地連線
-        self.broadcast_wrapped_message_local(room_code, wrapped.clone()).await;
-        
+        self.broadcast_wrapped_message_local(room_code, wrapped.clone())
+            .await;
+
         // 發布到 Redis
-        self.publish_wrapped_message_to_redis(room_code, &wrapped).await;
+        self.publish_wrapped_message_to_redis(room_code, &wrapped)
+            .await;
     }
 
     /// 廣播包裝訊息到本地房間連線
-    async fn broadcast_wrapped_message_local(&self, room_code: &str, message: super::messages::WrappedMessage) {
+    async fn broadcast_wrapped_message_local(
+        &self,
+        room_code: &str,
+        message: super::messages::WrappedMessage,
+    ) {
         let conn_ids = {
             let rooms = self.rooms.read().await;
             rooms.get(room_code).cloned().unwrap_or_default()
@@ -612,7 +618,10 @@ impl WebSocketHub {
                 if let Ok(json) = serde_json::to_string(&message) {
                     // 這裡暫時使用 SystemMessage 來傳送 JSON，
                     // 實際實現中應該修改 ConnectionHandle 以支持原始 JSON
-                    if handle.send(ServerMessage::system(json, super::messages::SystemMessageType::Info)) {
+                    if handle.send(ServerMessage::system(
+                        json,
+                        super::messages::SystemMessageType::Info,
+                    )) {
                         sent_count += 1;
                     }
                 }
@@ -628,7 +637,11 @@ impl WebSocketHub {
     }
 
     /// 發布包裝訊息到 Redis
-    async fn publish_wrapped_message_to_redis(&self, room_code: &str, message: &super::messages::WrappedMessage) {
+    async fn publish_wrapped_message_to_redis(
+        &self,
+        room_code: &str,
+        message: &super::messages::WrappedMessage,
+    ) {
         let pool = {
             let redis = self.redis_pool.read().await;
             match redis.as_ref() {
@@ -656,7 +669,7 @@ impl WebSocketHub {
         let timestamp = chrono::Utc::now().timestamp();
         let mut disconnected = self.disconnected_players.write().await;
         disconnected.insert(player_id, timestamp);
-        
+
         tracing::info!(player_id = %player_id, "玩家斷線已記錄");
     }
 
@@ -664,7 +677,7 @@ impl WebSocketHub {
     pub async fn cleanup_disconnected_players(&self) {
         let now = chrono::Utc::now().timestamp();
         let mut disconnected = self.disconnected_players.write().await;
-        
+
         // 移除 120 秒前斷線的玩家
         disconnected.retain(|player_id, &mut timestamp| {
             let keep = now - timestamp < 120;

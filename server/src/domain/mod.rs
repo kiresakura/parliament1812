@@ -10,7 +10,7 @@ pub mod user;
 
 // 重新匯出常用類型
 pub use game::{
-    ActionType, ChatRequest, GameAction, GameEvent, GamePhase, GameResponse, GameState, Vote,
+    ActionType, ChatRequest, GameActionRecord, GameEvent, GamePhase, GameResponse, GameState, Vote,
     VoteChoice, VoteRequest, VoteResult,
 };
 pub use player::{

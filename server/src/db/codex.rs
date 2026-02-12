@@ -38,16 +38,11 @@ impl CollectionDb {
     }
 
     /// 取得使用者收藏數量
-    pub async fn get_collection_count(
-        pool: &PgPool,
-        user_id: Uuid,
-    ) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar::<_, i64>(
-            r#"SELECT COUNT(*) FROM cards_collection WHERE user_id = $1"#,
-        )
-        .bind(user_id)
-        .fetch_one(pool)
-        .await
+    pub async fn get_collection_count(pool: &PgPool, user_id: Uuid) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM cards_collection WHERE user_id = $1"#)
+            .bind(user_id)
+            .fetch_one(pool)
+            .await
     }
 
     /// 新增卡牌到收藏（如已存在則忽略）
@@ -222,10 +217,7 @@ impl AchievementDb {
     }
 
     /// 取得已完成但未領取的成就數量
-    pub async fn get_unclaimed_count(
-        pool: &PgPool,
-        user_id: Uuid,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn get_unclaimed_count(pool: &PgPool, user_id: Uuid) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(*) FROM achievements_progress
@@ -283,10 +275,8 @@ pub async fn check_card_unlocks(
             _ => false,
         };
 
-        if should_unlock {
-            if CollectionDb::add_card(pool, stats.user_id, &entry.id).await? {
-                newly_unlocked.push(entry.id);
-            }
+        if should_unlock && CollectionDb::add_card(pool, stats.user_id, &entry.id).await? {
+            newly_unlocked.push(entry.id);
         }
     }
 
@@ -308,15 +298,9 @@ pub async fn check_achievements(
 
     for achievement in get_all_achievements() {
         let (progress, target) = match &achievement.condition {
-            AchievementCondition::PlayGames { target } => {
-                (stats.total_games, *target)
-            }
-            AchievementCondition::WinGames { target } => {
-                (stats.total_wins, *target)
-            }
-            AchievementCondition::CollectCards { target } => {
-                (collection_count as i32, *target)
-            }
+            AchievementCondition::PlayGames { target } => (stats.total_games, *target),
+            AchievementCondition::WinGames { target } => (stats.total_wins, *target),
+            AchievementCondition::CollectCards { target } => (collection_count as i32, *target),
             // 其他條件需要更多上下文，暫時跳過
             _ => continue,
         };

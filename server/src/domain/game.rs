@@ -105,7 +105,7 @@ impl std::fmt::Display for ActionType {
 
 /// 遊戲動作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameAction {
+pub struct GameActionRecord {
     /// 動作 ID
     pub id: Uuid,
     /// 執行者 ID
@@ -122,7 +122,7 @@ pub struct GameAction {
     pub description: String,
 }
 
-impl GameAction {
+impl GameActionRecord {
     /// 建立新動作
     pub fn new(
         actor_id: Uuid,
@@ -195,7 +195,7 @@ pub struct GameState {
     /// 當前議案
     pub current_bill: String,
     /// 遊戲動作歷史
-    pub actions: Vec<GameAction>,
+    pub actions: Vec<GameActionRecord>,
     /// 投票記錄
     pub votes: Vec<Vote>,
     /// 開始時間
@@ -258,7 +258,7 @@ impl GameState {
     }
 
     /// 記錄動作
-    pub fn record_action(&mut self, action: GameAction) {
+    pub fn record_action(&mut self, action: GameActionRecord) {
         self.actions.push(action);
     }
 
@@ -315,7 +315,7 @@ pub struct GameResponse {
     /// 玩家列表
     pub players: Vec<PlayerResponse>,
     /// 最近動作
-    pub recent_actions: Vec<GameAction>,
+    pub recent_actions: Vec<GameActionRecord>,
 }
 
 /// 遊戲事件（WebSocket 推送）
@@ -334,7 +334,7 @@ pub enum GameEvent {
         time_remaining: i32,
     },
     /// 動作執行
-    ActionPerformed { action: GameAction },
+    ActionPerformed { action: GameActionRecord },
     /// 玩家狀態更新
     PlayerUpdated { player: PlayerResponse },
     /// 投票提交

@@ -21,7 +21,7 @@ use crate::AppState;
 
 /// 今日任務回應
 #[derive(Debug, Serialize)]
-pub struct DailyQuestsApiResponse {
+pub struct GetDailyQuestsResponse {
     pub quests: Vec<QuestItem>,
     pub current_streak: i32,
     pub longest_streak: i32,
@@ -78,7 +78,7 @@ fn to_reward_item(reward: &crate::game::quests::QuestReward) -> RewardItem {
 pub async fn get_daily_quests(
     State(state): State<AppState>,
     auth_user: AuthUser,
-) -> Result<Json<DailyQuestsApiResponse>, AppError> {
+) -> Result<Json<GetDailyQuestsResponse>, AppError> {
     let resp = quest_system::get_daily_quests(&state.db, auth_user.user_id)
         .await
         .map_err(|e| AppError::DatabaseError(format!("取得每日任務失敗: {}", e)))?;
@@ -98,7 +98,7 @@ pub async fn get_daily_quests(
         })
         .collect();
 
-    Ok(Json(DailyQuestsApiResponse {
+    Ok(Json(GetDailyQuestsResponse {
         quests,
         current_streak: resp.current_streak,
         longest_streak: resp.longest_streak,

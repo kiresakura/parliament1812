@@ -7,7 +7,7 @@ use redis::AsyncCommands;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::game::GameState;
+use crate::game::EngineState;
 
 /// Redis Key 前綴
 const KEY_GAME_STATE: &str = "game:state:";
@@ -42,7 +42,7 @@ impl GameCache {
     pub async fn set_game_state(
         &self,
         room_code: &str,
-        state: &GameState,
+        state: &EngineState,
         ttl_secs: Option<u64>,
     ) -> Result<(), AppError> {
         let mut conn = self.get_conn().await?;
@@ -69,7 +69,7 @@ impl GameCache {
     ///
     /// # Returns
     /// 遊戲狀態（如果存在）
-    pub async fn get_game_state(&self, room_code: &str) -> Result<Option<GameState>, AppError> {
+    pub async fn get_game_state(&self, room_code: &str) -> Result<Option<EngineState>, AppError> {
         let mut conn = self.get_conn().await?;
         let key = format!("{}{}", KEY_GAME_STATE, room_code);
 
@@ -80,7 +80,7 @@ impl GameCache {
 
         match json {
             Some(json) => {
-                let state: GameState = serde_json::from_str(&json)
+                let state: EngineState = serde_json::from_str(&json)
                     .map_err(|e| AppError::InternalError(format!("反序列化遊戲狀態失敗: {}", e)))?;
                 Ok(Some(state))
             }

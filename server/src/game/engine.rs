@@ -13,7 +13,7 @@ use super::alliance::{AllianceError, AllianceManager};
 use super::bills::{BillSystem, VoteEffectResult};
 use super::cards;
 use super::characters::{CharacterSkills, GameError};
-use super::state::{GameState, PendingChallenge, PlayerState};
+use super::state::{EngineState, PendingChallenge, PlayerState};
 use crate::domain::card::{CardType, GameCard};
 use crate::domain::{CharacterType, GamePhase, Player, VoteChoice};
 
@@ -60,7 +60,7 @@ impl Default for GameConfig {
 #[derive(Debug)]
 pub struct GameEngine {
     /// 遊戲狀態
-    pub state: GameState,
+    pub state: EngineState,
     /// 遊戲設定
     pub config: GameConfig,
     /// AI 管理器
@@ -105,7 +105,7 @@ impl GameEngine {
             })
             .collect();
 
-        let state = GameState::new(room_code, player_states);
+        let state = EngineState::new(room_code, player_states);
 
         Self {
             state,
@@ -126,7 +126,7 @@ impl GameEngine {
             .map(|(id, name, character)| PlayerState::new(id, name, character))
             .collect();
 
-        let state = GameState::new(room_code, player_states);
+        let state = EngineState::new(room_code, player_states);
 
         Self {
             state,
@@ -223,13 +223,13 @@ impl GameEngine {
             GamePhase::Voting => {
                 // AI 投票
                 let _ai_results = self.process_ai_actions();
-                
+
                 // 計算投票結果並應用議案效果
                 if !self.state.votes.is_empty() {
                     // 計算獲勝選項
                     let vote_counts = self.calculate_vote_counts();
                     let winning_choice = vote_counts.get_winner();
-                    
+
                     if let Some(choice) = winning_choice {
                         // 應用議案效果
                         let _effects = self.apply_bill_effects(choice);
@@ -282,11 +282,9 @@ impl GameEngine {
 
     /// 獲取當前議案信息
     pub fn get_current_bill_info(&self) -> Option<(String, String)> {
-        if let Some(bill) = self.bill_system.get_current_bill() {
-            Some((bill.name.clone(), bill.description.clone()))
-        } else {
-            None
-        }
+        self.bill_system
+            .get_current_bill()
+            .map(|bill| (bill.name.clone(), bill.description.clone()))
     }
 
     /// 應用投票結果的議案效果到遊戲狀態
@@ -297,7 +295,7 @@ impl GameEngine {
             .iter()
             .map(|(id, p)| (*id, p.character))
             .collect();
-        
+
         let player_reputations: std::collections::HashMap<Uuid, i32> = self
             .state
             .players
@@ -434,7 +432,11 @@ impl GameEngine {
         }
 
         // 計算考慮同盟的傷害
-        let actual_damage = self.calculate_alliance_damage(attacker_id, target_id, self.config.base_challenge_damage);
+        let actual_damage = self.calculate_alliance_damage(
+            attacker_id,
+            target_id,
+            self.config.base_challenge_damage,
+        );
 
         // 設定待處理的質詢
         self.state.pending_challenge = Some(PendingChallenge {
@@ -453,8 +455,15 @@ impl GameEngine {
         });
 
         Ok(ActionResult::success_with_effects(
-            format!("質詢 {}，等待反駁{}", target_name, 
-                    if actual_damage < self.config.base_challenge_damage { "（盟友減傷）" } else { "" }),
+            format!(
+                "質詢 {}，等待反駁{}",
+                target_name,
+                if actual_damage < self.config.base_challenge_damage {
+                    "（盟友減傷）"
+                } else {
+                    ""
+                }
+            ),
             vec![
                 GameEffect::ReputationChange {
                     player_id: attacker_id,
@@ -885,7 +894,7 @@ impl GameEngine {
 
         // 檢查背叛（盟友投對方反對票）
         let mut betrayal_effects = Vec::new();
-        
+
         // 先收集需要背叛的盟友ID
         let betrayal_targets: Vec<Uuid> = {
             let player_alliances = self.get_player_alliances(player_id);
@@ -903,10 +912,10 @@ impl GameEngine {
             }
             targets
         };
-        
+
         // 處理背叛
         for partner_id in betrayal_targets {
-            if let Ok(_) = self.betray_alliance(player_id, partner_id) {
+            if self.betray_alliance(player_id, partner_id).is_ok() {
                 betrayal_effects.push(GameEffect::AllianceBroken {
                     betrayer_id: player_id,
                     victim_id: partner_id,
@@ -927,7 +936,10 @@ impl GameEngine {
             result_message.push_str("（觸發背叛）");
         }
 
-        Ok(ActionResult::success_with_effects(result_message, betrayal_effects))
+        Ok(ActionResult::success_with_effects(
+            result_message,
+            betrayal_effects,
+        ))
     }
 
     /// 處理結盟
@@ -1057,7 +1069,7 @@ impl GameEngine {
                 .iter()
                 .map(|(id, p)| (*id, p.character))
                 .collect();
-            
+
             let player_reputations: std::collections::HashMap<Uuid, i32> = self
                 .state
                 .players
@@ -1090,7 +1102,7 @@ impl GameEngine {
                 let bill_reputation_change = reputation_adjustments.get(&p.id).unwrap_or(&0);
                 let adjusted_reputation = p.reputation + bill_reputation_change;
                 let base_score = adjusted_reputation + p.gold;
-                
+
                 // 如果投票給獲勝選項，加分
                 let vote_bonus = self
                     .state
@@ -1146,7 +1158,7 @@ impl GameEngine {
         let player = self
             .state
             .get_player(player_id)
-            .ok_or_else(|| GameError::PlayerNotFound)?;
+            .ok_or(GameError::PlayerNotFound)?;
 
         if !player.can_act() {
             return Err(GameError::InvalidAction("玩家無法行動".to_string()));
@@ -1185,7 +1197,7 @@ impl GameEngine {
             Some(
                 self.state
                     .get_player(target_id)
-                    .ok_or_else(|| GameError::PlayerNotFound)?,
+                    .ok_or(GameError::PlayerNotFound)?,
             )
         } else {
             None
@@ -1193,7 +1205,9 @@ impl GameEngine {
 
         // 6. 執行卡牌效果
         let mut effects = Vec::new();
+        #[allow(unused_assignments)]
         let mut damage_dealt = 0;
+        #[allow(unused_assignments)]
         let mut healing_done = 0;
 
         match card.card_type {
@@ -1318,7 +1332,7 @@ impl GameEngine {
         let player = self
             .state
             .get_player(player_id)
-            .ok_or_else(|| GameError::PlayerNotFound)?;
+            .ok_or(GameError::PlayerNotFound)?;
 
         if !player.can_act() {
             return Err(GameError::InvalidAction("玩家無法行動".to_string()));
@@ -1359,7 +1373,7 @@ impl GameEngine {
         let player = self
             .state
             .get_player(player_id)
-            .ok_or_else(|| GameError::PlayerNotFound)?;
+            .ok_or(GameError::PlayerNotFound)?;
 
         if !player.can_act() {
             return Err(GameError::InvalidAction("玩家無法行動".to_string()));
@@ -1442,7 +1456,7 @@ impl GameEngine {
             player_states.push(PlayerState::new(*ai_id, ai_name.to_string(), ai_character));
         }
 
-        let state = GameState::new(room_code, player_states);
+        let state = EngineState::new(room_code, player_states);
 
         Self {
             state,
@@ -1487,9 +1501,8 @@ impl GameEngine {
                 AIAction::Betray { target_id } => self.process_betray(ai_id, target_id),
             };
 
-            match result {
-                Ok(action_result) => results.push(action_result),
-                Err(_) => {} // AI 行動失敗，忽略
+            if let Ok(action_result) = result {
+                results.push(action_result);
             }
         }
 
@@ -1511,23 +1524,43 @@ impl GameEngine {
     // ============================================================
 
     /// 提議同盟
-    pub fn propose_alliance(&mut self, proposer_id: Uuid, target_id: Uuid) -> Result<Uuid, AllianceError> {
-        self.alliance_manager.propose_alliance(proposer_id, target_id)
+    pub fn propose_alliance(
+        &mut self,
+        proposer_id: Uuid,
+        target_id: Uuid,
+    ) -> Result<Uuid, AllianceError> {
+        self.alliance_manager
+            .propose_alliance(proposer_id, target_id)
     }
 
     /// 接受同盟提議
-    pub fn accept_alliance(&mut self, target_id: Uuid, proposer_id: Uuid) -> Result<Uuid, AllianceError> {
-        self.alliance_manager.accept_proposal(target_id, proposer_id)
+    pub fn accept_alliance(
+        &mut self,
+        target_id: Uuid,
+        proposer_id: Uuid,
+    ) -> Result<Uuid, AllianceError> {
+        self.alliance_manager
+            .accept_proposal(target_id, proposer_id)
     }
 
     /// 拒絕同盟提議
-    pub fn reject_alliance(&mut self, target_id: Uuid, proposer_id: Uuid) -> Result<(), AllianceError> {
-        self.alliance_manager.reject_proposal(target_id, proposer_id)
+    pub fn reject_alliance(
+        &mut self,
+        target_id: Uuid,
+        proposer_id: Uuid,
+    ) -> Result<(), AllianceError> {
+        self.alliance_manager
+            .reject_proposal(target_id, proposer_id)
     }
 
     /// 背叛同盟（在投票階段投反對票觸發）
-    pub fn betray_alliance(&mut self, betrayer_id: Uuid, target_id: Uuid) -> Result<Uuid, AllianceError> {
-        self.alliance_manager.betray_alliance(betrayer_id, target_id)
+    pub fn betray_alliance(
+        &mut self,
+        betrayer_id: Uuid,
+        target_id: Uuid,
+    ) -> Result<Uuid, AllianceError> {
+        self.alliance_manager
+            .betray_alliance(betrayer_id, target_id)
     }
 
     /// 檢查兩個玩家是否有同盟關係
@@ -1536,8 +1569,14 @@ impl GameEngine {
     }
 
     /// 計算考慮同盟的傷害
-    pub fn calculate_alliance_damage(&self, attacker_id: Uuid, target_id: Uuid, base_damage: i32) -> i32 {
-        self.alliance_manager.calculate_damage_reduction(attacker_id, target_id, base_damage)
+    pub fn calculate_alliance_damage(
+        &self,
+        attacker_id: Uuid,
+        target_id: Uuid,
+        base_damage: i32,
+    ) -> i32 {
+        self.alliance_manager
+            .calculate_damage_reduction(attacker_id, target_id, base_damage)
     }
 
     /// 獲取玩家的所有有效同盟

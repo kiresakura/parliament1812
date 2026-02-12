@@ -442,7 +442,7 @@ pub enum ServerMessage {
         /// 玩家列表
         players: Vec<PlayerResponse>,
         /// 遊戲狀態（如果遊戲已開始）
-        game_state: Option<GameStateSnapshot>,
+        game_state: Box<Option<GameStateSnapshot>>,
         /// 最新序列號
         latest_seq: u64,
     },

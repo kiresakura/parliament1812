@@ -11,7 +11,7 @@ use crate::domain::{GamePhase, VoteChoice};
 use crate::error::AppError;
 use crate::game::elo::{self, MultiPlayerInfo};
 use crate::game::season;
-use crate::game::{ActionResult, GameEngine, GameResult, GameState};
+use crate::game::{ActionResult, EngineState, GameEngine, GameResult};
 use crate::AppState;
 
 /// 遊戲狀態 Redis 快取 TTL（秒）
@@ -33,7 +33,7 @@ impl GameService {
     ///
     /// # Returns
     /// 回傳初始遊戲狀態
-    pub async fn start_game(state: &AppState, room_code: &str) -> Result<GameState, AppError> {
+    pub async fn start_game(state: &AppState, room_code: &str) -> Result<EngineState, AppError> {
         // 取得房間內的玩家
         let players = {
             let room_players = state.room_players.read().await;
@@ -106,7 +106,10 @@ impl GameService {
     ///
     /// # Returns
     /// 回傳當前遊戲狀態
-    pub async fn get_game_state(state: &AppState, room_code: &str) -> Result<GameState, AppError> {
+    pub async fn get_game_state(
+        state: &AppState,
+        room_code: &str,
+    ) -> Result<EngineState, AppError> {
         // 優先從 Redis 讀取
         match state.game_cache().get_game_state(room_code).await {
             Ok(Some(cached_state)) => {
@@ -149,7 +152,7 @@ impl GameService {
     /// * `state` - 應用程式狀態
     /// * `room_code` - 房間代碼
     /// * `game_state` - 遊戲狀態
-    async fn sync_to_redis(state: &AppState, room_code: &str, game_state: &GameState) {
+    async fn sync_to_redis(state: &AppState, room_code: &str, game_state: &EngineState) {
         if let Err(e) = state
             .game_cache()
             .set_game_state(room_code, game_state, Some(GAME_STATE_TTL))
