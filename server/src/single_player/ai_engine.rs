@@ -300,7 +300,7 @@ impl AiEngine {
         _state: &EngineState,
         _ai_id: Uuid,
         ai_player: &PlayerState,
-        _enemies: &[&PlayerState],
+        enemies: &[&PlayerState],
     ) -> AiAction {
         // Easy AI：隨機選擇行動，30% 次優
         if ai_player.hand.cards.is_empty() {
@@ -336,7 +336,7 @@ impl AiEngine {
         _state: &EngineState,
         ai_id: Uuid,
         ai_player: &PlayerState,
-        _enemies: &[&PlayerState],
+        enemies: &[&PlayerState],
     ) -> AiAction {
         // Normal AI：基本評分函數
         let mut actions: Vec<ScoredAction> = Vec::new();
@@ -443,7 +443,7 @@ impl AiEngine {
         state: &EngineState,
         ai_id: Uuid,
         ai_player: &PlayerState,
-        _enemies: &[&PlayerState],
+        enemies: &[&PlayerState],
     ) -> AiAction {
         let my_rep = ai_player.reputation;
 
@@ -785,9 +785,7 @@ impl AiEngine {
         // 考慮對手可能的反擊（depth - 1）
         let retaliation_risk = if enemy_after > 10 { 0.15 } else { 0.0 };
 
-        (advantage * 0.5 + kill_bonus - retaliation_risk)
-            .max(0.0)
-            .min(1.0)
+        (advantage * 0.5 + kill_bonus - retaliation_risk).clamp(0.0, 1.0)
     }
 
     fn minimax_score_card(
@@ -817,9 +815,7 @@ impl AiEngine {
             0.0
         };
 
-        (advantage * 0.4 + kill_bonus - cost_penalty - self_damage_penalty)
-            .max(0.0)
-            .min(1.0)
+        (advantage * 0.4 + kill_bonus - cost_penalty - self_damage_penalty).clamp(0.0, 1.0)
     }
 
     fn evaluate_position(&self, state: &EngineState, ai_id: Uuid) -> f64 {
@@ -842,10 +838,10 @@ impl AiEngine {
 
     fn pick_best_skill_target_hard(
         &self,
-        state: &EngineState,
-        ai_id: Uuid,
+        _state: &EngineState,
+        _ai_id: Uuid,
         ai_player: &PlayerState,
-        _enemies: &[&PlayerState],
+        enemies: &[&PlayerState],
     ) -> Option<(Uuid, f64)> {
         if enemies.is_empty() {
             return None;

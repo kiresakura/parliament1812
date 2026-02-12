@@ -259,7 +259,7 @@ impl TutorialService {
         user_id: Uuid,
         step: i32,
     ) -> Result<TutorialProgressResponse, AppError> {
-        if step < 1 || step > TOTAL_TUTORIAL_STEPS {
+        if !(1..=TOTAL_TUTORIAL_STEPS).contains(&step) {
             return Err(AppError::BadRequest(format!(
                 "無效的教學步驟: {}（有效範圍 1-{}）",
                 step, TOTAL_TUTORIAL_STEPS

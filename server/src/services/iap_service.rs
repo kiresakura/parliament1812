@@ -24,6 +24,12 @@ pub enum ProductId {
     /// 寶石包 - 大（1200 寶石）
     #[serde(rename = "gems_1200")]
     Gems1200,
+    /// 寶石包 - 超大（3000 寶石）
+    #[serde(rename = "gems_3000")]
+    Gems3000,
+    /// 寶石包 - 巨量（6500 寶石）
+    #[serde(rename = "gems_6500")]
+    Gems6500,
     /// 戰役解鎖 - Chapter 2
     #[serde(rename = "campaign_ch2")]
     CampaignCh2,
@@ -51,6 +57,8 @@ impl ProductId {
             ProductId::Gems100 => Some(100),
             ProductId::Gems500 => Some(500),
             ProductId::Gems1200 => Some(1200),
+            ProductId::Gems3000 => Some(3000),
+            ProductId::Gems6500 => Some(6500),
             _ => None,
         }
     }
@@ -61,6 +69,8 @@ impl ProductId {
             ProductId::Gems100 => "com.parliament1812.app.gems100",
             ProductId::Gems500 => "com.parliament1812.app.gems500",
             ProductId::Gems1200 => "com.parliament1812.app.gems1200",
+            ProductId::Gems3000 => "com.parliament1812.app.gems3000",
+            ProductId::Gems6500 => "com.parliament1812.app.gems6500",
             ProductId::CampaignCh2 => "com.parliament1812.app.campaign_ch2",
             ProductId::CampaignCh3 => "com.parliament1812.app.campaign_ch3",
             ProductId::CampaignCh4 => "com.parliament1812.app.campaign_ch4",
@@ -76,6 +86,8 @@ impl ProductId {
             ProductId::Gems100 => "gems_100",
             ProductId::Gems500 => "gems_500",
             ProductId::Gems1200 => "gems_1200",
+            ProductId::Gems3000 => "gems_3000",
+            ProductId::Gems6500 => "gems_6500",
             ProductId::CampaignCh2 => "campaign_ch2",
             ProductId::CampaignCh3 => "campaign_ch3",
             ProductId::CampaignCh4 => "campaign_ch4",
@@ -89,7 +101,11 @@ impl ProductId {
     pub fn is_consumable(&self) -> bool {
         matches!(
             self,
-            ProductId::Gems100 | ProductId::Gems500 | ProductId::Gems1200
+            ProductId::Gems100
+                | ProductId::Gems500
+                | ProductId::Gems1200
+                | ProductId::Gems3000
+                | ProductId::Gems6500
         )
     }
 
@@ -373,6 +389,14 @@ impl IapService {
             "com.parliament1812.app.gems1200" | "gems_1200" => vec![PurchaseReward {
                 reward_type: RewardType::Gems,
                 amount: 1200,
+            }],
+            "com.parliament1812.app.gems3000" | "gems_3000" => vec![PurchaseReward {
+                reward_type: RewardType::Gems,
+                amount: 3000,
+            }],
+            "com.parliament1812.app.gems6500" | "gems_6500" => vec![PurchaseReward {
+                reward_type: RewardType::Gems,
+                amount: 6500,
             }],
             "com.parliament1812.app.campaign_ch2" | "campaign_ch2" => vec![PurchaseReward {
                 reward_type: RewardType::CampaignUnlock { chapter: 2 },
@@ -702,6 +726,8 @@ mod tests {
         assert_eq!(ProductId::Gems100.gem_amount(), Some(100));
         assert_eq!(ProductId::Gems500.gem_amount(), Some(500));
         assert_eq!(ProductId::Gems1200.gem_amount(), Some(1200));
+        assert_eq!(ProductId::Gems3000.gem_amount(), Some(3000));
+        assert_eq!(ProductId::Gems6500.gem_amount(), Some(6500));
         assert_eq!(ProductId::CampaignCh2.gem_amount(), None);
     }
 
@@ -727,6 +753,8 @@ mod tests {
     fn test_is_consumable() {
         assert!(ProductId::Gems100.is_consumable());
         assert!(ProductId::Gems500.is_consumable());
+        assert!(ProductId::Gems3000.is_consumable());
+        assert!(ProductId::Gems6500.is_consumable());
         assert!(!ProductId::CampaignCh2.is_consumable());
         assert!(!ProductId::AiUnlimitedMonthly.is_consumable());
     }
@@ -743,6 +771,14 @@ mod tests {
         let rewards = IapService::calculate_rewards("gems_100").unwrap();
         assert_eq!(rewards.len(), 1);
         assert_eq!(rewards[0].amount, 100);
+
+        let rewards = IapService::calculate_rewards("gems_3000").unwrap();
+        assert_eq!(rewards.len(), 1);
+        assert_eq!(rewards[0].amount, 3000);
+
+        let rewards = IapService::calculate_rewards("gems_6500").unwrap();
+        assert_eq!(rewards.len(), 1);
+        assert_eq!(rewards[0].amount, 6500);
     }
 
     #[test]

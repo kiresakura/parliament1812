@@ -450,7 +450,7 @@ impl AIPlayer {
                 // 困難 AI：複雜的投票邏輯
                 let my_reputation = state.get_player(self.id).map(|p| p.reputation).unwrap_or(0);
                 let allies = state.get_allies(self.id);
-                let _alive_count = state.alive_player_count();
+                let alive_count = state.alive_player_count();
 
                 // 如果自己血量高且盟友多，選擇 A（改革）
                 if my_reputation > 50 && allies.len() as f32 / alive_count as f32 > 0.4 {
@@ -474,7 +474,7 @@ impl AIPlayer {
                 // 專家 AI：模擬投票結果，選擇對自己最有利的選項
                 let my_reputation = state.get_player(self.id).map(|p| p.reputation).unwrap_or(0);
                 let allies = state.get_allies(self.id);
-                let _alive_count = state.alive_player_count();
+                let alive_count = state.alive_player_count();
                 let ally_ratio = if alive_count > 0 {
                     allies.len() as f32 / alive_count as f32
                 } else {
@@ -513,16 +513,6 @@ impl AIPlayer {
                             VoteChoice::A
                         } else {
                             VoteChoice::B
-                        }
-                    }
-                    _ => {
-                        // 其他角色：根據局勢最佳化
-                        if my_reputation > 50 && ally_ratio > 0.4 {
-                            VoteChoice::A
-                        } else if my_reputation < 30 {
-                            VoteChoice::B
-                        } else {
-                            VoteChoice::C
                         }
                     }
                 };

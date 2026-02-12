@@ -84,6 +84,13 @@ class MainMenuScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 12),
                         _MenuButton(
+                          icon: Icons.smart_toy,
+                          title: 'AI 對戰',
+                          subtitle: '挑戰 AI，每日 10 場免費',
+                          onPressed: () => context.go('/single-player/difficulty'),
+                        ),
+                        const SizedBox(height: 12),
+                        _MenuButton(
                           icon: Icons.group,
                           title: '房間列表',
                           subtitle: '加入或創建房間',
@@ -109,15 +116,17 @@ class MainMenuScreen extends ConsumerWidget {
                         _FriendsMenuButton(ref: ref),
                         const SizedBox(height: 12),
                         _MenuButton(
+                          icon: Icons.auto_stories,
+                          title: '故事戰役',
+                          subtitle: '5 章節故事模式',
+                          onPressed: () => context.go('/campaign'),
+                        ),
+                        const SizedBox(height: 12),
+                        _MenuButton(
                           icon: Icons.school,
                           title: '遊戲教學',
                           subtitle: '學習遊戲規則與策略',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const TutorialScreen()),
-                            );
-                          },
+                          onPressed: () => context.go('/tutorial'),
                         ),
 
                         const SizedBox(height: 24),
@@ -457,11 +466,11 @@ class CardCatalogScreen extends StatelessWidget {
 }
 
 // ============================================================
-// Tutorial Screen (遊戲教學)
+// Tutorial Screen (舊版靜態教學，保留供參考)
 // ============================================================
 
-class TutorialScreen extends StatelessWidget {
-  const TutorialScreen({super.key});
+class _OldTutorialScreen extends StatelessWidget {
+  const _OldTutorialScreen();
 
   @override
   Widget build(BuildContext context) {

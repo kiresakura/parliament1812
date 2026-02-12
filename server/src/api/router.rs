@@ -116,7 +116,8 @@ pub fn create_router(state: AppState) -> Router {
     // 公開路由
     let public_ranking_routes = Router::new()
         .route("/global", get(handlers::global_rankings))
-        .route("/seasons", get(handlers::list_seasons));
+        .route("/seasons", get(handlers::list_seasons))
+        .route("/season", get(handlers::rankings::current_season));
 
     // 受保護的排行榜路由
     let protected_ranking_routes = Router::new()

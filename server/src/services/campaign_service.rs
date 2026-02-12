@@ -313,15 +313,13 @@ impl CampaignService {
         let rewards = Self::calculate_stage_rewards(request.chapter, request.stage);
 
         // 首次通關才發放寶石獎勵
-        if existing.is_none() {
-            if rewards.gems > 0 {
-                sqlx::query("UPDATE users SET gems = COALESCE(gems, 0) + $1 WHERE id = $2")
-                    .bind(rewards.gems)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await
-                    .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-            }
+        if existing.is_none() && rewards.gems > 0 {
+            sqlx::query("UPDATE users SET gems = COALESCE(gems, 0) + $1 WHERE id = $2")
+                .bind(rewards.gems)
+                .bind(user_id)
+                .execute(pool)
+                .await
+                .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         }
 
         let new_gem_balance = IapService::get_gem_balance(pool, user_id).await?;
@@ -429,7 +427,7 @@ impl CampaignService {
         user_id: Uuid,
         chapter: i32,
     ) -> Result<ChapterDetailResponse, AppError> {
-        if chapter < 1 || chapter > TOTAL_CHAPTERS {
+        if !(1..=TOTAL_CHAPTERS).contains(&chapter) {
             return Err(AppError::NotFound(format!("章節 {} 不存在", chapter)));
         }
 
