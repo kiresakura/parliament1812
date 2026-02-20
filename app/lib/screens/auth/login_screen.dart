@@ -379,19 +379,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         label: const Text('使用 Google 登入'),
                       ),
                     ),
-                    const SizedBox(height: 12),
 
-                    // Apple 登入
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            authState.isLoading ? null : _handleAppleLogin,
-                        icon: const Icon(Icons.apple, size: 24),
-                        label: const Text('使用 Apple 登入'),
+                    // Apple 登入（僅 iOS）
+                    if (Theme.of(context).platform == TargetPlatform.iOS) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              authState.isLoading ? null : _handleAppleLogin,
+                          icon: const Icon(Icons.apple, size: 24),
+                          label: const Text('使用 Apple 登入'),
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 24),
 
                     // 註冊連結
