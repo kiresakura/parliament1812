@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/game_colors.dart';
 import '../../config/theme.dart';
+import '../../ui/theme/game_colors.dart' as gc;
+import '../../ui/theme/game_fonts.dart';
+import '../../ui/theme/game_spacing.dart';
 import '../../models/card.dart';
 import '../../models/single_player.dart';
 import '../../providers/auth_provider.dart';
@@ -14,7 +17,7 @@ import '../../services/haptic_service.dart';
 import '../../services/performance_service.dart';
 import '../../widgets/game_card_widget.dart';
 import '../../widgets/performance_aware.dart';
-import '../../widgets/animations/reputation_change_animation.dart';
+// AnimatedReputationBar replaced by LinearProgressIndicator in Rossetti v2
 
 // ═══════════════════════════════════════════
 // 角色肖像映射
@@ -44,6 +47,19 @@ String _characterDisplayName(String characterId) {
     'william': '議員威廉',
   };
   return map[characterId] ?? characterId;
+}
+
+/// 根據角色 ID 返回所屬派系
+String _characterFaction(String characterId) {
+  const map = {
+    'thomas': 'labor',
+    'george': 'labor',
+    'richard': 'capital',
+    'robert': 'reform',
+    'edward': 'neutral',
+    'william': 'neutral',
+  };
+  return map[characterId] ?? 'neutral';
 }
 
 // ═══════════════════════════════════════════
@@ -662,30 +678,131 @@ class _SinglePlayerGameScreenState
     return ['投票效果將在議案確定後顯示'];
   }
 
-  // ─── 玩家卡片區 ───
+  // ─── 玩家卡片區（羅塞蒂 v2 三欄 + 回合順序列） ───
 
   Widget _buildPlayersArea(SinglePlayerState state, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: SizedBox(
-        height: 152,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: state.players.length,
-          itemBuilder: (context, index) {
-            final player = state.players[index];
-            return Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: _PlayerCard(
-                player: player,
-                glowAnimation: _glowAnimation,
-                isAiTurnActor: state.aiTurnActorId == player.id,
-                flyText: _flyTexts[player.id],
+    return Column(
+      children: [
+        // 三欄橫排玩家卡
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: GameSpacing.screenPadding,
+            vertical: 8,
+          ),
+          child: Row(
+            children: [
+              for (int i = 0; i < state.players.length; i++) ...[
+                if (i > 0) const SizedBox(width: GameSpacing.cardGap),
+                Expanded(
+                  child: _PlayerCard(
+                    player: state.players[i],
+                    glowAnimation: _glowAnimation,
+                    isAiTurnActor: state.aiTurnActorId == state.players[i].id,
+                    isCurrentTurn: state.currentTurnPlayerId == state.players[i].id,
+                    flyText: _flyTexts[state.players[i].id],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        // 回合順序列
+        _buildTurnOrderBar(state, theme),
+      ],
+    );
+  }
+
+  // ─── 回合順序列 ───
+
+  Widget _buildTurnOrderBar(SinglePlayerState state, ThemeData theme) {
+    final players = state.players;
+    final currentTurnId = state.currentTurnPlayerId;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: GameSpacing.screenPadding,
+        vertical: 6,
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (int i = 0; i < players.length; i++) ...[
+              if (i > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '›',
+                    style: GameFont.factionBadge.copyWith(
+                      color: gc.GameColors.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              _buildTurnOrderItem(
+                players[i],
+                isActive: players[i].id == currentTurnId,
+                isMe: !players[i].isAi,
               ),
-            );
-          },
+            ],
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTurnOrderItem(
+    SinglePlayerInfo player, {
+    required bool isActive,
+    required bool isMe,
+  }) {
+    final faction = _characterFaction(player.character);
+    final dotColor = isActive
+        ? gc.GameColors.victorianGold
+        : gc.GameColors.getFactionColor(faction);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: dotColor,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          _characterDisplayName(player.character),
+          style: GameFont.factionBadge.copyWith(
+            color: isActive
+                ? gc.GameColors.victorianGold
+                : gc.GameColors.textSecondary,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 11,
+          ),
+        ),
+        if (isMe) ...[
+          const SizedBox(width: 3),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: gc.GameColors.victorianGold.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(
+              'YOU',
+              style: GameFont.factionBadge.copyWith(
+                color: gc.GameColors.victorianGold,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -1804,173 +1921,234 @@ class _SteampunkButtonState extends State<_SteampunkButton>
 }
 
 // ═══════════════════════════════════════════
-// P0-1: 玩家卡片 Widget（含金色呼吸光暈 + P0-3 飛字）
+// P0-1: 玩家卡片 Widget（羅塞蒂 v2 三欄設計 + 呼吸光暈 + 飛字）
 // ═══════════════════════════════════════════
 
 class _PlayerCard extends ConsumerWidget {
   final SinglePlayerInfo player;
   final Animation<double> glowAnimation;
   final bool isAiTurnActor;
+  final bool isCurrentTurn;
   final _FlyTextData? flyText;
 
   const _PlayerCard({
     required this.player,
     required this.glowAnimation,
     this.isAiTurnActor = false,
+    this.isCurrentTurn = false,
     this.flyText,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final config = ref.watch(qualityConfigProvider);
     final isDead = player.isPoliticallyDead;
     final isHuman = !player.isAi;
+    final isActiveTurn = isCurrentTurn || (isHuman && !isAiTurnActor);
+    final faction = _characterFaction(player.character);
+    final factionColor = gc.GameColors.getFactionColor(faction);
+    final reputationPct = (player.reputation / 100).clamp(0.0, 1.0);
 
-    // P0-1: 金色呼吸光暈（人類玩家 selected 狀態）
-    // AI 回合高亮（正在行動的 AI）
-    final shouldGlow = isHuman || isAiTurnActor;
+    // 影響力進度條顏色
+    Color barColor;
+    if (reputationPct > 0.6) {
+      barColor = const Color(0xFF27AE60);
+    } else if (reputationPct > 0.3) {
+      barColor = const Color(0xFFFFB74D);
+    } else {
+      barColor = const Color(0xFFE74C3C);
+    }
+
+    // 派系頭像背景色
+    Color avatarBg;
+    switch (faction) {
+      case 'labor':
+        avatarBg = const Color(0xFF3D7CC9);
+        break;
+      case 'capital':
+        avatarBg = const Color(0xFFC0392B);
+        break;
+      case 'reform':
+        avatarBg = const Color(0xFF6B3FA0);
+        break;
+      default:
+        avatarBg = const Color(0xFFC9A84C);
+    }
+
+    final shouldGlow = isActiveTurn || isAiTurnActor;
 
     Widget card = Container(
-      width: 110,
-      decoration: PerformanceAwareDecoration.build(
-        config: config,
+      padding: const EdgeInsets.all(GameSpacing.cardPadding),
+      decoration: BoxDecoration(
         color: isDead
-            ? theme.colorScheme.surfaceContainer.withValues(alpha: 0.5)
-            : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+            ? gc.GameColors.bgCard.withValues(alpha: 0.5)
+            : gc.GameColors.bgCard,
+        borderRadius: GameSpacing.cardBorderRadius,
         border: Border.all(
-          color: isHuman
-              ? GameColors.selectionGlow
+          color: isActiveTurn
+              ? gc.GameColors.victorianGold
               : isAiTurnActor
-                  ? GameColors.aiTurnHighlight
-                  : theme.colorScheme.outline.withValues(alpha: 0.3),
-          width: isHuman || isAiTurnActor
-              ? GameColors.selectionBorderWidth
-              : 1,
+                  ? gc.GameColors.victorianGold
+                  : Colors.transparent,
+          width: (isActiveTurn || isAiTurnActor) ? 1.5 : 0,
         ),
-        boxShadow: shouldGlow && !isDead
-            ? null // Will be handled by AnimatedBuilder below
-            : null,
+        boxShadow: [
+          const BoxShadow(
+            offset: Offset(0, 4),
+            blurRadius: 12,
+            color: Color(0x80000000),
+          ),
+          if (isActiveTurn)
+            BoxShadow(
+              offset: Offset.zero,
+              blurRadius: 16,
+              color: gc.GameColors.victorianGold.withValues(alpha: 0.4),
+            ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Opacity(
-          opacity: isDead ? 0.4 : 1.0,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // 角色肖像
-                  ClipOval(
-                    child: SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: PerformanceAwareImage(
-                        assetPath: _portraitPath(player.character),
-                        fit: BoxFit.cover,
-                        width: 44,
-                        height: 44,
-                        errorBuilder: (ctx, err, st) => CircleAvatar(
-                          radius: 22,
-                          backgroundColor:
-                              theme.colorScheme.primary.withValues(alpha: 0.2),
-                          child: Text(
-                            player.name.isNotEmpty
-                                ? player.name.substring(0, 1)
-                                : '?',
-                            style: TextStyle(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+      child: Opacity(
+        opacity: isDead ? 0.4 : 1.0,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 「行動中」badge
+                if (isActiveTurn)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: gc.GameColors.victorianGold,
+                      borderRadius: GameSpacing.badgeBorderRadius,
+                    ),
+                    child: Text(
+                      '行動中',
+                      style: GameFont.factionBadge.copyWith(
+                        color: gc.GameColors.bgPrimary,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-
-                  // 角色名稱
-                  Text(
-                    _characterDisplayName(player.character),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 10,
+                // 圓形字母頭像 + 姓名 + 黨派
+                Row(
+                  children: [
+                    // 圓形頭像 40px
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: avatarBg,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _characterDisplayName(player.character)
+                            .substring(0, 1),
+                        style: GameFont.factionBadge.copyWith(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
-                  // 聲望條
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: AnimatedReputationBar(
-                      reputation: player.reputation,
-                      height: 6,
+                    const SizedBox(width: 8),
+                    // 姓名 + 黨派
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _characterDisplayName(player.character),
+                            style: GameFont.playerName.copyWith(
+                              color: gc.GameColors.textPrimary,
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            gc.GameColors.getFactionLabel(faction)
+                                .toUpperCase(),
+                            style: GameFont.factionBadge.copyWith(
+                              color: factionColor,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-
-                  // 金幣 + 手牌
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.monetization_on,
-                          size: 10, color: Parliament1812Theme.gold),
-                      const SizedBox(width: 2),
-                      Text('${player.gold}',
-                          style: TextStyle(
-                              color: Parliament1812Theme.gold, fontSize: 10)),
-                      const SizedBox(width: 6),
-                      Icon(Icons.style,
-                          size: 10,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6)),
-                      const SizedBox(width: 2),
-                      Text('${player.handCount}',
-                          style: TextStyle(
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.6),
-                              fontSize: 10)),
-                    ],
-                  ),
-
-                  // 政治死亡標記
-                  if (isDead)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text('💀 政治死亡',
-                          style: TextStyle(
-                              color: Colors.red.shade300, fontSize: 9)),
-                    ),
-                ],
-              ),
-
-              // P0-3: 飛字效果
-              if (flyText != null && !flyText!.isExpired)
-                Positioned(
-                  top: -10,
-                  right: 0,
-                  child: _FlyTextWidget(data: flyText!),
+                  ],
                 ),
-            ],
-          ),
+                const SizedBox(height: 8),
+                // 影響力進度條（4px 高）
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: SizedBox(
+                    height: 4,
+                    child: LinearProgressIndicator(
+                      value: reputationPct,
+                      backgroundColor: gc.GameColors.bgPrimary,
+                      valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // 手牌數（右對齊）
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(
+                      Icons.style,
+                      size: 12,
+                      color: gc.GameColors.textSecondary,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${player.handCount}',
+                      style: GameFont.factionBadge.copyWith(
+                        color: gc.GameColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                // 政治死亡標記
+                if (isDead)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text('💀 政治死亡',
+                        style: TextStyle(
+                            color: Colors.red.shade300, fontSize: 9)),
+                  ),
+              ],
+            ),
+
+            // P0-3: 飛字效果
+            if (flyText != null && !flyText!.isExpired)
+              Positioned(
+                top: -10,
+                right: 0,
+                child: _FlyTextWidget(data: flyText!),
+              ),
+          ],
         ),
       ),
     );
 
-    // P0-1: 用 AnimatedBuilder 實現呼吸光暈
+    // 呼吸光暈
     if (shouldGlow && !isDead) {
       return AnimatedBuilder(
         animation: glowAnimation,
         builder: (context, child) {
           return Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: GameSpacing.cardBorderRadius,
               boxShadow: [
                 BoxShadow(
-                  color: (isAiTurnActor ? GameColors.aiTurnHighlight : GameColors.selectionGlow)
+                  color: gc.GameColors.victorianGold
                       .withValues(alpha: glowAnimation.value),
                   blurRadius: GameColors.selectionGlowBlur,
                   spreadRadius: 1,
