@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// 羅塞蒂字體規格系統 v1.0 — 15 種字體規格
+/// 羅塞蒂字體規格系統 v2.0 — 標題+內文+UI 三層字體
 ///
 /// 設計：羅塞蒂（美學大臣）
 /// 實現：艾達（技術大臣）
 ///
-/// 使用 Google Fonts 載入 Playfair Display（serif 標題）與
+/// 使用 Google Fonts 載入 Playfair Display（serif 標題）、
+/// Noto Serif TC（中文內文）、Inter（UI 標籤/數字）與
 /// Merriweather（serif 內文），不依賴外部字體檔案。
-/// 「rounded」設計用系統 .rounded 替代。
 class GameFont {
   GameFont._();
 
@@ -21,6 +21,12 @@ class GameFont {
 
   /// Merriweather — serif 內文字體（較高可讀性）
   static TextStyle get _body => GoogleFonts.merriweather();
+
+  /// Noto Serif TC — 中文 serif 內文字體
+  static TextStyle get _serifTC => GoogleFonts.notoSerifTc();
+
+  /// Inter — UI 標籤/數字字體
+  static TextStyle get _ui => GoogleFonts.inter();
 
   // ═══════════════════════════════════════════
   // 標題層
@@ -44,8 +50,8 @@ class GameFont {
   /// 卡牌名稱
   /// 顏色：textPrimary，需陰影確保可讀性
   static TextStyle get cardTitle => _serif.copyWith(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
       );
 
   // ═══════════════════════════════════════════
@@ -54,9 +60,9 @@ class GameFont {
 
   /// 行動按鈕文字
   /// 顏色：依情境 textPrimary 或 textSecondary
-  static TextStyle get uiLabel => _body.copyWith(
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
+  static TextStyle get uiLabel => _ui.copyWith(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
       );
 
   /// 回合階段標籤
@@ -69,8 +75,8 @@ class GameFont {
   /// 議案標題
   /// 顏色：textGold（重要）或 textPrimary（一般）
   static TextStyle get billTitle => _serif.copyWith(
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
+        fontSize: 22,
+        fontWeight: FontWeight.bold,
       );
 
   /// 議案描述
@@ -78,6 +84,21 @@ class GameFont {
   static TextStyle get billBody => _serif.copyWith(
         fontSize: 13,
         fontWeight: FontWeight.normal,
+      );
+
+  /// 玩家姓名
+  /// 顏色：textPrimary
+  static TextStyle get playerName => _serif.copyWith(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+      );
+
+  /// 黨派標籤
+  /// 顏色：依派系色
+  static TextStyle get factionBadge => _ui.copyWith(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.8,
       );
 
   // ═══════════════════════════════════════════
@@ -94,10 +115,9 @@ class GameFont {
 
   /// 資源數字（血量、票數等）
   /// 顏色：textPrimary
-  static TextStyle get resourceNumber => const TextStyle(
-        fontSize: 18,
+  static TextStyle get resourceNumber => _ui.copyWith(
+        fontSize: 15,
         fontWeight: FontWeight.bold,
-        fontFamily: '.SF Pro Rounded',
       );
 
   /// 浮動 +/- 數字
@@ -154,8 +174,8 @@ class GameFont {
 
   /// 事件日誌
   /// 顏色：依重要度對應
-  static TextStyle get eventLog => _serif.copyWith(
-        fontSize: 12,
+  static TextStyle get eventLog => _serifTC.copyWith(
+        fontSize: 13,
         fontWeight: FontWeight.normal,
       );
 

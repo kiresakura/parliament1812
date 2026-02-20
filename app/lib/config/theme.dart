@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../ui/theme/game_colors.dart' as gc;
 
 class Parliament1812Theme {
-  // ═══ 羅塞蒂配色系統 v1.0 映射 ═══
+  // ═══ 羅塞蒂配色系統 v2.0 映射 ═══
   // 舊名 → 新系統對照（保留向後相容）
   static const Color darkRed = gc.GameColors.deepCrimson;
   static const Color gold = gc.GameColors.victorianGold;

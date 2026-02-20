@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-/// 羅塞蒂配色系統 v1.0 — 深紫×維多利亞金×玫瑰紅
+/// 羅塞蒂配色系統 v2.0 — 深紫×維多利亞金×玫瑰紅
 ///
 /// 設計：羅塞蒂（美學大臣）
 /// 實現：艾達（技術大臣）
 ///
 /// 三色關係：
-/// - 深紫 (#1A0F2E)：背景底色，象徵議會暗室的神秘與陰謀
-/// - 維多利亞金 (#D4AF37)：主調強調色，權力與榮耀
+/// - 深紫 (#120E2A)：背景底色，象徵議會暗室的神秘與陰謀
+/// - 維多利亞金 (#C9A84C)：主調強調色，權力與榮耀
 /// - 玫瑰紅 (#C21E56)：行動色，攻擊性操作、危機事件
 class GameColors {
   GameColors._();
@@ -16,13 +16,13 @@ class GameColors {
   // 背景層次
   // ═══════════════════════════════════════════
   /// 深紫主背景
-  static const Color bgPrimary = Color(0xFF1A0F2E);
+  static const Color bgPrimary = Color(0xFF120E2A);
 
   /// 次級背景（卡牌背面、面板）
-  static const Color bgSecondary = Color(0xFF251640);
+  static const Color bgSecondary = Color(0xFF1C1535);
 
-  /// 卡牌底色
-  static const Color bgCard = Color(0xFF2D1B55);
+  /// 卡牌底色（與 bgSecondary 統一）
+  static const Color bgCard = Color(0xFF1C1535);
 
   /// 遮罩背景（85% 不透明度）
   static const Color bgOverlay = Color(0xD90D0820); // 0xD9 ≈ 0.85 * 255
@@ -31,7 +31,7 @@ class GameColors {
   // 主色調
   // ═══════════════════════════════════════════
   /// 維多利亞金（主強調色）— 權力與榮耀
-  static const Color victorianGold = Color(0xFFD4AF37);
+  static const Color victorianGold = Color(0xFFC9A84C);
 
   /// 金色高光
   static const Color goldLight = Color(0xFFF0D060);
@@ -85,10 +85,10 @@ class GameColors {
   // 文字色
   // ═══════════════════════════════════════════
   /// 羊皮紙白（主文字）
-  static const Color textPrimary = Color(0xFFF5E6C8);
+  static const Color textPrimary = Color(0xFFF0E6D3);
 
   /// 次要文字
-  static const Color textSecondary = Color(0xFFB8A882);
+  static const Color textSecondary = Color(0xFF9B8EA8);
 
   /// 靜默文字
   static const Color textMuted = Color(0xFF7A6B5A);
@@ -144,7 +144,7 @@ class GameColors {
   static const LinearGradient bgGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [bgPrimary, Color(0xFF120A22)],
+    colors: [bgPrimary, Color(0xFF0A0718)],
   );
 
   /// 金色按鈕漸層
@@ -269,13 +269,13 @@ class GameColors {
   // 議會派系色系（Phase 2 — 多人制）
   // ═══════════════════════════════════════════
   /// 輝格黨：皇家藍
-  static const Color whigBlue = Color(0xFF1A4A8C);
+  static const Color whigBlue = Color(0xFF3D7CC9);
 
   /// 托利黨：深緋紅
-  static const Color toryRed = Color(0xFF8C1A1A);
+  static const Color toryRed = Color(0xFFC0392B);
 
   /// 激進派：革命紫
-  static const Color radicalPurple = Color(0xFF5A1A8C);
+  static const Color radicalPurple = Color(0xFF6B3FA0);
 
   /// 獨立議員：古銅金
   static const Color independentGold = Color(0xFF8C7A1A);
@@ -325,11 +325,11 @@ class GameColors {
   // ═══════════════════════════════════════════
   // 議案投票色
   // ═══════════════════════════════════════════
-  /// FOR（贊成）：深綠
-  static const Color voteFor = Color(0xFF1A5C2E);
+  /// FOR（贊成）：翡翠綠
+  static const Color voteFor = Color(0xFF27AE60);
 
-  /// AGAINST（反對）：深紅
-  static const Color voteAgainst = Color(0xFF5C1A1A);
+  /// AGAINST（反對）：危機紅
+  static const Color voteAgainst = Color(0xFFE74C3C);
 
   /// 辯論日誌卡牌名色
   static const Color logCardName = Color(0xFF9B72CF);
