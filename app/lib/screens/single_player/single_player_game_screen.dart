@@ -1109,7 +1109,10 @@ class _SinglePlayerGameScreenState
                 height: 130,
                 child: _buildHandCardsArea(state, theme),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
+              // 角色狀態面板
+              _buildCharacterPanel(state),
+              const SizedBox(height: 8),
               // 行動按鈕
               _buildActionButtons(state, theme),
             ],
@@ -1163,6 +1166,155 @@ class _SinglePlayerGameScreenState
     );
   }
 
+  /// 角色狀態面板（羅塞蒂 v2）
+  Widget _buildCharacterPanel(SinglePlayerState state) {
+    // 找到人類玩家
+    final humanPlayer = state.players.cast<SinglePlayerInfo?>().firstWhere(
+          (p) => p != null && !p.isAi,
+          orElse: () => null,
+        );
+    if (humanPlayer == null) return const SizedBox.shrink();
+
+    final characterName = _characterDisplayName(humanPlayer.character);
+    final faction = _characterFaction(humanPlayer.character);
+    final factionLabel = gc.GameColors.getFactionLabel(faction).toUpperCase();
+    final factionColor = gc.GameColors.getFactionColor(faction);
+    final reputation = humanPlayer.reputation;
+    const maxReputation = 100;
+    final reputationRatio = (reputation / maxReputation).clamp(0.0, 1.0);
+    final ap = state.actionPointsRemaining;
+    const maxAp = 3;
+    final round = state.currentRound;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: gc.GameColors.bgSecondary,
+        borderRadius: BorderRadius.circular(GameSpacing.buttonRadius),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: 角色名 + 黨派 badge + 回合數
+          Row(
+            children: [
+              // 角色名
+              Text(
+                characterName,
+                style: GameFont.cardTitle.copyWith(
+                  color: gc.GameColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              // 黨派 badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: factionColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(GameSpacing.badgeRadius),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: factionColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      factionLabel,
+                      style: GameFont.factionBadge.copyWith(
+                        color: factionColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 回合數
+              Text(
+                '回合 $round/6',
+                style: GameFont.factionBadge.copyWith(
+                  color: gc.GameColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Row 2: INFLUENCE 進度條
+          Row(
+            children: [
+              Text(
+                'INFLUENCE',
+                style: GameFont.factionBadge.copyWith(
+                  color: gc.GameColors.textSecondary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: reputationRatio,
+                    minHeight: 6,
+                    backgroundColor: gc.GameColors.textSecondary.withValues(alpha: 0.2),
+                    valueColor: AlwaysStoppedAnimation<Color>(gc.GameColors.victorianGold),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$reputation/$maxReputation',
+                style: GameFont.factionBadge.copyWith(
+                  color: gc.GameColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Row 3: AP 圓點
+          Row(
+            children: [
+              Text(
+                'AP',
+                style: GameFont.factionBadge.copyWith(
+                  color: gc.GameColors.textSecondary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ...List.generate(maxAp, (i) {
+                final filled = i < ap;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: filled ? gc.GameColors.victorianGold : Colors.transparent,
+                      border: Border.all(
+                        color: filled
+                            ? gc.GameColors.victorianGold
+                            : gc.GameColors.textSecondary.withValues(alpha: 0.5),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons(SinglePlayerState state, ThemeData theme) {
     List<Widget> buttons;
 
@@ -1172,7 +1324,7 @@ class _SinglePlayerGameScreenState
         buttons = [
           _SteampunkButton(
             label: '質詢',
-            icon: Icons.gavel,
+            icon: Icons.search,
             accentColor: GameColors.btnChallenge,
             onPressed: ap > 0 ? () {
               HapticService.cardPlayed();
@@ -1195,7 +1347,7 @@ class _SinglePlayerGameScreenState
           ),
           _SteampunkButton(
             label: '抽牌',
-            icon: Icons.add_card,
+            icon: Icons.style,
             accentColor: GameColors.btnDraw,
             onPressed: () {
               HapticService.cardPlayed();
@@ -1204,8 +1356,8 @@ class _SinglePlayerGameScreenState
             },
           ),
           _SteampunkButton(
-            label: '結束回合',
-            icon: Icons.skip_next,
+            label: '結束發言',
+            icon: Icons.flag,
             accentColor: GameColors.btnEndTurn,
             onPressed: () {
               HapticService.voteConfirmed();
@@ -1251,7 +1403,7 @@ class _SinglePlayerGameScreenState
           ),
           _SteampunkButton(
             label: '下一階段',
-            icon: Icons.skip_next,
+            icon: Icons.flag,
             accentColor: GameColors.btnNextPhase,
             onPressed: () {
               HapticService.voteConfirmed();
@@ -1264,7 +1416,7 @@ class _SinglePlayerGameScreenState
         buttons = [
           _SteampunkButton(
             label: '質詢',
-            icon: Icons.gavel,
+            icon: Icons.search,
             accentColor: GameColors.btnChallenge,
             onPressed: () {
               HapticService.cardPlayed();
@@ -1275,7 +1427,7 @@ class _SinglePlayerGameScreenState
           ),
           _SteampunkButton(
             label: '抽牌',
-            icon: Icons.add_card,
+            icon: Icons.style,
             accentColor: GameColors.btnDraw,
             onPressed: () {
               HapticService.cardPlayed();
@@ -1285,7 +1437,7 @@ class _SinglePlayerGameScreenState
           ),
           _SteampunkButton(
             label: '下一階段',
-            icon: Icons.skip_next,
+            icon: Icons.flag,
             accentColor: GameColors.btnNextPhase,
             onPressed: () {
               HapticService.voteConfirmed();
@@ -2005,7 +2157,6 @@ class _SteampunkButtonState extends State<_SteampunkButton>
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
-    final opacity = enabled ? 1.0 : 0.5;
 
     return GestureDetector(
       onTapDown: enabled ? (_) {
@@ -2027,46 +2178,31 @@ class _SteampunkButtonState extends State<_SteampunkButton>
           return Transform.scale(
             scale: _scaleAnimation.value,
             child: Opacity(
-              opacity: opacity,
+              opacity: enabled ? 1.0 : 0.4,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color.lerp(GameColors.btnGradientStart, widget.accentColor, 0.3)!,
-                      Color.lerp(GameColors.btnGradientEnd, widget.accentColor, 0.2)!,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _isPressed
-                        ? GameColors.btnBorder
-                        : GameColors.btnBorder.withValues(alpha: 0.7),
-                    width: _isPressed ? 2.0 : 1.5,
-                  ),
+                  color: widget.accentColor,
+                  borderRadius: BorderRadius.circular(GameSpacing.buttonRadius),
                   boxShadow: _isPressed
                       ? []
-                      : [
+                      : const [
                           BoxShadow(
-                            color: widget.accentColor.withValues(alpha: 0.2),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                            offset: Offset(0, 2),
+                            blurRadius: 8,
+                            color: Color(0x66000000),
                           ),
                         ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(widget.icon, size: 16, color: GameColors.btnText),
+                    Icon(widget.icon, size: 16, color: gc.GameColors.textPrimary),
                     const SizedBox(height: 2),
                     Text(
                       widget.label,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: GameColors.btnText,
-                        fontWeight: FontWeight.w600,
+                      style: GameFont.uiLabel.copyWith(
+                        color: gc.GameColors.textPrimary,
                         shadows: [
                           Shadow(
                             offset: const Offset(0, 1),

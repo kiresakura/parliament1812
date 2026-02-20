@@ -29,18 +29,18 @@ class GameColors {
   static const Color btnBorder = design_system.GameColors.victorianGold;
   static const Color btnText = design_system.GameColors.textPrimary;
 
-  // 行動按鈕輔助色（升級至功能色系）
-  static const Color btnChallenge = Color(0xFF8B1A1A);   // 質詢深紅
-  static const Color btnAlliance = Color(0xFF2D5A3D);    // 結盟暗綠
-  static const Color btnDraw = Color(0xFF1B3A5C);        // 抽牌深藍
-  static const Color btnEndTurn = Color(0xFF5C4A1E);     // 結束回合暗金
-  static const Color btnInvestigate = Color(0xFF1B3A5C); // 調查深藍
-  static const Color btnNextPhase = Color(0xFF5C4A1E);   // 下一階段暗金
+  // 行動按鈕輔助色（羅塞蒂 v2 鮮明配色）
+  static const Color btnChallenge = Color(0xFF3D7CC9);   // 質詢藍
+  static const Color btnAlliance = Color(0xFF27AE60);    // 結盟綠
+  static const Color btnDraw = Color(0xFF6B3FA0);        // 抽牌紫
+  static const Color btnEndTurn = Color(0xFFC21E56);     // 結束回合玫瑰紅
+  static const Color btnInvestigate = Color(0xFF3D7CC9); // 調查藍
+  static const Color btnNextPhase = Color(0xFFC21E56);   // 下一階段玫瑰紅
 
   // 投票按鈕輔助色
-  static const Color btnVoteFor = Color(0xFF2D5A3D);     // 支持暗綠
-  static const Color btnVoteAgainst = Color(0xFF8B1A1A); // 反對深紅
-  static const Color btnAbstain = Color(0xFF4A4A4A);     // 棄權灰
+  static const Color btnVoteFor = Color(0xFF27AE60);     // 支持綠
+  static const Color btnVoteAgainst = Color(0xFFC21E56); // 反對玫瑰紅
+  static const Color btnAbstain = Color(0xFF6B6B6B);     // 棄權灰
   static const Color btnWaiting = Color(0xFF3A3A3A);     // 等待中灰
 
   // ═══ 數值飛字顏色 ═══
