@@ -79,10 +79,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Text(ref.read(authProvider).error ?? 'Google 登入失敗')),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('=== GOOGLE SIGN-IN ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Type: ${e.runtimeType}');
+      debugPrint('Stack: $stackTrace');
+      debugPrint('============================');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google 登入錯誤: $e')),
+          SnackBar(
+            content: Text('Google 登入錯誤: $e'),
+            duration: const Duration(seconds: 10),
+          ),
         );
       }
     }
