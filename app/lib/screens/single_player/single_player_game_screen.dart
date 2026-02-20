@@ -378,6 +378,7 @@ class _SinglePlayerGameScreenState
           Column(
             children: [
               _buildTopInfoBar(gameState, theme),
+              _buildTurnOrderBar(gameState, theme),
               Expanded(
                 child: _buildMainContent(gameState, theme),
               ),
@@ -879,8 +880,6 @@ class _SinglePlayerGameScreenState
             ],
           ),
         ),
-        // 回合順序列
-        _buildTurnOrderBar(state, theme),
       ],
     );
   }
@@ -1658,7 +1657,7 @@ class _SinglePlayerGameScreenState
   Widget _buildChatOverlay(ThemeData theme) {
     return Positioned(
       right: 12,
-      bottom: 180,
+      top: 140,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
