@@ -10,7 +10,7 @@ use crate::error::AppError;
 use crate::game::GameEngine;
 use crate::repository::{PlayerRepository, RoomRepository, UserRepository};
 use crate::single_player::session::SinglePlayerSession;
-use crate::websocket::WebSocketHub;
+use crate::websocket::{GameTimerManager, SharedTimerManager, WebSocketHub};
 use deadpool_redis::{Config as RedisConfig, Pool as RedisPool, Runtime};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
@@ -64,6 +64,8 @@ pub struct AppState {
     pub single_player_sessions: SinglePlayerStore,
     /// WebSocket Hub
     pub ws_hub: Arc<WebSocketHub>,
+    /// 遊戲計時器管理器
+    pub timers: SharedTimerManager,
 }
 
 impl AppState {
@@ -121,6 +123,7 @@ impl AppState {
             games: Arc::new(RwLock::new(HashMap::new())),
             single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
+            timers: GameTimerManager::shared(),
         })
     }
 
@@ -158,6 +161,7 @@ impl AppState {
             games: Arc::new(RwLock::new(HashMap::new())),
             single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
+            timers: GameTimerManager::shared(),
         })
     }
 
@@ -196,6 +200,7 @@ impl AppState {
             games: Arc::new(RwLock::new(HashMap::new())),
             single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
+            timers: GameTimerManager::shared(),
         }
     }
 
@@ -281,6 +286,7 @@ impl std::fmt::Debug for AppState {
             .field("games", &"GameStore { ... }")
             .field("single_player_sessions", &"SinglePlayerStore { ... }")
             .field("ws_hub", &"WebSocketHub { ... }")
+            .field("timers", &"SharedTimerManager { ... }")
             .finish()
     }
 }

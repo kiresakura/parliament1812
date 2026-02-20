@@ -1,42 +1,29 @@
-import 'dart:io';
-
 class AppConstants {
   // 應用資訊
   static const String appName = 'Parliament 1812';
   static const String appVersion = '1.0.0';
 
-  // 後端 URL 配置（支援環境變數切換）
+  // 後端 URL 配置
+  static const String _flyBaseUrl = 'https://parliament1812-api.fly.dev';
+  static const String _flyWsUrl = 'wss://parliament1812-api.fly.dev/ws';
+
   static String get baseUrl {
     const fromEnv = String.fromEnvironment('PARLIAMENT_API_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
-    
-    // 本地開發預設
-    if (Platform.isAndroid) {
-      // Android 模擬器需要用 10.0.2.2 來存取 localhost
-      return 'http://10.0.2.2:8080';
-    } else if (Platform.isIOS) {
-      // iOS 真機需要用 Mac 的區域網路 IP
-      return 'http://192.168.8.190:8080';
-    } else {
-      return 'http://localhost:8080';
-    }
+    // 預設連 Fly.io（Tokyo）
+    return _flyBaseUrl;
   }
 
   static String get websocketUrl {
     const fromEnv = String.fromEnvironment('PARLIAMENT_WS_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
-    
-    // 本地開發預設
-    if (Platform.isAndroid) {
-      return 'ws://10.0.2.2:8080/ws';
-    } else if (Platform.isIOS) {
-      return 'ws://192.168.8.190:8080/ws';
-    } else {
-      return 'ws://localhost:8080/ws';
-    }
+    return _flyWsUrl;
   }
 
-  // 生產環境 URL
+  // 本地開發用（需手動切換或傳環境變數）
+  // flutter run --dart-define=PARLIAMENT_API_URL=http://192.168.8.190:8080
+
+  // 生產環境 URL（自訂域名）
   static const String prodBaseUrl = 'https://api.parliament1812.com';
   static const String prodWebsocketUrl = 'wss://api.parliament1812.com/ws';
 
@@ -44,6 +31,7 @@ class AppConstants {
   static const String authEndpoint = '/api/auth';
   static const String roomsEndpoint = '/api/rooms';
   static const String gameEndpoint = '/api/game';
+  static const String codexEndpoint = '/api/codex';
   static const String websocketEndpoint = '/ws';
 
   // 遊戲常數

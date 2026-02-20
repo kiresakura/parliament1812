@@ -106,8 +106,14 @@ impl AiEngine {
         }
 
         match state.phase {
-            GamePhase::Conspiracy => self.decide_conspiracy(state, ai_id),
-            GamePhase::Debate => self.decide_debate(state, ai_id),
+            GamePhase::PlayerTurn => {
+                // 回合制：AI 在行動階段隨機選擇密謀或辯論策略
+                if self.rng.gen_bool(0.5) {
+                    self.decide_conspiracy(state, ai_id)
+                } else {
+                    self.decide_debate(state, ai_id)
+                }
+            }
             GamePhase::Voting => self.decide_voting(state, ai_id),
             _ => AiAction::Wait,
         }
@@ -987,7 +993,7 @@ mod tests {
     #[test]
     fn test_easy_ai_conspiracy() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Conspiracy;
+        state.phase = GamePhase::PlayerTurn;
         let mut engine = AiEngine::with_seed(AiDifficulty::Easy, 42);
 
         // 多次測試，確保能生成行動
@@ -1008,33 +1014,54 @@ mod tests {
     #[test]
     fn test_normal_ai_conspiracy() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Conspiracy;
-        let mut engine = AiEngine::with_seed(AiDifficulty::Normal, 42);
-        let action = engine.decide(&state, ai1_id());
-        // Normal AI 應該考慮結盟
-        assert!(
-            matches!(action, AiAction::FormAlliance { .. } | AiAction::Wait),
-            "Normal AI 應該在密謀階段結盟或等待"
-        );
+        state.phase = GamePhase::PlayerTurn;
+        // PlayerTurn 階段 AI 會隨機選擇密謀或辯論策略，驗證能產生有效行動
+        let mut got_action = false;
+        for seed in 0..50 {
+            let mut engine = AiEngine::with_seed(AiDifficulty::Normal, seed);
+            let action = engine.decide(&state, ai1_id());
+            match action {
+                AiAction::FormAlliance { .. }
+                | AiAction::Wait
+                | AiAction::Challenge { .. }
+                | AiAction::PlayCard { .. }
+                | AiAction::DrawCard => {
+                    got_action = true;
+                }
+                _ => {}
+            }
+        }
+        assert!(got_action, "Normal AI 應該在行動階段產生有效行動");
     }
 
     #[test]
     fn test_hard_ai_conspiracy_weak() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Conspiracy;
+        state.phase = GamePhase::PlayerTurn;
 
         // 讓 AI 血量很低
         if let Some(ai) = state.get_player_mut(ai1_id()) {
             ai.reputation = 20;
         }
 
-        let mut engine = AiEngine::with_seed(AiDifficulty::Hard, 42);
-        let action = engine.decide(&state, ai1_id());
-        // 弱勢 Hard AI 應該積極結盟
-        assert!(
-            matches!(action, AiAction::FormAlliance { .. } | AiAction::Wait),
-            "弱勢 Hard AI 應該嘗試結盟"
-        );
+        // PlayerTurn 階段 AI 會隨機選擇密謀或辯論策略，驗證弱勢 AI 能產生行動
+        let mut got_action = false;
+        for seed in 0..50 {
+            let mut engine = AiEngine::with_seed(AiDifficulty::Hard, seed);
+            let action = engine.decide(&state, ai1_id());
+            match action {
+                AiAction::FormAlliance { .. }
+                | AiAction::Wait
+                | AiAction::Challenge { .. }
+                | AiAction::PlayCard { .. }
+                | AiAction::DrawCard
+                | AiAction::Betray { .. } => {
+                    got_action = true;
+                }
+                _ => {}
+            }
+        }
+        assert!(got_action, "弱勢 Hard AI 應該在行動階段產生有效行動");
     }
 
     #[test]
@@ -1088,7 +1115,7 @@ mod tests {
     #[test]
     fn test_easy_ai_debate_no_hand() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Debate;
+        state.phase = GamePhase::PlayerTurn;
 
         // AI 沒有手牌時應該抽牌
         let mut engine = AiEngine::with_seed(AiDifficulty::Easy, 42);
@@ -1105,7 +1132,7 @@ mod tests {
     #[test]
     fn test_counter_decision_easy() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Debate;
+        state.phase = GamePhase::PlayerTurn;
 
         // 設置一個針對 AI1 的質詢
         state.pending_challenge = Some(crate::game::state::PendingChallenge {
@@ -1133,7 +1160,7 @@ mod tests {
     #[test]
     fn test_counter_decision_hard() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Debate;
+        state.phase = GamePhase::PlayerTurn;
 
         state.pending_challenge = Some(crate::game::state::PendingChallenge {
             attacker_id: Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
@@ -1151,7 +1178,7 @@ mod tests {
     #[test]
     fn test_dead_ai_waits() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Debate;
+        state.phase = GamePhase::PlayerTurn;
 
         if let Some(ai) = state.get_player_mut(ai1_id()) {
             ai.take_damage(100);
@@ -1192,7 +1219,7 @@ mod tests {
     #[test]
     fn test_minimax_kill_bonus() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Debate;
+        state.phase = GamePhase::PlayerTurn;
 
         // 讓目標快死了
         if let Some(enemy) = state.get_player_mut(ai2_id()) {
@@ -1226,7 +1253,7 @@ mod tests {
     #[test]
     fn test_hard_ai_betrayal() {
         let mut state = create_test_state();
-        state.phase = GamePhase::Conspiracy;
+        state.phase = GamePhase::PlayerTurn;
 
         // 讓 AI1 很強
         if let Some(ai) = state.get_player_mut(ai1_id()) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 5 步新手教學互動畫面
@@ -208,6 +209,10 @@ class _TutorialScreenState extends State<TutorialScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => context.go('/menu'),
+                    ),
                     TextButton(
                       onPressed: _skipTutorial,
                       child: Text(

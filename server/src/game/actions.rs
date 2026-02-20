@@ -59,6 +59,11 @@ pub enum GameAction {
         card_name: String,
         timestamp: chrono::DateTime<chrono::Utc>,
     },
+    /// 結束回合
+    EndTurn {
+        player_id: Uuid,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
 }
 
 /// 行動結果

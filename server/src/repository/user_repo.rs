@@ -275,6 +275,36 @@ impl UserRepository {
         Ok(())
     }
 
+    /// 更新個人檔案（display_name 和/或 avatar_url）
+    pub async fn update_profile(
+        &self,
+        user_id: Uuid,
+        display_name: Option<&str>,
+        avatar_url: Option<&str>,
+    ) -> Result<Option<FullUserRecord>, sqlx::Error> {
+        // 只更新有提供的欄位
+        let record = sqlx::query_as::<_, FullUserRecord>(
+            r#"
+            UPDATE users
+            SET display_name = COALESCE($2, display_name),
+                avatar_url = COALESCE($3, avatar_url),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, username, password_hash, display_name, email,
+                      oauth_provider, oauth_id, avatar_url,
+                      created_at, updated_at, last_login_at,
+                      is_banned, elo_rating, total_games, total_wins
+            "#,
+        )
+        .bind(user_id)
+        .bind(display_name)
+        .bind(avatar_url)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(record)
+    }
+
     /// 刪除使用者（GDPR）
     pub async fn delete(&self, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(

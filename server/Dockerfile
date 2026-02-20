@@ -15,6 +15,7 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && r
 # Build actual source
 COPY src ./src
 COPY migrations ./migrations
+ENV SQLX_OFFLINE=true
 RUN touch src/main.rs && cargo build --release
 
 # Stage 2: Runtime

@@ -1,10 +1,13 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/theme.dart';
+import '../../services/performance_service.dart';
 
 /// 投票動畫 — 票數跳動效果
-class VoteCountAnimation extends StatefulWidget {
+/// 支援三種模式：instant（低品質）、fast（中品質）、full（高品質）
+class VoteCountAnimation extends ConsumerStatefulWidget {
   final int targetCount;
   final String label;
   final Color? color;
@@ -21,10 +24,11 @@ class VoteCountAnimation extends StatefulWidget {
   });
 
   @override
-  State<VoteCountAnimation> createState() => _VoteCountAnimationState();
+  ConsumerState<VoteCountAnimation> createState() =>
+      _VoteCountAnimationState();
 }
 
-class _VoteCountAnimationState extends State<VoteCountAnimation>
+class _VoteCountAnimationState extends ConsumerState<VoteCountAnimation>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _countAnimation;
@@ -33,44 +37,75 @@ class _VoteCountAnimationState extends State<VoteCountAnimation>
   @override
   void initState() {
     super.initState();
+    final config = ref.read(qualityConfigProvider);
+
     _controller = AnimationController(
-      duration: widget.duration,
+      duration: config.voteAnimationDuration,
       vsync: this,
     );
 
-    _countAnimation = Tween<double>(
-      begin: 0,
-      end: widget.targetCount.toDouble(),
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
+    _setupAnimations(config);
 
-    _scaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 1.3),
-        weight: 15,
-      ),
-      TweenSequenceItem(
-        tween: Tween(begin: 1.3, end: 1.0),
-        weight: 15,
-      ),
-      TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 1.0),
-        weight: 70,
-      ),
-    ]).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
+    if (config.voteAnimationMode != VoteAnimationMode.instant) {
+      _controller.forward();
+    }
+  }
 
-    _controller.forward();
+  void _setupAnimations(QualityConfig config) {
+    switch (config.voteAnimationMode) {
+      case VoteAnimationMode.instant:
+        _countAnimation =
+            AlwaysStoppedAnimation(widget.targetCount.toDouble());
+        _scaleAnimation = const AlwaysStoppedAnimation(1.0);
+        break;
+
+      case VoteAnimationMode.fast:
+        _countAnimation = Tween<double>(
+          begin: 0,
+          end: widget.targetCount.toDouble(),
+        ).animate(CurvedAnimation(
+          parent: _controller,
+          curve: Curves.easeOutCubic,
+        ));
+        _scaleAnimation = const AlwaysStoppedAnimation(1.0);
+        break;
+
+      case VoteAnimationMode.full:
+        _countAnimation = Tween<double>(
+          begin: 0,
+          end: widget.targetCount.toDouble(),
+        ).animate(CurvedAnimation(
+          parent: _controller,
+          curve: Curves.easeOutCubic,
+        ));
+        _scaleAnimation = TweenSequence<double>([
+          TweenSequenceItem(
+              tween: Tween(begin: 1.0, end: 1.3), weight: 15),
+          TweenSequenceItem(
+              tween: Tween(begin: 1.3, end: 1.0), weight: 15),
+          TweenSequenceItem(
+              tween: Tween(begin: 1.0, end: 1.0), weight: 70),
+        ]).animate(CurvedAnimation(
+          parent: _controller,
+          curve: Curves.easeInOut,
+        ));
+        break;
+    }
   }
 
   @override
   void didUpdateWidget(VoteCountAnimation oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.targetCount != widget.targetCount) {
+      final config = ref.read(qualityConfigProvider);
+
+      if (config.voteAnimationMode == VoteAnimationMode.instant) {
+        _countAnimation =
+            AlwaysStoppedAnimation(widget.targetCount.toDouble());
+        setState(() {});
+        return;
+      }
+
       _countAnimation = Tween<double>(
         begin: oldWidget.targetCount.toDouble(),
         end: widget.targetCount.toDouble(),
@@ -91,7 +126,32 @@ class _VoteCountAnimationState extends State<VoteCountAnimation>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final config = ref.watch(qualityConfigProvider);
     final color = widget.color ?? Parliament1812Theme.gold;
+
+    // 低品質：直接顯示最終數字
+    if (config.voteAnimationMode == VoteAnimationMode.instant) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${widget.targetCount}',
+            style:
+                (widget.textStyle ?? theme.textTheme.displayMedium)?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color.withValues(alpha: 0.8),
+            ),
+          ),
+        ],
+      );
+    }
 
     return AnimatedBuilder(
       animation: _controller,
@@ -103,8 +163,7 @@ class _VoteCountAnimationState extends State<VoteCountAnimation>
             children: [
               Text(
                 '${_countAnimation.value.round()}',
-                style: (widget.textStyle ??
-                        theme.textTheme.displayMedium)
+                style: (widget.textStyle ?? theme.textTheme.displayMedium)
                     ?.copyWith(
                   color: color,
                   fontWeight: FontWeight.bold,
@@ -126,7 +185,7 @@ class _VoteCountAnimationState extends State<VoteCountAnimation>
 }
 
 /// 投票進度條動畫
-class VoteProgressBar extends StatelessWidget {
+class VoteProgressBar extends ConsumerWidget {
   final double progress;
   final Color color;
   final String label;
@@ -141,8 +200,9 @@ class VoteProgressBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final config = ref.watch(qualityConfigProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,22 +221,34 @@ class VoteProgressBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: min(progress, 1.0)),
-          duration: const Duration(milliseconds: 800),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, child) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: value,
-                backgroundColor: color.withValues(alpha: 0.15),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-                minHeight: 8,
-              ),
-            );
-          },
-        ),
+        if (!config.enableAnimations)
+          // 低品質：不播放動畫
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: min(progress, 1.0),
+              backgroundColor: color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 8,
+            ),
+          )
+        else
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: min(progress, 1.0)),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: value,
+                  backgroundColor: color.withValues(alpha: 0.15),
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                  minHeight: 8,
+                ),
+              );
+            },
+          ),
       ],
     );
   }

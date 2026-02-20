@@ -183,7 +183,7 @@ impl GameService {
             let engine = Self::get_engine_mut(&mut games, room_code).await?;
 
             // 檢查階段
-            if engine.state.phase != GamePhase::Debate {
+            if engine.state.phase != GamePhase::PlayerTurn {
                 return Err(AppError::BadRequest("只能在辯論階段發起質詢".to_string()));
             }
 
@@ -227,7 +227,7 @@ impl GameService {
             let engine = Self::get_engine_mut(&mut games, room_code).await?;
 
             // 檢查階段
-            if engine.state.phase != GamePhase::Debate {
+            if engine.state.phase != GamePhase::PlayerTurn {
                 return Err(AppError::BadRequest("只能在辯論階段反駁".to_string()));
             }
 
@@ -364,11 +364,9 @@ impl GameService {
             let mut games = state.games.write().await;
             let engine = Self::get_engine_mut(&mut games, room_code).await?;
 
-            // 結盟可在密謀或辯論階段進行
-            if engine.state.phase != GamePhase::Conspiracy
-                && engine.state.phase != GamePhase::Debate
-            {
-                return Err(AppError::BadRequest("只能在密謀或辯論階段結盟".to_string()));
+            // 結盟在行動階段進行
+            if engine.state.phase != GamePhase::PlayerTurn {
+                return Err(AppError::BadRequest("只能在行動階段結盟".to_string()));
             }
 
             let result = engine
@@ -750,8 +748,7 @@ impl GameService {
             match games.get(room_code) {
                 Some(engine) => {
                     let duration = match new_phase {
-                        GamePhase::Conspiracy => engine.config.conspiracy_duration_secs,
-                        GamePhase::Debate => engine.config.debate_duration_secs,
+                        GamePhase::PlayerTurn => 0, // 回合制不計時
                         GamePhase::Voting => engine.config.voting_duration_secs,
                         GamePhase::Result => engine.config.result_duration_secs,
                         _ => 0,
@@ -1057,7 +1054,7 @@ mod tests {
         assert!(result.is_ok());
 
         let game_state = result.unwrap();
-        assert_eq!(game_state.phase, GamePhase::Conspiracy);
+        assert_eq!(game_state.phase, GamePhase::PlayerTurn);
         assert_eq!(game_state.current_round, 1);
     }
 
@@ -1089,8 +1086,7 @@ mod tests {
         {
             let mut games = state.games.write().await;
             let engine = games.get_mut(&room_code).unwrap();
-            engine.advance_phase(); // Conspiracy -> Debate
-            engine.advance_phase(); // Debate -> Voting
+            engine.advance_phase(); // PlayerTurn -> Voting
         }
 
         // 投票

@@ -5,7 +5,7 @@
 use axum::{
     http::{header, Method},
     middleware,
-    routing::{any, delete, get, post},
+    routing::{any, delete, get, post, put},
     Router,
 };
 
@@ -78,7 +78,12 @@ pub fn create_router(state: AppState) -> Router {
     // 受保護的認證路由（需要驗證）
     let protected_auth_routes = Router::new()
         .route("/me", get(handlers::me))
+        .route("/profile", put(handlers::update_profile))
         .route("/account", delete(handlers::delete_account))
+        .route("/link/google", post(handlers::link_google))
+        .route("/link/apple", post(handlers::link_apple))
+        .route("/link/:provider", delete(handlers::unlink_provider))
+        .route("/links", get(handlers::get_linked_accounts))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -140,6 +145,13 @@ pub fn create_router(state: AppState) -> Router {
             post(handlers::quests::claim_quest_reward),
         )
         .route("/history", get(handlers::quests::get_quest_history))
+        // 週挑戰路由
+        .route("/weekly", get(handlers::get_weekly_challenges))
+        .route(
+            "/weekly/claim/:quest_id",
+            post(handlers::claim_weekly_reward),
+        )
+        .route("/summary", get(handlers::get_quest_summary))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

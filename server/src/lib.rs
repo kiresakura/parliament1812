@@ -79,5 +79,6 @@ pub use services::{
 };
 pub use state::{AppState, GameStore};
 pub use websocket::{
-    handle_socket, process_message, ClientMessage, Hub, ServerMessage, WebSocketHub,
+    handle_socket, process_message, ClientMessage, GameTimerManager, Hub, ServerMessage,
+    SharedTimerManager, WebSocketHub,
 };

@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../providers/auth_provider.dart';
+import '../../providers/single_player_provider.dart';
+import '../../services/audio_service.dart';
+import '../../services/stamina_service.dart';
+import '../../widgets/stamina_bar.dart';
 
 /// 故事戰役地圖畫面
 /// 顯示 5 章節的列表，包含已完成/鎖定/可玩的狀態
@@ -11,11 +18,11 @@ class CampaignScreen extends ConsumerStatefulWidget {
 }
 
 class _CampaignScreenState extends ConsumerState<CampaignScreen> {
-  // 章節資料（本地定義，與後端同步）
+  // 章節資料（本地定義）
   final List<_ChapterData> _chapters = [
     _ChapterData(
       id: 1,
-      title: '初入議會',
+      title: '議會新手',
       subtitle: 'Easy',
       description: '你第一次踏入議會大廳，一切都是新的。\n學習基本的政治運作，結交你的第一個盟友。',
       icon: Icons.school,
@@ -25,64 +32,68 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
           '你，一個新晉議員，踏入了這座古老的議會大廳。\n\n'
           '歡迎來到國會風雲。',
       rewards: '🎁 50 寶石 · 🏅 新手議員',
+      gemCost: 0,
       isUnlocked: true,
       isCompleted: false,
     ),
     _ChapterData(
       id: 2,
-      title: '黨派之爭',
-      subtitle: 'Easy → Normal',
-      description: '議會中的黨派紛爭加劇。\n你只能使用基本卡牌，學會在限制中尋找機會。',
+      title: '政治風暴',
+      subtitle: 'Normal',
+      description: '議會中的黨派紛爭加劇。\n引入聯盟機制，學會在合縱連橫中生存。',
       icon: Icons.groups,
       color: const Color(0xFFFF9800),
       introText: '議會中的黨派紛爭日益激烈。\n\n'
           '工人派、資方派、改革派——每個陣營都在爭奪控制權。\n'
           '用你手中有限的牌，證明你值得留在這個舞台上。',
       rewards: '🎁 100 寶石 · 🏅 黨派鬥士',
+      gemCost: 0,
       isUnlocked: false,
       isCompleted: false,
     ),
     _ChapterData(
       id: 3,
-      title: '預算風暴',
-      subtitle: 'Normal',
-      description: '國家預算案引發激烈辯論。\n時間緊迫，你必須在更短的時限內做出決策。',
+      title: '工業革命',
+      subtitle: 'Hard',
+      description: '工人與工廠主的激烈對決。\n在資源匱乏的困境中做出艱難選擇。',
       icon: Icons.trending_up,
       color: const Color(0xFF2196F3),
-      introText: '年度預算案擺在議會面前。\n\n'
-          '軍費、社會福利、工業補貼——每一項都關係到千萬人的命運。\n'
-          '而時間不等人，預算必須在期限前通過。',
-      rewards: '🎁 150 寶石 · 🏅 預算專家',
+      introText: '蒸汽機的轟鳴聲迴盪在整個城市。\n\n'
+          '工廠主們追求利潤最大化，工人們爭取基本權益。\n'
+          '你必須在這場博弈中找到自己的位置。',
+      rewards: '🎁 150 寶石 · 🏅 工業先鋒',
+      gemCost: 50,
       isUnlocked: false,
       isCompleted: false,
     ),
     _ChapterData(
       id: 4,
-      title: '彈劾危機',
-      subtitle: 'Normal → Hard',
-      description: '你面臨彈劾威脅。\n兩個 AI 聯手對付你，你必須在逆境中求生。',
+      title: '改革之路',
+      subtitle: 'Hard',
+      description: '多方博弈，每個選擇都至關重要。\n聯盟、背叛、妥協——政治的真諦。',
       icon: Icons.warning_amber,
       color: const Color(0xFFF44336),
-      introText: '噩耗傳來。\n\n'
-          '工廠主理查和盧德派喬治——這兩個本應水火不容的勢力，\n'
-          '竟然聯手對你發動了彈劾。\n\n'
-          '以一敵二，你能否在這場政治風暴中存活？',
-      rewards: '🎁 200 寶石 · 🏅 不倒翁',
+      introText: '改革的呼聲越來越高。\n\n'
+          '保守派死守舊制，改革派推動變革。\n'
+          '在這個多方博弈的漩渦中，你的每個選擇都將改變歷史。',
+      rewards: '🎁 200 寶石 · 🏅 改革先驅',
+      gemCost: 100,
       isUnlocked: false,
       isCompleted: false,
     ),
     _ChapterData(
       id: 5,
-      title: '最終表決',
-      subtitle: 'Hard',
-      description: '最後的決戰。\n全規則、困難 AI、加上隨機特殊事件。\n這是你的終極挑戰。',
+      title: '彼得盧之役',
+      subtitle: 'Expert',
+      description: '終極挑戰。\n全規則、Expert AI。\n這是你的最終審判。',
       icon: Icons.emoji_events,
       color: const Color(0xFFD4AF37),
       introText: '一切都在這一刻。\n\n'
-          '《機器法案》的最終表決即將開始。\n'
-          '這一票，將決定工人的未來、工業的走向、整個國家的命運。\n\n'
+          '彼得盧廣場的血腥鎮壓震驚了全國。\n'
+          '議會內外的風暴即將到達頂峰。\n\n'
           '準備好了嗎？這是你的最終審判。',
       rewards: '🎁 500 寶石 · 🏅 議會之王',
+      gemCost: 200,
       isUnlocked: false,
       isCompleted: false,
     ),
@@ -91,9 +102,14 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/menu'),
+        ),
         title: const Text('故事戰役'),
         centerTitle: true,
       ),
@@ -108,29 +124,72 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
             ],
           ),
         ),
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _chapters.length,
-          itemBuilder: (context, index) {
-            final chapter = _chapters[index];
-            final isLast = index == _chapters.length - 1;
+        child: Column(
+          children: [
+            // 行動力顯示
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: StaminaBar(),
+            ),
 
-            return Column(
-              children: [
-                _ChapterCard(
-                  chapter: chapter,
-                  onTap: chapter.isUnlocked
-                      ? () => _showChapterDetail(chapter)
-                      : null,
-                ),
-                if (!isLast)
-                  _ConnectionLine(
-                    isCompleted: chapter.isCompleted,
-                    color: chapter.color,
+            // 登入提示（訪客模式）
+            if (!authState.isAuthenticated)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.3)),
                   ),
-              ],
-            );
-          },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          size: 16, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '訪客模式：進度僅存在本地',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.amber,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 章節列表
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _chapters.length,
+                itemBuilder: (context, index) {
+                  final chapter = _chapters[index];
+                  final isLast = index == _chapters.length - 1;
+
+                  return Column(
+                    children: [
+                      _ChapterCard(
+                        chapter: chapter,
+                        onTap: chapter.isUnlocked
+                            ? () => _showChapterDetail(chapter)
+                            : null,
+                      ),
+                      if (!isLast)
+                        _ConnectionLine(
+                          isCompleted: chapter.isCompleted,
+                          color: chapter.color,
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -151,14 +210,63 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
     );
   }
 
-  void _startChapter(_ChapterData chapter) {
-    // TODO: 連接到單人遊戲 session
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('開始第 ${chapter.id} 章：${chapter.title}'),
-        behavior: SnackBarBehavior.floating,
-      ),
+  void _startChapter(_ChapterData chapter) async {
+    // 檢查行動力
+    final staminaService = ref.read(staminaServiceProvider);
+    await staminaService.init();
+    final current = await staminaService.currentStamina;
+
+    if (current < StaminaService.costCampaign) {
+      if (!mounted) return;
+      final purchased = await showStaminaInsufficientDialog(
+        context,
+        ref,
+        cost: StaminaService.costCampaign,
+        current: current,
+      );
+      if (!purchased) return;
+    }
+
+    // 消耗行動力
+    final consumed =
+        await staminaService.consume(StaminaService.costCampaign);
+    if (!consumed) return;
+    ref.invalidate(currentStaminaProvider);
+
+    ref.read(audioServiceProvider).playSfx(SfxType.cardPlay);
+
+    // Show loading
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    final campaignNotifier = ref.read(campaignProvider.notifier);
+    final result = await campaignNotifier.startChapter(
+      chapter: chapter.id,
+    );
+
+    // Dismiss loading
+    if (mounted) Navigator.of(context).pop();
+
+    if (result != null && mounted) {
+      ref
+          .read(singlePlayerProvider.notifier)
+          .setGameState(result.state, result.sessionId);
+      context.go('/single-player/game');
+    } else if (mounted) {
+      // 退還行動力
+      await staminaService.purchase(StaminaService.costCampaign, 0);
+      ref.invalidate(currentStaminaProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('無法開始戰役，請稍後再試。'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }
 
@@ -187,7 +295,8 @@ class _ChapterCard extends StatelessWidget {
             children: [
               // 章節標題列
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: chapter.color.withValues(alpha: 0.12),
                 ),
@@ -231,7 +340,8 @@ class _ChapterCard extends StatelessWidget {
                     if (chapter.isCompleted)
                       Chip(
                         label: const Text('✅ 完成'),
-                        backgroundColor: Colors.green.withValues(alpha: 0.15),
+                        backgroundColor:
+                            Colors.green.withValues(alpha: 0.15),
                         labelStyle: const TextStyle(
                           fontSize: 12,
                           color: Colors.green,
@@ -242,7 +352,8 @@ class _ChapterCard extends StatelessWidget {
                     else if (chapter.isUnlocked)
                       Chip(
                         label: const Text('▶ 可玩'),
-                        backgroundColor: chapter.color.withValues(alpha: 0.15),
+                        backgroundColor:
+                            chapter.color.withValues(alpha: 0.15),
                         labelStyle: TextStyle(
                           fontSize: 12,
                           color: chapter.color,
@@ -252,8 +363,11 @@ class _ChapterCard extends StatelessWidget {
                       )
                     else
                       Chip(
-                        label: const Text('🔒 鎖定'),
-                        backgroundColor: Colors.grey.withValues(alpha: 0.15),
+                        label: Text(chapter.gemCost > 0
+                            ? '💎 ${chapter.gemCost}'
+                            : '🔒 鎖定'),
+                        backgroundColor:
+                            Colors.grey.withValues(alpha: 0.15),
                         labelStyle: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
@@ -274,7 +388,8 @@ class _ChapterCard extends StatelessWidget {
                     Text(
                       chapter.description,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.7),
                         height: 1.5,
                       ),
                     ),
@@ -289,11 +404,21 @@ class _ChapterCard extends StatelessWidget {
                             color: chapter.color,
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.bolt,
+                            size: 14, color: Colors.amber),
+                        Text(
+                          ' ${StaminaService.costCampaign}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.amber,
+                          ),
+                        ),
                         const Spacer(),
                         Text(
                           chapter.rewards,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.5),
                           ),
                         ),
                       ],
@@ -364,7 +489,8 @@ class _ChapterDetailSheet extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: ListView(
             controller: scrollController,
@@ -377,7 +503,8 @@ class _ChapterDetailSheet extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -431,6 +558,21 @@ class _ChapterDetailSheet extends StatelessWidget {
 
               const SizedBox(height: 16),
 
+              // 行動力消耗提示
+              Row(
+                children: [
+                  const Icon(Icons.bolt, size: 18, color: Colors.amber),
+                  const SizedBox(width: 8),
+                  Text(
+                    '消耗 ${StaminaService.costCampaign} 行動力',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.amber,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
               // 獎勵
               Row(
                 children: [
@@ -483,6 +625,7 @@ class _ChapterData {
   final Color color;
   final String introText;
   final String rewards;
+  final int gemCost;
   final bool isUnlocked;
   final bool isCompleted;
 
@@ -495,6 +638,7 @@ class _ChapterData {
     required this.color,
     required this.introText,
     required this.rewards,
+    required this.gemCost,
     required this.isUnlocked,
     required this.isCompleted,
   });

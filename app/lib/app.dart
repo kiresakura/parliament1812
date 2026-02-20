@@ -23,6 +23,7 @@ import 'screens/campaign/campaign_screen.dart';
 import 'screens/single_player/difficulty_select_screen.dart';
 import 'screens/single_player/single_player_game_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/profile/profile_screen.dart';
 import 'providers/game_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -78,6 +79,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: '/tutorial',

@@ -341,5 +341,6 @@
 
   "connectionConnected": "已连线",
   "connectionDisconnected": "已断线",
-  "connectionConnecting": "连线中..."
+  "connectionConnecting": "连线中...",
+  "graphicsQuality": "画面品质"
 }

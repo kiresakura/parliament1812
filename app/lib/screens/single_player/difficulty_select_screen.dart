@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/single_player.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/single_player_provider.dart';
 import '../../services/audio_service.dart';
+import '../../services/stamina_service.dart';
+import '../../widgets/stamina_bar.dart';
 
 /// AI 難度選擇畫面
 class DifficultySelectScreen extends ConsumerWidget {
@@ -13,6 +16,7 @@ class DifficultySelectScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -39,7 +43,11 @@ class DifficultySelectScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // 行動力顯示
+                const StaminaBar(),
+
                 const SizedBox(height: 16),
+
                 Text(
                   '選擇難度',
                   style: theme.textTheme.headlineMedium?.copyWith(
@@ -50,7 +58,9 @@ class DifficultySelectScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '每日可免費對戰 10 場',
+                  authState.isAuthenticated
+                      ? '對戰記錄將同步到伺服器'
+                      : '訪客模式：對戰記錄僅存在本地',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
@@ -58,12 +68,16 @@ class DifficultySelectScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 32),
 
-                ...AiDifficulty.values.map((difficulty) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _DifficultyCard(difficulty: difficulty),
-                    )),
-
-                const Spacer(),
+                Expanded(
+                  child: ListView(
+                    children: AiDifficulty.values
+                        .map((difficulty) => Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _DifficultyCard(difficulty: difficulty),
+                            ))
+                        .toList(),
+                  ),
+                ),
               ],
             ),
           ),
@@ -110,18 +124,7 @@ class _DifficultyCard extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          ref.read(audioServiceProvider).playSfx(SfxType.cardPlay);
-
-          final notifier = ref.read(singlePlayerProvider.notifier);
-          final success = await notifier.startQuickMatch(
-            difficulty: difficulty,
-          );
-
-          if (success && context.mounted) {
-            context.go('/single-player/game');
-          }
-        },
+        onTap: () => _startGame(context, ref),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Row(
@@ -161,6 +164,19 @@ class _DifficultyCard extends ConsumerWidget {
                   ],
                 ),
               ),
+              // 行動力消耗提示
+              Column(
+                children: [
+                  const Icon(Icons.bolt, size: 14, color: Colors.amber),
+                  Text(
+                    '${StaminaService.costQuickMatch}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.amber,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
               Icon(
                 Icons.chevron_right,
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
@@ -170,5 +186,66 @@ class _DifficultyCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _startGame(BuildContext context, WidgetRef ref) async {
+    // 檢查行動力
+    final staminaService = ref.read(staminaServiceProvider);
+    await staminaService.init();
+    final current = await staminaService.currentStamina;
+
+    if (current < StaminaService.costQuickMatch) {
+      if (!context.mounted) return;
+      final purchased = await showStaminaInsufficientDialog(
+        context,
+        ref,
+        cost: StaminaService.costQuickMatch,
+        current: current,
+      );
+      if (!purchased) return;
+    }
+
+    // 消耗行動力
+    final consumed = await staminaService.consume(StaminaService.costQuickMatch);
+    if (!consumed) return;
+    ref.invalidate(currentStaminaProvider);
+
+    ref.read(audioServiceProvider).playSfx(SfxType.cardPlay);
+
+    // Show loading
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // 取得玩家名稱
+    final authState = ref.read(authProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
+    String playerName = authState.playerName ?? prefs.getString('player_name') ?? '議員';
+
+    final notifier = ref.read(singlePlayerProvider.notifier);
+    final success = await notifier.startQuickMatch(
+      difficulty: difficulty,
+      playerName: playerName,
+    );
+
+    // Dismiss loading
+    if (context.mounted) Navigator.of(context).pop();
+
+    if (success && context.mounted) {
+      context.go('/single-player/game');
+    } else if (context.mounted) {
+      // 退還行動力
+      await staminaService.purchase(StaminaService.costQuickMatch, 0);
+      ref.invalidate(currentStaminaProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('無法開始對戰，請稍後再試。'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

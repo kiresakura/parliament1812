@@ -11,6 +11,7 @@ pub mod codex;
 pub mod friends;
 pub mod games;
 pub mod migrations;
+pub mod oauth_links;
 pub mod rankings;
 pub mod users;
 

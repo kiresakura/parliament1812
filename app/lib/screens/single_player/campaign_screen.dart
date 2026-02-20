@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/single_player.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/single_player_provider.dart';
 import '../../services/audio_service.dart';
+import '../../services/stamina_service.dart';
+import '../../widgets/stamina_bar.dart';
 
-/// 故事戰役畫面
+/// 故事戰役畫面（從 single_player 路徑存取）
 class CampaignScreen extends ConsumerStatefulWidget {
   const CampaignScreen({super.key});
 
@@ -27,6 +30,7 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chapters = ref.watch(campaignProvider);
+    final authState = ref.watch(authProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -36,32 +40,129 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
           onPressed: () => context.go('/menu'),
         ),
       ),
-      body: chapters.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: chapters.length,
-              itemBuilder: (context, index) {
-                return _ChapterCard(
-                  chapter: chapters[index],
-                  onTap: () => _startChapter(chapters[index]),
-                );
-              },
+      body: Column(
+        children: [
+          // 行動力顯示
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: StaminaBar(),
+          ),
+
+          // 登入提示
+          if (!authState.isAuthenticated)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 16, color: Colors.amber),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '訪客模式：進度僅存在本地',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.amber,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+
+          // 章節列表
+          Expanded(
+            child: chapters.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: chapters.length,
+                    itemBuilder: (context, index) {
+                      return _ChapterCard(
+                        chapter: chapters[index],
+                        onTap: () => _startChapter(chapters[index]),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _startChapter(CampaignChapter chapter) {
+  Future<void> _startChapter(CampaignChapter chapter) async {
     if (!chapter.isUnlocked && !chapter.isFree) {
       _showUnlockDialog(chapter);
       return;
     }
 
+    // 檢查行動力
+    final staminaService = ref.read(staminaServiceProvider);
+    await staminaService.init();
+    final current = await staminaService.currentStamina;
+
+    if (current < StaminaService.costCampaign) {
+      if (!mounted) return;
+      final purchased = await showStaminaInsufficientDialog(
+        context,
+        ref,
+        cost: StaminaService.costCampaign,
+        current: current,
+      );
+      if (!purchased) return;
+    }
+
+    // 消耗行動力
+    final consumed =
+        await staminaService.consume(StaminaService.costCampaign);
+    if (!consumed) return;
+    ref.invalidate(currentStaminaProvider);
+
     ref.read(audioServiceProvider).playSfx(SfxType.cardPlay);
-    // TODO: Navigate to campaign game screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('開始 ${chapter.title}...')),
+
+    // 顯示 loading
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    final result = await ref.read(campaignProvider.notifier).startChapter(
+          chapter: chapter.chapter,
+          stage: chapter.stagesCompleted + 1,
+        );
+
+    // 關閉 loading
+    if (!mounted) return;
+    Navigator.of(context).pop();
+
+    if (result != null) {
+      ref
+          .read(singlePlayerProvider.notifier)
+          .setGameState(result.state, result.sessionId);
+      if (!mounted) return;
+      context.go('/single-player/game');
+    } else {
+      // 退還行動力
+      await staminaService.purchase(StaminaService.costCampaign, 0);
+      ref.invalidate(currentStaminaProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('無法開始「${chapter.title}」，請稍後再試。'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _showUnlockDialog(CampaignChapter chapter) {
@@ -185,7 +286,8 @@ class _ChapterCard extends StatelessWidget {
                   Text(
                     chapter.description,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      color: theme.colorScheme.onSurface
+                          .withValues(alpha: 0.7),
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -202,6 +304,14 @@ class _ChapterCard extends StatelessWidget {
                         icon: '📋',
                         text:
                             '${chapter.stagesCompleted}/${chapter.totalStages}',
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.bolt, size: 14, color: Colors.amber),
+                      Text(
+                        ' ${StaminaService.costCampaign}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.amber,
+                        ),
                       ),
                       const Spacer(),
                       if (isLocked)

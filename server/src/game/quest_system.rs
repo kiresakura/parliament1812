@@ -9,6 +9,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::quests::{all_quest_templates, QuestReward, QuestTemplate, QuestType};
+use super::weekly_system;
+use super::weekly_challenges::WeeklyQuestType;
 
 // ============================================================
 // 資料模型
@@ -322,9 +324,26 @@ pub async fn claim_quest_reward(
     Ok((reward_desc, bonus_gems))
 }
 
-/// 遊戲結束後批次更新所有玩家的任務進度
+/// 將每日任務類型映射到對應的週挑戰類型（如果存在）
+fn map_quest_to_weekly(quest_type: QuestType) -> Option<WeeklyQuestType> {
+    match quest_type {
+        QuestType::PlayGames => Some(WeeklyQuestType::WeeklyPlay10),
+        QuestType::WinGames => Some(WeeklyQuestType::WeeklyWin5),
+        QuestType::VoteOnBills => Some(WeeklyQuestType::WeeklyVote15),
+        QuestType::UseAttackCards => Some(WeeklyQuestType::WeeklyAttack15),
+        QuestType::UseDefenseCards => Some(WeeklyQuestType::WeeklyDefense10),
+        QuestType::FormAlliance => Some(WeeklyQuestType::WeeklyAlliance5),
+        QuestType::InitiateChallenge => Some(WeeklyQuestType::WeeklyChallenge8),
+        QuestType::DealReputationDamage => Some(WeeklyQuestType::WeeklyDamage100),
+        QuestType::EarnGold => Some(WeeklyQuestType::WeeklyGold200),
+        QuestType::PlayCardsInDebate => Some(WeeklyQuestType::WeeklyCards30),
+        _ => None, // 沒有對應的週挑戰
+    }
+}
+
+/// 遊戲結束後批次更新所有玩家的任務進度（包含週挑戰）
 ///
-/// 傳入參與遊戲的玩家資訊，自動追蹤相關任務。
+/// 傳入參與遊戲的玩家資訊，自動追蹤每日任務與週挑戰進度。
 pub async fn update_all_quest_progress(
     pool: &PgPool,
     game_result: &GameEndQuestData,
@@ -332,13 +351,20 @@ pub async fn update_all_quest_progress(
     for player in &game_result.players {
         // PlayGames +1
         update_quest_progress(pool, player.user_id, QuestType::PlayGames, 1).await?;
+        if let Some(weekly_type) = map_quest_to_weekly(QuestType::PlayGames) {
+            weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, 1).await?;
+        }
 
         // PlayAsCharacter +1
         update_quest_progress(pool, player.user_id, QuestType::PlayAsCharacter, 1).await?;
+        // 無對應週挑戰
 
         // WinGames +1 if won
         if player.is_winner {
             update_quest_progress(pool, player.user_id, QuestType::WinGames, 1).await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::WinGames) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, 1).await?;
+            }
         }
 
         // WinWithReputation if won with reputation >= 60
@@ -355,6 +381,9 @@ pub async fn update_all_quest_progress(
                 player.votes_cast,
             )
             .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::VoteOnBills) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.votes_cast).await?;
+            }
         }
 
         // UseAttackCards
@@ -366,6 +395,9 @@ pub async fn update_all_quest_progress(
                 player.attack_cards_used,
             )
             .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::UseAttackCards) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.attack_cards_used).await?;
+            }
         }
 
         // UseDefenseCards
@@ -377,6 +409,9 @@ pub async fn update_all_quest_progress(
                 player.defense_cards_used,
             )
             .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::UseDefenseCards) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.defense_cards_used).await?;
+            }
         }
 
         // FormAlliance
@@ -388,6 +423,9 @@ pub async fn update_all_quest_progress(
                 player.alliances_formed,
             )
             .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::FormAlliance) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.alliances_formed).await?;
+            }
         }
 
         // InitiateChallenge

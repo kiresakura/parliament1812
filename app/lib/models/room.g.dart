@@ -62,6 +62,7 @@ const _$RoomStatusEnumMap = {
 const _$GamePhaseEnumMap = {
   GamePhase.waiting: 'waiting',
   GamePhase.preparation: 'preparation',
+  GamePhase.playerTurn: 'player_turn',
   GamePhase.conspiracy: 'conspiracy',
   GamePhase.debate: 'debate',
   GamePhase.event: 'event',

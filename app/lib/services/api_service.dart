@@ -219,7 +219,7 @@ class ApiService {
       final request = await _httpClient.openUrl(method, uri);
       
       // 設定標頭
-      request.headers.set('Content-Type', 'application/json');
+      request.headers.set('Content-Type', 'application/json; charset=utf-8');
       if (_authToken != null) {
         request.headers.set('Authorization', 'Bearer $_authToken');
       }
@@ -227,7 +227,7 @@ class ApiService {
       // 添加請求體
       if (body != null) {
         final bodyStr = jsonEncode(body);
-        request.write(bodyStr);
+        request.add(utf8.encode(bodyStr));
       }
       
       final response = await request.close();
@@ -583,6 +583,86 @@ class ApiService {
       return ApiResult.error(response.error ?? '取得賽季資訊失敗');
     } catch (e) {
       return ApiResult.error('取得賽季資訊失敗: $e');
+    }
+  }
+
+  // ==================== 圖鑑 API ====================
+
+  /// 取得全卡牌列表（含收藏狀態）
+  Future<ApiResult<Map<String, dynamic>>> getCodexCards() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/cards');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得卡牌列表失敗');
+    } catch (e) {
+      return ApiResult.error('取得卡牌列表失敗: $e');
+    }
+  }
+
+  /// 取得我的收藏
+  Future<ApiResult<Map<String, dynamic>>> getCollection() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/collection');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得收藏失敗');
+    } catch (e) {
+      return ApiResult.error('取得收藏失敗: $e');
+    }
+  }
+
+  /// 取得圖鑑統計
+  Future<ApiResult<Map<String, dynamic>>> getCodexStats() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/stats');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得統計失敗');
+    } catch (e) {
+      return ApiResult.error('取得圖鑑統計失敗: $e');
+    }
+  }
+
+  /// 取得成就列表（含進度）
+  Future<ApiResult<Map<String, dynamic>>> getAchievements() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/achievements');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得成就失敗');
+    } catch (e) {
+      return ApiResult.error('取得成就列表失敗: $e');
+    }
+  }
+
+  /// 領取成就獎勵
+  Future<ApiResult<Map<String, dynamic>>> claimAchievement(
+    String achievementId,
+  ) async {
+    try {
+      final body = {'achievement_id': achievementId};
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/achievements/claim');
+      final response = await _makeRequest('POST', uri, body: body);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '領取獎勵失敗');
+    } catch (e) {
+      return ApiResult.error('領取成就獎勵失敗: $e');
     }
   }
 

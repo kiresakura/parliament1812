@@ -2,11 +2,16 @@
 //!
 //! 提供用戶註冊、登入、OAuth、密碼重設、取得當前用戶資訊等功能
 
-use axum::{extract::State, Json};
+use axum::{
+    extract::{Path, State},
+    Json,
+};
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
     auth::{hash_password, validate_password_strength, verify_password, AuthUser},
+    db::oauth_links::OAuthLinkDb,
     domain::{
         ForgotPasswordRequest, LoginRequest, MessageResponse, OAuthLoginRequest,
         RefreshTokenRequest, ResetPasswordRequest, TokenResponse, UserResponse,
@@ -239,8 +244,40 @@ async fn handle_oauth_login(
     display_name: Option<String>,
 ) -> AppResult<Json<TokenResponse>> {
     let repo = state.user_repo();
+    let pool = state.db();
 
-    // 查找已有的 OAuth 使用者
+    // 1. 先查 user_oauth_links 表
+    let oauth_link = OAuthLinkDb::find_by_provider(
+        pool,
+        &oauth_result.provider,
+        &oauth_result.provider_user_id,
+    )
+    .await
+    .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    if let Some(link) = oauth_link {
+        // 透過 oauth_links 找到使用者
+        let user_record = repo
+            .find_full_by_id(link.user_id)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| AppError::InternalError("OAuth 連結的使用者不存在".to_string()))?;
+
+        let _ = repo.update_last_login(user_record.id).await;
+
+        let pair = state.jwt.generate_token_pair(user_record.id)?;
+        let user_response = user_record.into_response();
+
+        tracing::info!(
+            user_id = %user_response.id,
+            provider = %oauth_result.provider,
+            "OAuth 登入 (via oauth_links)"
+        );
+
+        return Ok(Json(TokenResponse::from_pair(pair, Some(user_response))));
+    }
+
+    // 2. 回退：查 users 表的 oauth_provider（向後兼容）
     let existing = repo
         .find_by_oauth(&oauth_result.provider, &oauth_result.provider_user_id)
         .await
@@ -258,16 +295,29 @@ async fn handle_oauth_login(
             .or(oauth_result.name)
             .unwrap_or_else(|| username.clone());
 
-        repo.create_oauth_user(
-            &username,
-            oauth_result.email.as_deref(),
+        let new_user = repo
+            .create_oauth_user(
+                &username,
+                oauth_result.email.as_deref(),
+                &oauth_result.provider,
+                &oauth_result.provider_user_id,
+                Some(&name),
+                oauth_result.avatar_url.as_deref(),
+            )
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // 同時在 oauth_links 表建立記錄
+        let _ = OAuthLinkDb::create_link(
+            pool,
+            new_user.id,
             &oauth_result.provider,
             &oauth_result.provider_user_id,
-            Some(&name),
-            oauth_result.avatar_url.as_deref(),
+            oauth_result.email.as_deref(),
         )
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?
+        .await;
+
+        new_user
     };
 
     // 生成 token pair
@@ -375,6 +425,63 @@ pub async fn reset_password(
 }
 
 // ============================================================
+// PUT /api/v1/auth/profile
+// ============================================================
+
+/// 更新個人檔案請求
+#[derive(Debug, serde::Deserialize)]
+pub struct UpdateProfileRequest {
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
+/// 更新個人檔案
+///
+/// PUT /api/v1/auth/profile
+/// Body: { display_name?: String, avatar_url?: String }
+/// Header: Authorization: Bearer <access_token>
+pub async fn update_profile(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<UpdateProfileRequest>,
+) -> AppResult<Json<UserResponse>> {
+    // 驗證 display_name（如有提供）
+    if let Some(ref name) = req.display_name {
+        let trimmed = name.trim();
+        if trimmed.is_empty() || trimmed.len() > 50 {
+            return Err(AppError::BadRequest(
+                "顯示名稱長度必須在 1-50 字元之間".to_string(),
+            ));
+        }
+    }
+
+    // 驗證 avatar_url（如有提供）
+    if let Some(ref url) = req.avatar_url {
+        if url.len() > 500 {
+            return Err(AppError::BadRequest("頭像 URL 過長".to_string()));
+        }
+    }
+
+    let repo = state.user_repo();
+
+    let record = repo
+        .update_profile(
+            auth.user_id,
+            req.display_name.as_deref(),
+            req.avatar_url.as_deref(),
+        )
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("用戶不存在".to_string()))?;
+
+    let user_response = record.into_response();
+
+    tracing::info!(user_id = %auth.user_id, "個人檔案已更新");
+
+    Ok(Json(user_response))
+}
+
+// ============================================================
 // GET /api/v1/auth/me
 // ============================================================
 
@@ -434,6 +541,197 @@ pub async fn delete_account(
     Ok(Json(MessageResponse {
         message: "帳號已成功刪除".to_string(),
     }))
+}
+
+// ============================================================
+// OAuth 帳號綁定相關
+// ============================================================
+
+/// 已綁定帳號資訊
+#[derive(Debug, Clone, Serialize)]
+pub struct LinkedAccount {
+    pub provider: String,
+    pub email: Option<String>,
+    pub linked_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// 已綁定帳號列表回應
+#[derive(Debug, Clone, Serialize)]
+pub struct LinkedAccountsResponse {
+    pub accounts: Vec<LinkedAccount>,
+}
+
+/// 綁定 Google 帳號
+///
+/// POST /api/v1/auth/link/google
+/// Header: Authorization: Bearer <access_token>
+/// Body: { "token": "google_id_token" }
+pub async fn link_google(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<OAuthLoginRequest>,
+) -> AppResult<Json<MessageResponse>> {
+    let oauth_result = crate::auth::verify_google_token(&req.token).await?;
+    handle_link_provider(state, auth.user_id, oauth_result).await
+}
+
+/// 綁定 Apple 帳號
+///
+/// POST /api/v1/auth/link/apple
+/// Header: Authorization: Bearer <access_token>
+/// Body: { "token": "apple_identity_token" }
+pub async fn link_apple(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<OAuthLoginRequest>,
+) -> AppResult<Json<MessageResponse>> {
+    let oauth_result = crate::auth::verify_apple_token(&req.token).await?;
+    handle_link_provider(state, auth.user_id, oauth_result).await
+}
+
+/// 統一處理 OAuth 帳號綁定
+async fn handle_link_provider(
+    state: AppState,
+    user_id: Uuid,
+    oauth_result: crate::auth::OAuthResult,
+) -> AppResult<Json<MessageResponse>> {
+    let pool = state.db();
+
+    // 檢查該 OAuth 帳號是否已被其他用戶綁定
+    let existing = OAuthLinkDb::find_by_provider(
+        pool,
+        &oauth_result.provider,
+        &oauth_result.provider_user_id,
+    )
+    .await
+    .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    if let Some(link) = existing {
+        if link.user_id == user_id {
+            return Err(AppError::BadRequest("此帳號已綁定到您的帳號".to_string()));
+        }
+        return Err(AppError::BadRequest(
+            "此 OAuth 帳號已被其他用戶綁定".to_string(),
+        ));
+    }
+
+    // 也檢查 users 表中是否有其他用戶使用此 OAuth（向後兼容）
+    let repo = state.user_repo();
+    let existing_user = repo
+        .find_by_oauth(&oauth_result.provider, &oauth_result.provider_user_id)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    if let Some(record) = existing_user {
+        if record.id != user_id {
+            return Err(AppError::BadRequest(
+                "此 OAuth 帳號已被其他用戶使用".to_string(),
+            ));
+        }
+    }
+
+    // 建立綁定
+    OAuthLinkDb::create_link(
+        pool,
+        user_id,
+        &oauth_result.provider,
+        &oauth_result.provider_user_id,
+        oauth_result.email.as_deref(),
+    )
+    .await
+    .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    tracing::info!(
+        user_id = %user_id,
+        provider = %oauth_result.provider,
+        "OAuth 帳號綁定成功"
+    );
+
+    Ok(Json(MessageResponse {
+        message: format!("{} 帳號綁定成功", oauth_result.provider),
+    }))
+}
+
+/// 解綁 OAuth 帳號
+///
+/// DELETE /api/v1/auth/link/:provider
+/// Header: Authorization: Bearer <access_token>
+pub async fn unlink_provider(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(provider): Path<String>,
+) -> AppResult<Json<MessageResponse>> {
+    let pool = state.db();
+    let repo = state.user_repo();
+
+    // 驗證 provider 名稱
+    if provider != "google" && provider != "apple" {
+        return Err(AppError::BadRequest("不支援的 OAuth 提供者".to_string()));
+    }
+
+    // 檢查用戶至少保留一個登入方式
+    let user = repo
+        .find_full_by_id(auth.user_id)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("用戶不存在".to_string()))?;
+
+    let has_password = user.password_hash.is_some();
+    let oauth_link_count = OAuthLinkDb::count_by_user(pool, auth.user_id)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    // 如果沒有密碼且只剩一個 OAuth 連結，不允許解綁
+    if !has_password && oauth_link_count <= 1 {
+        return Err(AppError::BadRequest(
+            "無法解綁：至少需要保留一個登入方式。請先設定密碼或綁定其他帳號。".to_string(),
+        ));
+    }
+
+    // 執行解綁
+    let deleted = OAuthLinkDb::delete_link(pool, auth.user_id, &provider)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    if !deleted {
+        return Err(AppError::NotFound("未找到該 OAuth 綁定".to_string()));
+    }
+
+    tracing::info!(
+        user_id = %auth.user_id,
+        provider = %provider,
+        "OAuth 帳號解綁成功"
+    );
+
+    Ok(Json(MessageResponse {
+        message: format!("{} 帳號已解綁", provider),
+    }))
+}
+
+/// 取得已綁定帳號列表
+///
+/// GET /api/v1/auth/links
+/// Header: Authorization: Bearer <access_token>
+pub async fn get_linked_accounts(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> AppResult<Json<LinkedAccountsResponse>> {
+    let pool = state.db();
+
+    let links = OAuthLinkDb::find_by_user(pool, auth.user_id)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    let accounts: Vec<LinkedAccount> = links
+        .into_iter()
+        .map(|link| LinkedAccount {
+            provider: link.provider,
+            email: link.email,
+            linked_at: link.linked_at,
+        })
+        .collect();
+
+    Ok(Json(LinkedAccountsResponse { accounts }))
 }
 
 #[cfg(test)]

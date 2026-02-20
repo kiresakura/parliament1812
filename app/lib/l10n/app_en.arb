@@ -341,5 +341,6 @@
 
   "connectionConnected": "Connected",
   "connectionDisconnected": "Disconnected",
-  "connectionConnecting": "Connecting..."
+  "connectionConnecting": "Connecting...",
+  "graphicsQuality": "Graphics Quality"
 }

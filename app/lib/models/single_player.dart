@@ -1,4 +1,25 @@
-/// 單人模式資料模型
+// 單人模式資料模型
+
+/// AI 行動記錄（用於逐步展示 AI 回合）
+class AiActionRecord {
+  final String actorId;
+  final String actorName;
+  final String actionType; // 'play_card', 'challenge', 'alliance', 'heal', 'buff', 'draw', etc.
+  final String description;
+  final String? targetId;
+  final String? targetName;
+  final int? valueChange; // 聲望變化值（正/負）
+
+  const AiActionRecord({
+    required this.actorId,
+    required this.actorName,
+    required this.actionType,
+    required this.description,
+    this.targetId,
+    this.targetName,
+    this.valueChange,
+  });
+}
 
 /// AI 難度
 enum AiDifficulty {
@@ -55,6 +76,14 @@ class SinglePlayerState {
   final List<String> aiActionsLog;
   final bool isGameOver;
   final SinglePlayerResult? result;
+  /// 回合制：剩餘行動點數
+  final int actionPointsRemaining;
+  /// 回合制：當前行動玩家 ID
+  final String? currentTurnPlayerId;
+  /// AI 回合待展示的行動列表
+  final List<AiActionRecord> pendingAiActions;
+  /// 當前正在展示行動的 AI ID（用於高亮）
+  final String? aiTurnActorId;
 
   SinglePlayerState({
     required this.sessionId,
@@ -67,7 +96,37 @@ class SinglePlayerState {
     required this.aiActionsLog,
     required this.isGameOver,
     this.result,
+    this.actionPointsRemaining = 3,
+    this.currentTurnPlayerId,
+    this.pendingAiActions = const [],
+    this.aiTurnActorId,
   });
+
+  /// 複製並修改部分欄位
+  SinglePlayerState copyWith({
+    String? phase,
+    List<String>? aiActionsLog,
+    List<AiActionRecord>? pendingAiActions,
+    String? aiTurnActorId,
+    bool clearAiTurnActorId = false,
+  }) {
+    return SinglePlayerState(
+      sessionId: sessionId,
+      phase: phase ?? this.phase,
+      currentRound: currentRound,
+      currentBill: currentBill,
+      players: players,
+      hand: hand,
+      phaseTimeRemaining: phaseTimeRemaining,
+      aiActionsLog: aiActionsLog ?? this.aiActionsLog,
+      isGameOver: isGameOver,
+      result: result,
+      actionPointsRemaining: actionPointsRemaining,
+      currentTurnPlayerId: currentTurnPlayerId,
+      pendingAiActions: pendingAiActions ?? this.pendingAiActions,
+      aiTurnActorId: clearAiTurnActorId ? null : (aiTurnActorId ?? this.aiTurnActorId),
+    );
+  }
 
   factory SinglePlayerState.fromJson(Map<String, dynamic> json) {
     return SinglePlayerState(
@@ -92,6 +151,8 @@ class SinglePlayerState {
       result: json['result'] != null
           ? SinglePlayerResult.fromJson(json['result'])
           : null,
+      actionPointsRemaining: json['action_points_remaining'] ?? 3,
+      currentTurnPlayerId: json['current_turn_player_id'],
     );
   }
 }

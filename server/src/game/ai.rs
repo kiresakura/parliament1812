@@ -85,8 +85,16 @@ impl AIPlayer {
         }
 
         match state.phase {
-            GamePhase::Conspiracy => self.conspiracy_action(state),
-            GamePhase::Debate => self.debate_action(state),
+            GamePhase::PlayerTurn => {
+                // 回合制：AI 在行動階段可以執行密謀或辯論相關行動
+                // 隨機決定策略傾向
+                let seed = self.rng_seed.wrapping_add(state.current_round as u64);
+                if seed % 2 == 0 {
+                    self.conspiracy_action(state)
+                } else {
+                    self.debate_action(state)
+                }
+            }
             GamePhase::Voting => self.voting_action(state),
             _ => AIAction::Wait,
         }
@@ -717,7 +725,7 @@ mod tests {
     #[test]
     fn test_difficulty_differences() {
         let mut state = create_test_game_state();
-        state.phase = GamePhase::Conspiracy;
+        state.phase = GamePhase::PlayerTurn;
 
         let easy_ai = AIPlayer::new(Uuid::new_v4(), CharacterType::Thomas, AIDifficulty::Easy);
         let hard_ai = AIPlayer::new(Uuid::new_v4(), CharacterType::Richard, AIDifficulty::Hard);

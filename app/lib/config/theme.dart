@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../ui/theme/game_colors.dart' as gc;
+
 class Parliament1812Theme {
-  // 1812 年代顏色
-  static const Color darkRed = Color(0xFF8B0000);
-  static const Color gold = Color(0xFFD4AF37);
-  static const Color darkGold = Color(0xFFB8941C);
-  static const Color cream = Color(0xFFFFF8DC);
-  static const Color darkBrown = Color(0xFF3C1810);
-  static const Color lightBrown = Color(0xFF8B4513);
-  static const Color charcoal = Color(0xFF2F2F2F);
-  static const Color slate = Color(0xFF1A1A1A);
+  // ═══ 羅塞蒂配色系統 v1.0 映射 ═══
+  // 舊名 → 新系統對照（保留向後相容）
+  static const Color darkRed = gc.GameColors.deepCrimson;
+  static const Color gold = gc.GameColors.victorianGold;
+  static const Color darkGold = gc.GameColors.goldDim;
+  static const Color cream = gc.GameColors.textPrimary;
+  static const Color darkBrown = gc.GameColors.bgPrimary;
+  static const Color lightBrown = Color(0xFF5A3D7A); // 升級為紫調棕
+  static const Color charcoal = gc.GameColors.bgSecondary;
+  static const Color slate = gc.GameColors.bgPrimary;
 
   /// Base serif text style using Playfair Display
   static TextStyle get _serifBase => GoogleFonts.playfairDisplay();
@@ -22,25 +25,25 @@ class Parliament1812Theme {
     return ThemeData(
       brightness: Brightness.dark,
 
-      // 主色調
-      primarySwatch: Colors.red,
+      // 主色調 — 羅塞蒂 v1.0：深紫×維多利亞金×玫瑰紅
+      primarySwatch: Colors.purple,
 
-      colorScheme: const ColorScheme.dark(
-        primary: darkRed,
-        primaryContainer: Color(0xFF660000),
-        secondary: gold,
-        secondaryContainer: darkGold,
-        surface: slate,
-        surfaceContainer: charcoal,
-        onPrimary: cream,
-        onSecondary: darkBrown,
-        onSurface: cream,
-        error: Color(0xFFFF6B6B),
+      colorScheme: ColorScheme.dark(
+        primary: gc.GameColors.roseRed,           // 行動色：玫瑰紅
+        primaryContainer: gc.GameColors.bgCard,    // 卡牌底色
+        secondary: gc.GameColors.victorianGold,    // 強調色：維多利亞金
+        secondaryContainer: gc.GameColors.goldDim, // 金色陰影
+        surface: gc.GameColors.bgPrimary,          // 深紫主背景
+        surfaceContainer: gc.GameColors.bgSecondary, // 次級背景
+        onPrimary: gc.GameColors.textPrimary,      // 羊皮紙白
+        onSecondary: gc.GameColors.bgPrimary,      // 深紫（金色上文字）
+        onSurface: gc.GameColors.textPrimary,      // 羊皮紙白
+        error: gc.GameColors.roseLight,            // 錯誤：玫瑰紅高光
         outline: lightBrown,
       ),
 
       // 背景
-      scaffoldBackgroundColor: slate,
+      scaffoldBackgroundColor: gc.GameColors.bgPrimary,
 
       // 卡片主題
       cardTheme: CardThemeData(
@@ -295,16 +298,16 @@ class Parliament1812Theme {
     );
   }
 
-  // 遊戲專用顏色
-  static const Color reputationColor = Color(0xFFFF6B6B); // 聲望（紅色）
-  static const Color influenceColor = Color(0xFF4ECDC4); // 影響力（青色）
+  // 遊戲專用顏色（升級）
+  static const Color reputationColor = gc.GameColors.roseLight; // 聲望（玫瑰紅）
+  static const Color influenceColor = gc.GameColors.actionQuery; // 影響力（冷藍）
   static const Color goldColor = gold; // 金幣
 
-  // 卡牌稀有度顏色
-  static const Color commonCardColor = Color(0xFF9E9E9E); // 普通（灰）
-  static const Color rareCardColor = Color(0xFF2196F3); // 稀有（藍）
-  static const Color epicCardColor = Color(0xFF9C27B0); // 史詩（紫）
-  static const Color legendaryCardColor = Color(0xFFFFD700); // 傳說（金）
+  // 卡牌稀有度顏色（升級至羅塞蒂色系）
+  static const Color commonCardColor = gc.GameColors.rarityN;      // N 普通：銀灰
+  static const Color rareCardColor = gc.GameColors.rarityR;        // R 稀有：天藍
+  static const Color epicCardColor = gc.GameColors.raritySR;       // SR 超稀有：薰衣草紫
+  static const Color legendaryCardColor = gc.GameColors.raritySSR; // SSR 最高：維多利亞金
 
   // 陣營顏色
   static const Color laborColor = Color(0xFFE53935); // 勞工派（紅）
@@ -312,9 +315,9 @@ class Parliament1812Theme {
   static const Color reformColor = Color(0xFF1E88E5); // 改革派（藍）
   static const Color neutralColor = Color(0xFF757575); // 中立（灰）
 
-  // 聲望變化顏色
-  static const Color reputationUpColor = Color(0xFF4CAF50); // 綠
-  static const Color reputationDownColor = Color(0xFFF44336); // 紅
+  // 聲望變化顏色（升級）
+  static const Color reputationUpColor = gc.GameColors.actionAlliance; // 翠綠
+  static const Color reputationDownColor = gc.GameColors.roseRed;      // 玫瑰紅
 
   // 實用方法：獲取稀有度顏色
   static Color getCardRarityColor(String rarity) {

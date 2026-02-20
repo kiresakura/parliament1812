@@ -21,6 +21,14 @@ class GameState with _$GameState {
     String? currentSpeakerId,
     String? currentBill,
     GameResult? result,
+    /// 回合制：當前行動玩家 ID
+    String? currentTurnPlayerId,
+    /// 回合制：當前行動玩家名稱
+    String? currentTurnPlayerName,
+    /// 回合制：剩餘行動點數
+    @Default(3) int actionPointsRemaining,
+    /// 回合制：回合順序
+    @Default([]) List<String> turnOrder,
   }) = _GameState;
 
   factory GameState.fromJson(Map<String, Object?> json) => _$GameStateFromJson(json);
@@ -140,8 +148,12 @@ extension GameStateExtension on GameState {
     return room.findPlayer(currentPlayerId!);
   }
 
-  // 檢查是否為當前玩家的回合
+  // 檢查是否為當前玩家的回合（回合制）
   bool get isMyTurn {
+    if (phase == GamePhase.playerTurn) {
+      return currentPlayerId != null && 
+             currentTurnPlayerId == currentPlayerId;
+    }
     return currentPlayerId != null && 
            room.findPlayer(currentPlayerId!) != null;
   }
@@ -173,12 +185,25 @@ extension GameStateExtension on GameState {
       case GamePhase.preparation:
         return false;
         
+      case GamePhase.playerTurn:
+        // 回合制行動階段：所有行動類型的卡牌都可用
+        return [
+          CardType.attack, 
+          CardType.defense, 
+          CardType.control, 
+          CardType.buff,
+          CardType.healing,
+          CardType.social, 
+          CardType.intel, 
+          CardType.special,
+        ].contains(card.type);
+        
       case GamePhase.conspiracy:
-        // 密謀階段：可使用結盟、調查、賄賂等
+        // 密謀階段（舊流程保留相容）
         return [CardType.social, CardType.intel, CardType.special].contains(card.type);
         
       case GamePhase.debate:
-        // 辯論階段：可使用攻擊、防禦、控制、增益等
+        // 辯論階段（舊流程保留相容）
         return [
           CardType.attack, 
           CardType.defense, 
@@ -191,7 +216,6 @@ extension GameStateExtension on GameState {
         return false;
         
       case GamePhase.finalSpeech:
-        // 最終發言：可使用剩餘卡牌
         return [
           CardType.attack, 
           CardType.defense, 
@@ -246,6 +270,8 @@ extension GameStateExtension on GameState {
         return '等待玩家';
       case GamePhase.preparation:
         return '準備階段';
+      case GamePhase.playerTurn:
+        return '玩家行動';
       case GamePhase.conspiracy:
         return '密謀階段';
       case GamePhase.debate:

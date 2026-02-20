@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/audio_service.dart';
+import '../../services/performance_service.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 設定畫面
@@ -19,6 +20,10 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/menu'),
+        ),
         title: Text(l10n.settingsTitle),
       ),
       body: ListView(
@@ -63,6 +68,15 @@ class SettingsScreen extends ConsumerWidget {
               ref.read(audioServiceProvider).setBgmEnabled(value, prefs);
             },
           ),
+
+          const SizedBox(height: 24),
+
+          // ═══════════════════════════════════════════
+          // 畫面品質
+          // ═══════════════════════════════════════════
+          _SectionHeader(title: l10n.graphicsQuality, icon: Icons.tune),
+          const SizedBox(height: 8),
+          _GraphicsQualitySection(),
 
           const SizedBox(height: 24),
 
@@ -264,3 +278,90 @@ class _AudioToggleTile extends ConsumerWidget {
 // 音效啟用 providers（簡易版本）
 final sfxEnabledProvider = StateProvider<bool>((ref) => true);
 final bgmEnabledProvider = StateProvider<bool>((ref) => true);
+
+// ═══════════════════════════════════════════
+// 畫面品質設定
+// ═══════════════════════════════════════════
+
+class _GraphicsQualitySection extends ConsumerWidget {
+  static const _qualityOptions = GraphicsQuality.values;
+
+  static IconData _iconForQuality(GraphicsQuality quality) {
+    switch (quality) {
+      case GraphicsQuality.auto:
+        return Icons.auto_awesome;
+      case GraphicsQuality.low:
+        return Icons.speed;
+      case GraphicsQuality.medium:
+        return Icons.balance;
+      case GraphicsQuality.high:
+        return Icons.high_quality;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final currentQuality = ref.watch(graphicsQualityProvider);
+    final detectedQuality = ref.watch(detectedQualityProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: _qualityOptions.map((quality) {
+        final isSelected = currentQuality == quality;
+        return Card(
+          color: isSelected
+              ? theme.colorScheme.secondary.withValues(alpha: 0.1)
+              : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: isSelected
+                ? BorderSide(color: theme.colorScheme.secondary, width: 2)
+                : BorderSide.none,
+          ),
+          child: ListTile(
+            leading: Icon(
+              _iconForQuality(quality),
+              color: isSelected ? theme.colorScheme.secondary : null,
+            ),
+            title: Text(
+              quality.displayName,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? theme.colorScheme.secondary : null,
+              ),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  quality.description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                if (quality == GraphicsQuality.auto && isSelected)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '偵測建議：${detectedQuality.displayName}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            trailing: isSelected
+                ? Icon(Icons.check_circle, color: theme.colorScheme.secondary)
+                : null,
+            onTap: () {
+              ref.read(graphicsQualityProvider.notifier).setQuality(quality);
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
+}

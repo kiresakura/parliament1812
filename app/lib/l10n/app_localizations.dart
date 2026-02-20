@@ -1893,6 +1893,12 @@ abstract class AppLocalizations {
   /// In zh_TW, this message translates to:
   /// **'連線中...'**
   String get connectionConnecting;
+
+  /// No description provided for @graphicsQuality.
+  ///
+  /// In zh_TW, this message translates to:
+  /// **'畫面品質'**
+  String get graphicsQuality;
 }
 
 class _AppLocalizationsDelegate

@@ -15,6 +15,7 @@ class _AuthKeys {
   static const String email = 'auth_email';
   static const String displayName = 'auth_display_name';
   static const String avatarUrl = 'auth_avatar_url';
+  static const String loginMethod = 'auth_login_method';
 }
 
 /// 使用者資訊
@@ -78,6 +79,27 @@ class TokenResponse {
       user: json['user'] != null
           ? AuthUser.fromJson(json['user'] as Map<String, dynamic>)
           : null,
+    );
+  }
+}
+
+/// 已綁定的 OAuth 帳號
+class LinkedAccount {
+  final String provider;
+  final String? email;
+  final String linkedAt;
+
+  const LinkedAccount({
+    required this.provider,
+    this.email,
+    required this.linkedAt,
+  });
+
+  factory LinkedAccount.fromJson(Map<String, dynamic> json) {
+    return LinkedAccount(
+      provider: json['provider'] as String,
+      email: json['email'] as String?,
+      linkedAt: json['linked_at'] as String,
     );
   }
 }
@@ -146,6 +168,7 @@ class AuthService {
     if (result.success && result.data != null) {
       final tokenResponse = TokenResponse.fromJson(result.data!);
       await _storeTokens(tokenResponse);
+      await saveLoginMethod('password');
       return AuthResult.success(tokenResponse);
     }
     return AuthResult.error(result.error ?? '登入失敗');
@@ -160,6 +183,7 @@ class AuthService {
     if (result.success && result.data != null) {
       final tokenResponse = TokenResponse.fromJson(result.data!);
       await _storeTokens(tokenResponse);
+      await saveLoginMethod('google');
       return AuthResult.success(tokenResponse);
     }
     return AuthResult.error(result.error ?? 'Google 登入失敗');
@@ -178,9 +202,12 @@ class AuthService {
     if (result.success && result.data != null) {
       final tokenResponse = TokenResponse.fromJson(result.data!);
       await _storeTokens(tokenResponse);
+      await saveLoginMethod('apple');
       return AuthResult.success(tokenResponse);
     }
-    return AuthResult.error(result.error ?? 'Apple 登入失敗');
+    final errorMsg = result.error ?? 'Apple 登入失敗';
+    debugPrint('Apple login failed: $errorMsg');
+    return AuthResult.error('Apple 登入失敗: $errorMsg');
   }
 
   /// 重新整理 Token
@@ -242,6 +269,83 @@ class AuthService {
     return AuthResult.error(result.error ?? '密碼重設失敗');
   }
 
+  /// 更新個人檔案
+  Future<AuthResult<AuthUser>> updateProfile({
+    String? displayName,
+    String? avatarUrl,
+  }) async {
+    final body = <String, dynamic>{};
+    if (displayName != null) body['display_name'] = displayName;
+    if (avatarUrl != null) body['avatar_url'] = avatarUrl;
+
+    final result = await _put('/api/v1/auth/profile', body);
+
+    if (result.success && result.data != null) {
+      final user = AuthUser.fromJson(result.data!);
+      // 更新本地儲存
+      if (user.displayName != null) {
+        await _prefs.setString(_AuthKeys.displayName, user.displayName!);
+      }
+      if (user.avatarUrl != null) {
+        await _prefs.setString(_AuthKeys.avatarUrl, user.avatarUrl!);
+      }
+      return AuthResult.success(user);
+    }
+    return AuthResult.error(result.error ?? '更新個人檔案失敗');
+  }
+
+  // ============================================================
+  // OAuth 帳號綁定
+  // ============================================================
+
+  /// 綁定 Google 帳號
+  Future<AuthResult<String>> linkGoogle(String idToken) async {
+    final result = await _post('/api/v1/auth/link/google', {
+      'token': idToken,
+    });
+
+    if (result.success && result.data != null) {
+      return AuthResult.success(result.data!['message'] as String);
+    }
+    return AuthResult.error(result.error ?? 'Google 帳號綁定失敗');
+  }
+
+  /// 綁定 Apple 帳號
+  Future<AuthResult<String>> linkApple(String identityToken) async {
+    final result = await _post('/api/v1/auth/link/apple', {
+      'token': identityToken,
+    });
+
+    if (result.success && result.data != null) {
+      return AuthResult.success(result.data!['message'] as String);
+    }
+    return AuthResult.error(result.error ?? 'Apple 帳號綁定失敗');
+  }
+
+  /// 解綁 OAuth 帳號
+  Future<AuthResult<String>> unlinkProvider(String provider) async {
+    final result = await _delete('/api/v1/auth/link/$provider');
+
+    if (result.success && result.data != null) {
+      return AuthResult.success(result.data!['message'] as String);
+    }
+    return AuthResult.error(result.error ?? '帳號解綁失敗');
+  }
+
+  /// 取得已綁定帳號列表
+  Future<AuthResult<List<LinkedAccount>>> getLinkedAccounts() async {
+    final result = await _get('/api/v1/auth/links');
+
+    if (result.success && result.data != null) {
+      final accountsJson = result.data!['accounts'] as List<dynamic>;
+      final accounts = accountsJson
+          .map((e) => LinkedAccount.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return AuthResult.success(accounts);
+    }
+    return AuthResult.error(result.error ?? '取得綁定帳號列表失敗');
+  }
+
   /// 刪除帳號
   Future<AuthResult<String>> deleteAccount() async {
     final result = await _delete('/api/v1/auth/account');
@@ -251,6 +355,25 @@ class AuthService {
       return AuthResult.success(result.data!['message'] as String);
     }
     return AuthResult.error(result.error ?? '帳號刪除失敗');
+  }
+
+  // ============================================================
+  // 登入方式記憶
+  // ============================================================
+
+  /// 儲存登入方式
+  Future<void> saveLoginMethod(String method) async {
+    await _prefs.setString(_AuthKeys.loginMethod, method);
+  }
+
+  /// 取得上次登入方式
+  String? getLoginMethod() {
+    return _prefs.getString(_AuthKeys.loginMethod);
+  }
+
+  /// 清除登入方式記憶
+  Future<void> clearLoginMethod() async {
+    await _prefs.remove(_AuthKeys.loginMethod);
   }
 
   /// 登出
@@ -312,6 +435,10 @@ class AuthService {
     return _makeRequest('POST', path, body: body);
   }
 
+  Future<_ApiResponse> _put(String path, Map<String, dynamic> body) async {
+    return _makeRequest('PUT', path, body: body);
+  }
+
   Future<_ApiResponse> _delete(String path) async {
     return _makeRequest('DELETE', path);
   }
@@ -325,13 +452,13 @@ class AuthService {
       final uri = Uri.parse('$_baseUrl$path');
       final request = await _httpClient.openUrl(method, uri);
 
-      request.headers.set('Content-Type', 'application/json');
+      request.headers.set('Content-Type', 'application/json; charset=utf-8');
       if (_accessToken != null) {
         request.headers.set('Authorization', 'Bearer $_accessToken');
       }
 
       if (body != null) {
-        request.write(jsonEncode(body));
+        request.add(utf8.encode(jsonEncode(body)));
       }
 
       final response = await request.close();

@@ -73,16 +73,25 @@ pub async fn verify_apple_token(identity_token: &str) -> AppResult<OAuthResult> 
     }
 
     // 取得 Apple 的公開金鑰
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| AppError::InternalError(format!("HTTP client 建立失敗: {}", e)))?;
+
     let keys_response = client
         .get("https://appleid.apple.com/auth/keys")
         .send()
         .await
-        .map_err(|e| AppError::InternalError(format!("Apple 公開金鑰請求失敗: {}", e)))?;
+        .map_err(|e| {
+            tracing::error!(error = %e, "Apple 公開金鑰請求失敗");
+            AppError::InternalError(format!("Apple 公開金鑰請求失敗: {}", e))
+        })?;
 
     if !keys_response.status().is_success() {
+        let status = keys_response.status();
+        tracing::error!(status = %status, "Apple 公開金鑰 API 返回非 200");
         return Err(AppError::InternalError(
-            "無法取得 Apple 公開金鑰".to_string(),
+            format!("無法取得 Apple 公開金鑰 (HTTP {})", status),
         ));
     }
 
@@ -117,7 +126,10 @@ pub async fn verify_apple_token(identity_token: &str) -> AppResult<OAuthResult> 
 
     let token_data =
         jsonwebtoken::decode::<AppleTokenClaims>(identity_token, &decoding_key, &validation)
-            .map_err(|e| AppError::Unauthorized(format!("Apple token 驗證失敗: {}", e)))?;
+            .map_err(|e| {
+                tracing::error!(error = %e, kid = %kid, "Apple JWT 驗證失敗");
+                AppError::Unauthorized(format!("Apple token 驗證失敗: {}", e))
+            })?;
 
     Ok(OAuthResult {
         provider: "apple".to_string(),

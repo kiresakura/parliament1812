@@ -135,6 +135,9 @@ pub enum ClientMessage {
         accept: bool,
     },
 
+    /// 結束回合（回合制）
+    EndTurn,
+
     /// 表情反應
     ReactToMessage {
         /// 目標消息 ID（房間內的消息序列號）
@@ -223,6 +226,9 @@ pub enum ServerMessage {
         phase: GamePhase,
         /// 階段持續時間（秒）
         duration_secs: u32,
+        /// 回合順序（玩家 ID 列表）
+        #[serde(default)]
+        turn_order: Vec<Uuid>,
     },
 
     /// 階段變更
@@ -435,6 +441,19 @@ pub enum ServerMessage {
         remaining_secs: u32,
     },
 
+    /// 回合變更（回合制：輪到某玩家行動）
+    TurnChanged {
+        /// 當前行動玩家 ID
+        current_player_id: Uuid,
+        /// 當前行動玩家名稱
+        current_player_name: String,
+        /// 剩餘行動點數
+        action_points: i32,
+        /// 回合順序（玩家 ID 列表）
+        #[serde(default)]
+        turn_order: Vec<Uuid>,
+    },
+
     /// 重連數據（發送完整遊戲狀態）
     ReconnectData {
         /// 房間資訊
@@ -599,6 +618,9 @@ pub struct GameStateSnapshot {
     pub vote_state: Option<VoteStateSnapshot>,
     /// 同盟關係
     pub alliances: Vec<AllianceSnapshot>,
+    /// 回合順序（玩家 ID 列表）
+    #[serde(default)]
+    pub turn_order: Vec<Uuid>,
 }
 
 /// 議案快照
@@ -717,6 +739,7 @@ impl ClientMessage {
                 | ClientMessage::Counter
                 | ClientMessage::UseSkill { .. }
                 | ClientMessage::Vote { .. }
+                | ClientMessage::EndTurn
         )
     }
 }

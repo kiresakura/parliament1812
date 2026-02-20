@@ -218,8 +218,7 @@ impl SinglePlayerSession {
         for rule in &special_rules {
             match rule {
                 SpecialRule::ShorterTimer => {
-                    session.engine.config.conspiracy_duration_secs = 60;
-                    session.engine.config.debate_duration_secs = 150;
+                    // 回合制不需要調整行動階段時長，僅調整投票計時
                     session.engine.config.voting_duration_secs = 30;
                 }
                 SpecialRule::ExtraAi => {
@@ -569,7 +568,7 @@ mod tests {
         );
 
         let state = session.start().unwrap();
-        assert_eq!(state.phase, GamePhase::Conspiracy);
+        assert_eq!(state.phase, GamePhase::PlayerTurn);
         assert_eq!(state.current_round, 1);
         assert!(!state.hand.is_empty(), "玩家應該有初始手牌");
         assert_eq!(state.players.len(), 4);
@@ -585,7 +584,7 @@ mod tests {
         session.start().unwrap();
 
         // 推進到辯論階段（玩家可以抽牌）
-        session.engine.state.phase = GamePhase::Debate;
+        session.engine.state.phase = GamePhase::PlayerTurn;
 
         let response = session
             .process_action(SinglePlayerAction::DrawCard)
@@ -621,7 +620,7 @@ mod tests {
             AiDifficulty::Easy,
         );
         session.start().unwrap();
-        session.engine.state.phase = GamePhase::Debate;
+        session.engine.state.phase = GamePhase::PlayerTurn;
 
         let target_id = session.ai_player_ids[0];
         let response = session
@@ -638,11 +637,12 @@ mod tests {
             AiDifficulty::Easy,
         );
         session.start().unwrap();
-        assert_eq!(session.engine.state.phase, GamePhase::Conspiracy);
+        assert_eq!(session.engine.state.phase, GamePhase::PlayerTurn);
 
         let response = session.advance();
         assert!(response.success);
-        assert_eq!(response.state.phase, GamePhase::Debate);
+        // PlayerTurn → Voting (advance_phase 的正確轉換)
+        assert_eq!(response.state.phase, GamePhase::Voting);
     }
 
     #[test]
@@ -658,7 +658,8 @@ mod tests {
             .process_action(SinglePlayerAction::EndPhase)
             .unwrap();
         assert!(response.success);
-        assert_eq!(response.state.phase, GamePhase::Debate);
+        // PlayerTurn → Voting (advance_phase 的正確轉換)
+        assert_eq!(response.state.phase, GamePhase::Voting);
     }
 
     #[test]
@@ -707,8 +708,7 @@ mod tests {
             3,
         );
 
-        assert_eq!(session.engine.config.conspiracy_duration_secs, 60);
-        assert_eq!(session.engine.config.debate_duration_secs, 150);
+        // 回合制不再有 conspiracy/debate 時長，僅投票計時
         assert_eq!(session.engine.config.voting_duration_secs, 30);
     }
 
@@ -893,7 +893,7 @@ mod tests {
                 difficulty,
             );
             let state = session.start().unwrap();
-            assert_eq!(state.phase, GamePhase::Conspiracy);
+            assert_eq!(state.phase, GamePhase::PlayerTurn);
             assert_eq!(state.difficulty, difficulty);
         }
     }
