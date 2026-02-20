@@ -1183,7 +1183,7 @@ class _SinglePlayerGameScreenState
     const maxReputation = 100;
     final reputationRatio = (reputation / maxReputation).clamp(0.0, 1.0);
     final ap = state.actionPointsRemaining;
-    const maxAp = 3;
+    const maxAp = 4;
     final round = state.currentRound;
 
     return Container(
@@ -1263,7 +1263,7 @@ class _SinglePlayerGameScreenState
                     value: reputationRatio,
                     minHeight: 6,
                     backgroundColor: gc.GameColors.textSecondary.withValues(alpha: 0.2),
-                    valueColor: AlwaysStoppedAnimation<Color>(gc.GameColors.victorianGold),
+                    valueColor: AlwaysStoppedAnimation<Color>(gc.GameColors.roseRed),
                   ),
                 ),
               ),
@@ -1581,7 +1581,7 @@ class _SinglePlayerGameScreenState
   Widget _buildChatOverlay(ThemeData theme) {
     return Positioned(
       right: 16,
-      bottom: 200,
+      bottom: 320,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
