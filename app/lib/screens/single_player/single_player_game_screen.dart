@@ -1580,8 +1580,8 @@ class _SinglePlayerGameScreenState
 
   Widget _buildChatOverlay(ThemeData theme) {
     return Positioned(
-      right: 16,
-      bottom: 320,
+      right: 12,
+      bottom: 180,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
