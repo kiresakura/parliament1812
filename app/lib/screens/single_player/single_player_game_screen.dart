@@ -561,6 +561,171 @@ class _SinglePlayerGameScreenState
     );
   }
 
+  // ─── 投票支持率計算 ───
+
+  /// 根據玩家派系與聲望計算 FOR/AGAINST 百分比
+  (double forPct, double againstPct) _calculateVotePercentage(
+      SinglePlayerState state) {
+    if (state.players.isEmpty) return (0.55, 0.45);
+
+    // 找到人類玩家的派系
+    final humanPlayer = state.players.where((p) => !p.isAi).firstOrNull;
+    if (humanPlayer == null) return (0.55, 0.45);
+
+    final humanFaction = _characterFaction(humanPlayer.character);
+
+    double forWeight = 0;
+    double againstWeight = 0;
+    double totalWeight = 0;
+
+    for (final player in state.players) {
+      if (player.isPoliticallyDead) continue;
+
+      final rep = player.reputation.toDouble().clamp(1.0, double.infinity);
+      totalWeight += rep;
+
+      if (!player.isAi) {
+        // 人類玩家算 FOR
+        forWeight += rep;
+      } else {
+        final aiFaction = _characterFaction(player.character);
+        if (aiFaction == humanFaction) {
+          // 同派系 → FOR
+          forWeight += rep;
+        } else if (aiFaction == 'neutral') {
+          // neutral → 50/50
+          forWeight += rep * 0.5;
+          againstWeight += rep * 0.5;
+        } else {
+          // 不同派系 → AGAINST
+          againstWeight += rep;
+        }
+      }
+    }
+
+    if (totalWeight <= 0) return (0.55, 0.45);
+
+    final forPct = (forWeight / totalWeight).clamp(0.0, 1.0);
+    final againstPct = (againstWeight / totalWeight).clamp(0.0, 1.0);
+
+    return (forPct, againstPct);
+  }
+
+  // ─── 投票進度條 ───
+
+  Widget _buildVoteProgressBars(SinglePlayerState state, ThemeData theme) {
+    final (forPct, againstPct) = _calculateVotePercentage(state);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        children: [
+          _buildSingleVoteBar(
+            label: 'FOR',
+            percent: forPct,
+            color: const Color(0xFF27AE60),
+            icon: '✓',
+            theme: theme,
+          ),
+          const SizedBox(height: 6),
+          _buildSingleVoteBar(
+            label: 'AGAINST',
+            percent: againstPct,
+            color: const Color(0xFFE74C3C),
+            icon: '✗',
+            theme: theme,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingleVoteBar({
+    required String label,
+    required double percent,
+    required Color color,
+    required String icon,
+    required ThemeData theme,
+  }) {
+    final percentInt = (percent * 100).round();
+
+    return Row(
+      children: [
+        // 標籤（固定寬度，Inter Bold 12sp）
+        SizedBox(
+          width: 60,
+          child: Text(
+            label,
+            style: GameFont.factionBadge.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ),
+        // 進度條
+        Expanded(
+          child: SizedBox(
+            height: 6,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: Stack(
+                children: [
+                  // 背景
+                  Container(
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  // 動畫進度條
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: percent),
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      return FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: value.clamp(0.0, 1.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // 百分比 + icon（右對齊）
+        SizedBox(
+          width: 52,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: percentInt.toDouble()),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Text(
+                '${value.round()}% $icon',
+                textAlign: TextAlign.right,
+                style: GameFont.factionBadge.copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   // ─── 議案區 ───
 
   Widget _buildBillArea(SinglePlayerState state, ThemeData theme) {
@@ -612,6 +777,10 @@ class _SinglePlayerGameScreenState
             style: theme.textTheme.bodyLarge
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
+
+          // FOR/AGAINST 投票進度條（所有階段都顯示）
+          if (state.currentBill.isNotEmpty)
+            _buildVoteProgressBars(state, theme),
 
           // 投票階段顯示效果預覽
           if (state.phase == 'voting') ...[
