@@ -2032,52 +2032,57 @@ class _PlayerCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                // 圓形字母頭像 + 姓名 + 黨派
+                // 圓形字母頭像（置中）
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: avatarBg,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _characterDisplayName(player.character)
+                        .substring(0, 1),
+                    style: GameFont.factionBadge.copyWith(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // 姓名（置中）
+                Text(
+                  _characterDisplayName(player.character),
+                  style: GameFont.playerName.copyWith(
+                    color: gc.GameColors.textPrimary,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 3),
+                // 黨派 badge（水平 Row：● + WHIG）
                 Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 圓形頭像 40px
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 6,
+                      height: 6,
                       decoration: BoxDecoration(
-                        color: avatarBg,
+                        color: factionColor,
                         shape: BoxShape.circle,
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _characterDisplayName(player.character)
-                            .substring(0, 1),
-                        style: GameFont.factionBadge.copyWith(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                     ),
-                    const SizedBox(width: 8),
-                    // 姓名 + 黨派
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _characterDisplayName(player.character),
-                            style: GameFont.playerName.copyWith(
-                              color: gc.GameColors.textPrimary,
-                              fontSize: 14,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            gc.GameColors.getFactionLabel(faction)
-                                .toUpperCase(),
-                            style: GameFont.factionBadge.copyWith(
-                              color: factionColor,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(width: 4),
+                    Text(
+                      gc.GameColors.getFactionLabel(faction)
+                          .toUpperCase(),
+                      style: GameFont.factionBadge.copyWith(
+                        color: factionColor,
                       ),
                     ),
                   ],
