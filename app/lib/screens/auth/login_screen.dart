@@ -51,7 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final GoogleSignIn googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
         serverClientId:
-            '1071586546991-0v65rkt7ud4jsp77jk121ta9prjvl6ti.apps.googleusercontent.com',
+            '1071586546991-lglhakpba06p2ts3j5b50d2joa8ou7hj.apps.googleusercontent.com',
       );
       final GoogleSignInAccount? account = await googleSignIn.signIn();
       if (account == null) return; // User cancelled
