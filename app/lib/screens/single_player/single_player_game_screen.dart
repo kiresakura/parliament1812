@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -200,6 +201,9 @@ class _SinglePlayerGameScreenState
 
   // P0-4: 事件日誌追蹤（用於 fadeIn 動畫）
   int _lastLogCount = 0;
+
+  // Step 5: 手牌扇形展示 — 選中牌索引
+  int? _selectedCardIndex;
 
   // 快捷訊息
   final List<String> _quickMessages = [
@@ -1104,11 +1108,8 @@ class _SinglePlayerGameScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 手牌區（使用 GameCardWidget）
-              SizedBox(
-                height: 130,
-                child: _buildHandCardsArea(state, theme),
-              ),
+              // 手牌區（扇形展示）
+              _buildHandCardsArea(state, theme),
               const SizedBox(height: 8),
               // 角色狀態面板
               _buildCharacterPanel(state),
@@ -1124,45 +1125,121 @@ class _SinglePlayerGameScreenState
 
   Widget _buildHandCardsArea(SinglePlayerState state, ThemeData theme) {
     final handCards = state.hand;
+    final count = handCards.length;
 
-    if (handCards.isEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.3)),
-        ),
-        child: Center(
-          child: Text('暫無手牌',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color:
-                      theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+    if (count == 0) {
+      return SizedBox(
+        height: 130,
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+          ),
+          child: Center(
+            child: Text('暫無手牌',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                    color:
+                        theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+          ),
         ),
       );
     }
 
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: handCards.length,
-      itemBuilder: (context, index) {
-        final cardMap = handCards[index];
-        final gameCard = _mapToGameCard(cardMap);
-        final canPlay =
-            state.phase == 'player_turn' || state.phase == 'debate' || state.phase == 'conspiracy';
+    const cardWidth = 85.0;
+    const cardHeight = 125.0;
+    const overlap = 60.0;
+    const maxAngleDeg = 15.0;
 
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: GameCardWidget(
-            card: gameCard,
-            isPlayable: canPlay,
-            width: 85,
-            height: 125,
-            onTap: canPlay ? () => _onCardTapped(gameCard) : null,
-            onDragCompleted: canPlay ? _onCardPlayed : null,
+    final totalWidth = cardWidth + (count - 1) * overlap;
+    final canPlay =
+        state.phase == 'player_turn' || state.phase == 'debate' || state.phase == 'conspiracy';
+
+    // 清除選中狀態如果手牌數量變化導致索引越界
+    if (_selectedCardIndex != null && _selectedCardIndex! >= count) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedCardIndex = null);
+      });
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: SizedBox(
+        height: cardHeight + 40, // 額外空間給選中跳起
+        child: Center(
+          child: SizedBox(
+            width: totalWidth,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomCenter,
+              children: List.generate(count, (i) {
+                // 計算扇形角度（均分 -15° 到 +15°）
+                final normalizedPos = count > 1
+                    ? (i - (count - 1) / 2) / ((count - 1) / 2)
+                    : 0.0;
+                final angleDeg = normalizedPos * maxAngleDeg;
+                final angleRad = angleDeg * math.pi / 180;
+                // 弧形下沉：越外側越下移
+                final yOffset = (normalizedPos.abs()) * 12;
+                final isSelected = _selectedCardIndex == i;
+
+                final cardMap = handCards[i];
+                final gameCard = _mapToGameCard(cardMap);
+
+                // 選中的牌提到最上層（z-index）
+                return Positioned(
+                  left: i * overlap,
+                  bottom: 0,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_selectedCardIndex == i) {
+                        // 再次點擊 → 出牌
+                        if (canPlay) {
+                          setState(() => _selectedCardIndex = null);
+                          _onCardTapped(gameCard);
+                        }
+                      } else {
+                        setState(() => _selectedCardIndex = i);
+                      }
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      // ignore: deprecated_member_use
+                      transform: Matrix4.identity()
+                        // ignore: deprecated_member_use
+                        ..translate(0.0, isSelected ? -20.0 : yOffset)
+                        ..rotateZ(angleRad)
+                        // ignore: deprecated_member_use
+                        ..scale(isSelected ? 1.05 : 1.0),
+                      transformAlignment: Alignment.bottomCenter,
+                      child: GameCardWidget(
+                        card: gameCard,
+                        isPlayable: canPlay,
+                        width: cardWidth,
+                        height: cardHeight,
+                        onTap: null, // 由外層 GestureDetector 處理
+                        onDragCompleted: canPlay ? _onCardPlayed : null,
+                      ),
+                    ),
+                  ),
+                );
+              })
+                // 重新排序：選中的牌放最後（最上層）
+                ..sort((a, b) {
+                  final aPos = a as Positioned;
+                  final bPos = b as Positioned;
+                  final aIdx = (aPos.left! / overlap).round();
+                  final bIdx = (bPos.left! / overlap).round();
+                  if (_selectedCardIndex == aIdx) return 1;
+                  if (_selectedCardIndex == bIdx) return -1;
+                  return aIdx.compareTo(bIdx);
+                }),
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
