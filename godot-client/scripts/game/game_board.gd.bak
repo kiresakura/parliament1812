@@ -1,0 +1,706 @@
+class_name GameBoard
+extends Control
+## 遊戲場景邏輯
+## 負責回合制狀態機、卡牌出牌、計時器、玩家顯示
+## 支援兩種模式：
+##   - 多人模式（WebSocket 驅動）
+##   - 單人模式（HTTP request-response + mock fallback）
+
+# === 信號 ===
+signal phase_changed(phase: GameStateData.Phase)
+signal round_started(round_number: int)
+signal turn_changed(player_id: String)
+
+# === 節點參考 ===
+@onready var player_hand: PlayerHand = $PlayerHand
+@onready var voting_panel: VotingPanel = $VotingPanel
+@onready var hud: HUD = $HUD
+@onready var play_area: Control = $PlayArea
+@onready var play_area_label: Label = $PlayArea/PlayAreaLabel
+@onready var player_slots: Control = $PlayerSlots
+
+# === 遊戲狀態 ===
+var game_state: GameStateData = GameStateData.new()
+var _timer: Timer = null
+var _time_remaining: float = 0.0
+
+# === 模式 ===
+var _is_single_player: bool = false
+var _is_mock: bool = false  # 離線 mock 模式
+var _session_id: String = ""
+var _difficulty: String = "normal"
+var _is_ai_turn: bool = false
+
+
+func _ready() -> void:
+	print("[GameBoard] _ready() 開始！")
+	# 設定本地玩家 ID
+	var user_id: String = AuthService.get_user_id()
+	game_state.local_player_id = user_id if user_id != "" else "local_player"
+
+	# 建立計時器
+	_timer = Timer.new()
+	_timer.wait_time = 1.0
+	_timer.timeout.connect(_on_timer_tick)
+	add_child(_timer)
+
+	# 初始隱藏投票面板
+	if voting_panel:
+		voting_panel.visible = false
+
+	# 判斷遊戲模式
+	var game_data: Dictionary = GameManager.current_game_data
+	_is_single_player = game_data.get("mode", "") == "single"
+	_is_mock = bool(game_data.get("is_mock", false))
+	_session_id = str(game_data.get("session_id", ""))
+	_difficulty = str(game_data.get("difficulty", "normal"))
+
+	if _is_single_player:
+		_setup_single_player()
+	else:
+		_setup_multiplayer()
+
+	# 連接手牌事件
+	if player_hand:
+		player_hand.card_played_from_hand.connect(_on_card_played_from_hand)
+
+	# 連接投票事件
+	if voting_panel:
+		voting_panel.vote_submitted.connect(_on_vote_submitted)
+
+	# 延遲載入初始遊戲狀態（等所有子場景 _ready 完成）
+	_load_initial_state.call_deferred()
+
+
+func _process(delta: float) -> void:
+	# 更新計時器顯示
+	if _time_remaining > 0:
+		_time_remaining -= delta
+		_update_timer_display()
+
+
+# === 公開方法 ===
+
+## 取得目前遊戲狀態
+func get_game_state() -> GameStateData:
+	return game_state
+
+
+# === 模式設定 ===
+
+## 設定單人模式
+func _setup_single_player() -> void:
+	print("[GameBoard] 單人模式（%s / %s）" % [_difficulty, "mock" if _is_mock else "online"])
+	# 單人不需要 WebSocket
+
+
+## 設定多人模式
+func _setup_multiplayer() -> void:
+	print("[GameBoard] 多人模式")
+	# 連接 WebSocket 事件
+	WsService.phase_changed.connect(_on_ws_phase_changed)
+	WsService.round_changed.connect(_on_ws_round_changed)
+	WsService.card_played.connect(_on_ws_card_played)
+	WsService.vote_cast.connect(_on_ws_vote_cast)
+	WsService.timer_updated.connect(_on_ws_timer_updated)
+	WsService.game_ended.connect(_on_ws_game_ended)
+
+
+# === 狀態機 ===
+
+## 切換遊戲階段
+func _change_phase(new_phase: GameStateData.Phase) -> void:
+	var old_phase: GameStateData.Phase = game_state.current_phase
+	game_state.current_phase = new_phase
+
+	# 更新 HUD
+	if hud:
+		hud.update_phase(game_state.get_phase_name())
+
+	# 根據階段設定 UI
+	match new_phase:
+		GameStateData.Phase.PROPOSAL:
+			_enter_proposal_phase()
+		GameStateData.Phase.DEBATE:
+			_enter_debate_phase()
+		GameStateData.Phase.VOTING:
+			_enter_voting_phase()
+		GameStateData.Phase.RESOLUTION:
+			_enter_resolution_phase()
+		GameStateData.Phase.GAME_OVER:
+			_enter_game_over()
+
+	phase_changed.emit(new_phase)
+	print("[GameBoard] 階段: %s → %s" % [
+		GameStateData.phase_names.get(old_phase, "?"),
+		GameStateData.phase_names.get(new_phase, "?"),
+	])
+
+
+## 提案階段
+func _enter_proposal_phase() -> void:
+	if voting_panel:
+		voting_panel.visible = false
+	if player_hand:
+		player_hand.set_interactable(game_state.is_local_player_turn())
+	if play_area_label:
+		play_area_label.text = "拖曳卡牌到此處出牌"
+	_start_phase_timer(60.0)
+
+	# 單人模式：如果是 AI 回合，自動處理
+	if _is_single_player and not game_state.is_local_player_turn():
+		_handle_ai_turn()
+
+
+## 討論階段
+func _enter_debate_phase() -> void:
+	if player_hand:
+		player_hand.set_interactable(true)
+	if play_area_label:
+		play_area_label.text = "討論中 — 可使用辯論卡"
+	_start_phase_timer(90.0)
+
+
+## 投票階段
+func _enter_voting_phase() -> void:
+	if voting_panel:
+		voting_panel.visible = true
+		voting_panel.reset()
+		if game_state.current_proposal.size() > 0:
+			voting_panel.set_proposal(game_state.current_proposal.get("name", "議案"))
+	if player_hand:
+		player_hand.set_interactable(false)
+	if play_area_label:
+		play_area_label.text = "投票進行中"
+	_start_phase_timer(30.0)
+
+
+## 結算階段
+func _enter_resolution_phase() -> void:
+	if voting_panel:
+		voting_panel.visible = false
+	if player_hand:
+		player_hand.set_interactable(false)
+	if play_area_label:
+		play_area_label.text = "結算中..."
+	_timer.stop()
+
+	# 單人模式：自動進入下一回合或結束
+	if _is_single_player:
+		await get_tree().create_timer(2.0).timeout
+		_advance_single_player_round()
+	else:
+		await get_tree().create_timer(2.0).timeout
+
+
+## 遊戲結束
+func _enter_game_over() -> void:
+	_timer.stop()
+	if player_hand:
+		player_hand.set_interactable(false)
+	if voting_panel:
+		voting_panel.visible = false
+
+	# 判斷勝負
+	var local_score: int = game_state.get_player_score(game_state.local_player_id)
+	var is_winner: bool = true
+	for i: int in range(game_state.players.size()):
+		var player: Dictionary = game_state.players[i]
+		var pid: String = str(player.get("id", ""))
+		if pid != game_state.local_player_id:
+			if game_state.get_player_score(pid) >= local_score:
+				is_winner = false
+
+	# 設定結果數據
+	var result_data: Dictionary = GameManager.current_game_data.duplicate(true)
+	result_data["winner_id"] = game_state.local_player_id if is_winner else "ai_opponent"
+	result_data["rankings"] = _build_rankings()
+	result_data["rewards"] = {"coins": 50 if is_winner else 10, "experience": 30 if is_winner else 10}
+	result_data["rating_change"] = 15 if is_winner else -5
+	GameManager.current_game_data = result_data
+	GameManager.set_state(GameManager.GameState.GAME_OVER)
+
+	# 播放結算音效
+	if is_winner:
+		AudioManager.play_sfx(AudioManagerClass.SFX.VICTORY)
+		AudioManager.play_music(AudioManagerClass.MusicTrack.NONE)
+	else:
+		AudioManager.play_sfx(AudioManagerClass.SFX.DEFEAT)
+		AudioManager.play_music(AudioManagerClass.MusicTrack.GAME_OVER)
+
+	# 延遲後跳轉結算畫面
+	await get_tree().create_timer(1.5).timeout
+	if is_winner:
+		SceneManager.go_to_victory_result()
+	else:
+		SceneManager.go_to_defeat_result()
+
+
+## 建立排名數據
+func _build_rankings() -> Array:
+	var rankings: Array = []
+	for i: int in range(game_state.players.size()):
+		var player: Dictionary = game_state.players[i]
+		var pid: String = str(player.get("id", ""))
+		rankings.append({
+			"id": pid,
+			"username": str(player.get("username", "")),
+			"score": game_state.get_player_score(pid),
+		})
+	# 按分數排序（降序）
+	rankings.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return a.get("score", 0) > b.get("score", 0)
+	)
+	return rankings
+
+
+# === 計時器 ===
+
+## 開始階段計時器
+func _start_phase_timer(duration: float) -> void:
+	_time_remaining = duration
+	_timer.start()
+	_update_timer_display()
+
+
+## 計時器每秒回調
+func _on_timer_tick() -> void:
+	if _time_remaining <= 0:
+		_timer.stop()
+		# 單人模式：計時器到期自動推進
+		if _is_single_player:
+			_on_single_player_timer_expired()
+		return
+
+	# 緊急提示（最後 10 秒）
+	if _time_remaining <= 10.0:
+		AudioManager.play_sfx(AudioManagerClass.SFX.TIMER_URGENT)
+
+
+## 更新計時器顯示
+func _update_timer_display() -> void:
+	var minutes: int = int(max(_time_remaining, 0.0)) / 60
+	var seconds: int = int(max(_time_remaining, 0.0)) % 60
+	var time_text: String = "%d:%02d" % [minutes, seconds]
+	var urgent: bool = _time_remaining <= 10.0
+
+	if hud:
+		hud.update_timer(time_text, urgent)
+
+
+# === 單人模式邏輯 ===
+
+## 單人模式計時器到期
+func _on_single_player_timer_expired() -> void:
+	match game_state.current_phase:
+		GameStateData.Phase.PROPOSAL:
+			# 時間到但沒出牌 → 跳到投票（用第一張手牌）
+			if player_hand and player_hand.get_card_count() > 0:
+				var first_card: Card = player_hand.cards[0] as Card
+				if first_card:
+					_play_card_single_player(first_card)
+		GameStateData.Phase.DEBATE:
+			_change_phase(GameStateData.Phase.VOTING)
+		GameStateData.Phase.VOTING:
+			# 沒投票 → 自動棄權
+			_change_phase(GameStateData.Phase.RESOLUTION)
+
+
+## 處理 AI 回合（mock 模式）
+func _handle_ai_turn() -> void:
+	if _is_ai_turn:
+		return
+	_is_ai_turn = true
+
+	if hud:
+		hud.show_notification("AI 正在思考...", Color(0.788, 0.659, 0.298))
+
+	if _is_mock:
+		# Mock 模式：AI 延遲後隨機出牌
+		await get_tree().create_timer(randf_range(1.0, 2.5)).timeout
+		_mock_ai_play_card()
+	else:
+		# 線上模式：呼叫 API
+		var result: Dictionary = await ApiService.single_action(_session_id, {
+			"type": "ai_turn",
+		})
+		if result.get("success", false):
+			var data: Dictionary = result.get("data", {})
+			game_state.update_from_dict(data)
+			_sync_ui_from_state()
+		else:
+			# API 失敗 → fallback 到 mock
+			_mock_ai_play_card()
+
+	_is_ai_turn = false
+
+
+## Mock AI 出牌
+func _mock_ai_play_card() -> void:
+	var ai_card_names: Array[String] = ["反對提案", "軍費削減", "外交施壓", "議事阻撓", "秘密協商"]
+	var card_name: String = ai_card_names[randi() % ai_card_names.size()]
+
+	# 顯示 AI 出牌通知
+	if hud:
+		var ai_name: String = "AI"
+		for i: int in range(game_state.players.size()):
+			var p: Dictionary = game_state.players[i]
+			if p.get("is_ai", false):
+				ai_name = str(p.get("username", "AI"))
+				break
+		hud.show_card_played(ai_name, card_name)
+
+	AudioManager.play_sfx(AudioManagerClass.SFX.CARD_PLAY)
+
+	# 設定為提案
+	game_state.current_proposal = {"name": card_name, "player": "ai_opponent"}
+
+	# AI 出完牌 → 進入辯論階段
+	await get_tree().create_timer(1.0).timeout
+	_change_phase(GameStateData.Phase.DEBATE)
+
+
+## 單人模式出牌
+func _play_card_single_player(card: Card) -> void:
+	if player_hand:
+		player_hand.set_interactable(false)
+
+	# 設定為當前提案
+	if card.card_data:
+		game_state.current_proposal = card.card_data.to_dict()
+	else:
+		game_state.current_proposal = {"name": "提案", "id": card.card_id}
+
+	# 從手牌移除
+	if player_hand:
+		player_hand.remove_card(card)
+
+	AudioManager.play_sfx(AudioManagerClass.SFX.CARD_PLAY)
+
+	# 顯示出牌通知
+	var player_name: String = str(AuthService.current_user.get("username", "你"))
+	var card_name: String = game_state.current_proposal.get("name", "卡牌")
+	if hud:
+		hud.show_card_played(player_name, card_name)
+
+	# 更新 play area 顯示
+	if play_area_label:
+		play_area_label.text = "已提出：%s" % card_name
+
+	if _is_mock:
+		# Mock：加分 + 進入投票
+		var power: int = int(game_state.current_proposal.get("power", 1))
+		var current_score: int = int(game_state.scores.get(game_state.local_player_id, 0))
+		game_state.scores[game_state.local_player_id] = current_score + power
+		_update_scores_display()
+
+		await get_tree().create_timer(1.0).timeout
+		_change_phase(GameStateData.Phase.VOTING)
+	else:
+		# 線上模式：呼叫 API
+		var result: Dictionary = await ApiService.single_action(_session_id, {
+			"type": "play_card",
+			"card_id": card.card_id,
+		})
+		if result.get("success", false):
+			game_state.update_from_dict(result.get("data", {}))
+			_sync_ui_from_state()
+		else:
+			# Fallback
+			await get_tree().create_timer(1.0).timeout
+			_change_phase(GameStateData.Phase.VOTING)
+
+
+## 推進單人模式回合
+func _advance_single_player_round() -> void:
+	# 清除提案
+	game_state.current_proposal = {}
+	game_state.votes.clear()
+
+	# 下一回合
+	game_state.current_round += 1
+	if hud:
+		hud.update_round(game_state.current_round, game_state.max_rounds)
+	round_started.emit(game_state.current_round)
+
+	# 檢查是否遊戲結束
+	if game_state.current_round > game_state.max_rounds:
+		_change_phase(GameStateData.Phase.GAME_OVER)
+		return
+
+	# Mock 模式：補抽牌
+	if _is_mock and player_hand:
+		if player_hand.get_card_count() < 5:
+			var new_cards: Array[Dictionary] = _generate_mock_draw_cards(1)
+			for i: int in range(new_cards.size()):
+				var card_data: CardData = CardData.from_dict(new_cards[i])
+				if card_data:
+					await player_hand.add_card(card_data, true)
+
+	# 交替先手：奇數回合玩家先手，偶數回合 AI 先手
+	if game_state.current_round % 2 == 1:
+		game_state.current_player_index = 0  # 玩家
+	else:
+		game_state.current_player_index = 1  # AI
+
+	# 進入提案階段
+	_change_phase(GameStateData.Phase.PROPOSAL)
+
+
+## 生成 mock 抽牌
+func _generate_mock_draw_cards(count: int) -> Array[Dictionary]:
+	var cards: Array[Dictionary] = []
+	var names: Array[String] = ["稅制改革", "軍備提案", "外交交涉", "經濟振興", "民意調查", "預算審查"]
+	var types: Array[int] = [0, 1, 2, 3, 4]
+	for i: int in range(count):
+		cards.append({
+			"id": "draw_%d_%d" % [game_state.current_round, randi()],
+			"name": names[randi() % names.size()],
+			"description": "回合 %d 抽到的新卡。" % game_state.current_round,
+			"type": types[randi() % types.size()],
+			"rarity": randi() % 3,
+			"cost": randi_range(1, 3),
+			"power": randi_range(1, 4),
+			"influence": randi_range(1, 3),
+			"effects": [],
+		})
+	return cards
+
+
+## 單人模式投票處理
+func _handle_single_player_vote(vote: GameStateData.VoteOption) -> void:
+	game_state.votes[game_state.local_player_id] = vote
+
+	# AI 也投票（mock）
+	if _is_mock:
+		await get_tree().create_timer(randf_range(0.5, 1.5)).timeout
+		var ai_vote: GameStateData.VoteOption
+		# AI 投票邏輯：根據難度
+		var rand: float = randf()
+		match _difficulty:
+			"easy":
+				ai_vote = GameStateData.VoteOption.YEA if rand < 0.6 else GameStateData.VoteOption.NAY
+			"normal":
+				ai_vote = GameStateData.VoteOption.YEA if rand < 0.4 else GameStateData.VoteOption.NAY
+			"hard":
+				ai_vote = GameStateData.VoteOption.YEA if rand < 0.25 else GameStateData.VoteOption.NAY
+			_:
+				ai_vote = GameStateData.VoteOption.YEA if rand < 0.4 else GameStateData.VoteOption.NAY
+
+		game_state.votes["ai_opponent"] = ai_vote
+		if voting_panel:
+			voting_panel.update_vote_count(game_state.get_vote_counts())
+
+		if hud:
+			var ai_name: String = "AI"
+			for i: int in range(game_state.players.size()):
+				var p: Dictionary = game_state.players[i]
+				if p.get("is_ai", false):
+					ai_name = str(p.get("username", "AI"))
+					break
+			hud.show_vote_notification(ai_name)
+
+		AudioManager.play_sfx(AudioManagerClass.SFX.VOTE_CAST)
+
+		# 投票結果判定
+		await get_tree().create_timer(1.0).timeout
+		var counts: Dictionary = game_state.get_vote_counts()
+		var yea_count: int = counts.get(GameStateData.VoteOption.YEA, 0)
+		var nay_count: int = counts.get(GameStateData.VoteOption.NAY, 0)
+		var passed: bool = yea_count > nay_count
+
+		if voting_panel:
+			voting_panel.show_result(passed, counts)
+
+		# 加分
+		if passed:
+			var proposer_id: String = str(game_state.current_proposal.get("player", game_state.local_player_id))
+			if proposer_id == "" or proposer_id == game_state.local_player_id:
+				proposer_id = game_state.local_player_id
+			var current: int = int(game_state.scores.get(proposer_id, 0))
+			game_state.scores[proposer_id] = current + int(game_state.current_proposal.get("power", 1))
+
+		_update_scores_display()
+
+		await get_tree().create_timer(1.5).timeout
+		_change_phase(GameStateData.Phase.RESOLUTION)
+	else:
+		# 線上模式
+		var vote_str: String = ""
+		match vote:
+			GameStateData.VoteOption.YEA:
+				vote_str = "yea"
+			GameStateData.VoteOption.NAY:
+				vote_str = "nay"
+			GameStateData.VoteOption.ABSTAIN:
+				vote_str = "abstain"
+
+		var result: Dictionary = await ApiService.single_action(_session_id, {
+			"type": "vote",
+			"vote": vote_str,
+		})
+		if result.get("success", false):
+			game_state.update_from_dict(result.get("data", {}))
+			_sync_ui_from_state()
+
+
+## 更新分數顯示
+func _update_scores_display() -> void:
+	# 更新 PlayerSlots
+	if player_slots:
+		# 清除舊的 slot（保留 SlotsTitle）
+		var children: Array[Node] = []
+		for child: Node in player_slots.get_children():
+			children.append(child)
+		for child: Node in children:
+			if child.name != "SlotsTitle":
+				child.queue_free()
+
+		# 重建 slot
+		for i: int in range(game_state.players.size()):
+			var player: Dictionary = game_state.players[i]
+			var pid: String = str(player.get("id", ""))
+			var slot: HBoxContainer = HBoxContainer.new()
+			slot.add_theme_constant_override("separation", 8)
+
+			var name_lbl: Label = Label.new()
+			name_lbl.text = str(player.get("username", "???"))
+			name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			if pid == game_state.local_player_id:
+				name_lbl.add_theme_color_override("font_color", Color(0.788, 0.659, 0.298))
+			else:
+				name_lbl.add_theme_color_override("font_color", Color(0.91, 0.835, 0.718))
+			slot.add_child(name_lbl)
+
+			var score_lbl: Label = Label.new()
+			score_lbl.text = str(game_state.scores.get(pid, 0))
+			score_lbl.add_theme_color_override("font_color", Color(0.788, 0.659, 0.298))
+			slot.add_child(score_lbl)
+
+			player_slots.add_child(slot)
+
+
+## 同步 UI 和 game_state
+func _sync_ui_from_state() -> void:
+	# 同步階段
+	_change_phase(game_state.current_phase)
+
+	# 同步回合
+	if hud:
+		hud.update_round(game_state.current_round, game_state.max_rounds)
+
+	# 同步手牌
+	if player_hand and game_state.hand_cards.size() > 0:
+		await player_hand.set_hand(game_state.hand_cards)
+
+	# 同步分數
+	_update_scores_display()
+
+
+# === WebSocket 事件處理（多人模式）===
+
+func _on_ws_phase_changed(data: Dictionary) -> void:
+	var new_phase: int = int(data.get("phase", 0))
+	_change_phase(new_phase as GameStateData.Phase)
+
+
+func _on_ws_round_changed(data: Dictionary) -> void:
+	game_state.current_round = int(data.get("round", 0))
+	if hud:
+		hud.update_round(game_state.current_round, game_state.max_rounds)
+	round_started.emit(game_state.current_round)
+
+
+func _on_ws_card_played(data: Dictionary) -> void:
+	var player_id: String = data.get("player_id", "")
+	var card_data_dict: Dictionary = data.get("card", {})
+
+	# 顯示出牌通知
+	var player_name: String = ""
+	for i: int in range(game_state.players.size()):
+		var p: Dictionary = game_state.players[i]
+		if str(p.get("id", "")) == player_id:
+			player_name = str(p.get("username", ""))
+			break
+	var card_name: String = card_data_dict.get("name", "卡牌")
+	if hud:
+		hud.show_card_played(player_name, card_name)
+
+	AudioManager.play_sfx(AudioManagerClass.SFX.CARD_PLAY)
+
+
+func _on_ws_vote_cast(data: Dictionary) -> void:
+	var player_id: String = data.get("player_id", "")
+	var vote: int = data.get("vote", 0)
+	game_state.votes[player_id] = vote
+
+	if voting_panel:
+		voting_panel.update_vote_count(game_state.get_vote_counts())
+
+	AudioManager.play_sfx(AudioManagerClass.SFX.VOTE_CAST)
+
+
+func _on_ws_timer_updated(data: Dictionary) -> void:
+	_time_remaining = float(data.get("time_remaining", 0.0))
+	_update_timer_display()
+
+
+func _on_ws_game_ended(data: Dictionary) -> void:
+	game_state.update_from_dict(data)
+	_change_phase(GameStateData.Phase.GAME_OVER)
+
+
+# === 本地事件處理 ===
+
+func _on_card_played_from_hand(card: Card) -> void:
+	if _is_single_player:
+		_play_card_single_player(card)
+	else:
+		# 多人模式：發送出牌到伺服器
+		WsService.send_play_card(card.card_id)
+		if player_hand:
+			player_hand.remove_card(card)
+		AudioManager.play_sfx(AudioManagerClass.SFX.CARD_PLAY)
+
+
+func _on_vote_submitted(vote: GameStateData.VoteOption) -> void:
+	if _is_single_player:
+		_handle_single_player_vote(vote)
+	else:
+		var vote_str: String = ""
+		match vote:
+			GameStateData.VoteOption.YEA:
+				vote_str = "yea"
+			GameStateData.VoteOption.NAY:
+				vote_str = "nay"
+			GameStateData.VoteOption.ABSTAIN:
+				vote_str = "abstain"
+		WsService.send_vote(vote_str)
+		AudioManager.play_sfx(AudioManagerClass.SFX.VOTE_CAST)
+
+
+## 載入初始遊戲狀態（由 call_deferred 呼叫，確保子場景已就緒）
+func _load_initial_state() -> void:
+	var game_data: Dictionary = GameManager.current_game_data
+	if game_data.is_empty():
+		print("[GameBoard] 無遊戲數據")
+		return
+
+	# 從 GameManager 取得遊戲資料
+	game_state.update_from_dict(game_data)
+
+	# 設定階段（先設定 UI 再設定手牌）
+	_change_phase(game_state.current_phase)
+
+	# 更新回合顯示
+	if hud:
+		hud.update_round(game_state.current_round, game_state.max_rounds)
+
+	# 更新玩家分數
+	_update_scores_display()
+
+	# 設定手牌（最後做，因為有 await 動畫）
+	if player_hand and game_state.hand_cards.size() > 0:
+		await player_hand.set_hand(game_state.hand_cards)
+	else:
+		print("[GameBoard] 無手牌數據")

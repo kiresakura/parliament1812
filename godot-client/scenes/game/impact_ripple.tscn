@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://c0impactripple"]
+
+[ext_resource type="Script" uid="uid://dsugugqrxketl" path="res://scripts/game/impact_ripple.gd" id="1_script"]
+
+[node name="ImpactRipple" type="Control"]
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1_script")

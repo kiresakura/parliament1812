@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="8" fill="#1A1A2E"/>
+  <!-- Handshake - Diplomacy -->
+  <!-- Left hand -->
+  <path d="M10 32 L18 28 L26 32 L34 28" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right hand -->
+  <path d="M54 32 L46 28 L38 32 L30 28" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Clasped area -->
+  <ellipse cx="32" cy="30" rx="8" ry="4" fill="none" stroke="#C9A84C" stroke-width="1" opacity="0.5"/>
+  <!-- Left sleeve -->
+  <path d="M10 32 L8 38 L16 36 L18 28" fill="none" stroke="#C9A84C" stroke-width="1.5"/>
+  <!-- Right sleeve -->
+  <path d="M54 32 L56 38 L48 36 L46 28" fill="none" stroke="#C9A84C" stroke-width="1.5"/>
+  <!-- Flourish -->
+  <path d="M24 20 Q28 16 32 18 Q36 16 40 20" fill="none" stroke="#C9A84C" stroke-width="1" opacity="0.4"/>
+  <!-- Base line -->
+  <line x1="16" y1="44" x2="48" y2="44" stroke="#C9A84C" stroke-width="1" opacity="0.3"/>
+</svg>

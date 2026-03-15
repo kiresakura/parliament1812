@@ -1,0 +1,25 @@
+[gd_resource type="ParticleProcessMaterial" load_steps=3 format=3]
+
+[sub_resource type="Gradient" id="Gradient_victory_gold"]
+offsets = PackedFloat32Array(0, 0.3, 0.7, 1)
+colors = PackedColorArray(1, 1, 0.85, 1, 1, 0.843, 0, 1, 0.788, 0.659, 0.298, 0.6, 0.788, 0.659, 0.298, 0)
+
+[sub_resource type="Curve" id="Curve_scale"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.5, 0.6), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+particle_flag_disable_z = true
+emission_shape = 1
+emission_sphere_radius = 10.0
+direction = Vector3(1, 0, 0)
+spread = 180.0
+initial_velocity_min = 300.0
+initial_velocity_max = 800.0
+gravity = Vector3(0, 0, 0)
+damping_min = 2.0
+damping_max = 5.0
+scale_min = 3.0
+scale_max = 8.0
+color = Color(0.788, 0.659, 0.298, 1)
+color_ramp = SubResource("Gradient_victory_gold")

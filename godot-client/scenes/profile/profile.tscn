@@ -1,0 +1,129 @@
+[gd_scene load_steps=2 format=3 uid="uid://profile001"]
+
+[ext_resource type="Script" path="res://scripts/ui/profile.gd" id="1"]
+
+[node name="Profile" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.102, 0.102, 0.18, 1)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = -16.0
+offset_bottom = -12.0
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="ScrollContainer/VBox"]
+layout_mode = 2
+text = "個人檔案"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(0.788, 0.659, 0.298, 1)
+
+[node name="HSeparator" type="HSeparator" parent="ScrollContainer/VBox"]
+layout_mode = 2
+
+[node name="TopSection" type="VBoxContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="AvatarRect" type="TextureRect" parent="ScrollContainer/VBox/TopSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 100)
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="InfoBox" type="VBoxContainer" parent="ScrollContainer/VBox/TopSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="UsernameLabel" type="Label" parent="ScrollContainer/VBox/TopSection/InfoBox"]
+layout_mode = 2
+text = "用戶名"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.91, 0.835, 0.718, 1)
+
+[node name="RankLabel" type="Label" parent="ScrollContainer/VBox/TopSection/InfoBox"]
+layout_mode = 2
+text = "🪶 新進議員"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.788, 0.659, 0.298, 1)
+
+[node name="EloLabel" type="Label" parent="ScrollContainer/VBox/TopSection/InfoBox"]
+layout_mode = 2
+text = "ELO: 1000"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.91, 0.835, 0.718, 1)
+
+[node name="HSeparator2" type="HSeparator" parent="ScrollContainer/VBox"]
+layout_mode = 2
+
+[node name="StatsTitle" type="Label" parent="ScrollContainer/VBox"]
+layout_mode = 2
+text = "戰績統計"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.788, 0.659, 0.298, 1)
+
+[node name="StatsBox" type="GridContainer" parent="ScrollContainer/VBox"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 8
+
+[node name="WinsLabel" type="Label" parent="ScrollContainer/VBox/StatsBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "勝利: 0"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.2, 0.8, 0.2, 1)
+
+[node name="LossesLabel" type="Label" parent="ScrollContainer/VBox/StatsBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "敗北: 0"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.8, 0.2, 0.2, 1)
+
+[node name="WinrateLabel" type="Label" parent="ScrollContainer/VBox/StatsBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "勝率: 0.0%"
+horizontal_alignment = 1
+
+[node name="TotalGamesLabel" type="Label" parent="ScrollContainer/VBox/StatsBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "總場次: 0"
+horizontal_alignment = 1
+
+[node name="BackButton" type="Button" parent="ScrollContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+size_flags_horizontal = 4
+text = "← 返回"

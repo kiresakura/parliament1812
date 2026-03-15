@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="8" fill="#1A1A2E"/>
+  <!-- Eagle silhouette - Hawks faction -->
+  <path d="M32 12 L28 20 L18 18 L24 26 L16 30 L26 32 L22 42 L32 36 L42 42 L38 32 L48 30 L40 26 L46 18 L36 20 Z" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Head detail -->
+  <circle cx="32" cy="20" r="3" fill="#C9A84C" opacity="0.4"/>
+  <!-- Wing tips -->
+  <path d="M18 18 L12 14 M46 18 L52 14" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="32" y="58" text-anchor="middle" font-family="serif" font-size="8" fill="#C9A84C" opacity="0.7">鷹派</text>
+</svg>

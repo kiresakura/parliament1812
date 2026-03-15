@@ -1,0 +1,19 @@
+[gd_resource type="ParticleProcessMaterial" load_steps=2 format=3]
+
+[sub_resource type="Gradient" id="Gradient_card_gold"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 0.95, 0.7, 1, 0.788, 0.659, 0.298, 0.8, 0.788, 0.659, 0.298, 0)
+
+[resource]
+particle_flag_disable_z = true
+emission_shape = 3
+emission_box_extents = Vector3(60, 80, 0)
+direction = Vector3(0, 0, 0)
+spread = 180.0
+initial_velocity_min = 80.0
+initial_velocity_max = 160.0
+gravity = Vector3(0, 40, 0)
+scale_min = 0.3
+scale_max = 1.0
+color = Color(0.788, 0.659, 0.298, 1)
+color_ramp = SubResource("Gradient_card_gold")

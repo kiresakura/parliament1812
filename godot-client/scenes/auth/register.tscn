@@ -1,0 +1,113 @@
+[gd_scene load_steps=2 format=3 uid="uid://register001"]
+
+[ext_resource type="Script" path="res://scenes/auth/register.gd" id="1"]
+
+[node name="Register" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.102, 0.102, 0.18, 1)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 0)
+horizontal_scroll_mode = 0
+
+[node name="Panel" type="PanelContainer" parent="CenterContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/ScrollContainer/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/ScrollContainer/Panel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "註冊新帳號"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+
+[node name="Spacer1" type="Control" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 12)
+
+[node name="UsernameLabel" type="Label" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "使用者名稱"
+
+[node name="UsernameInput" type="LineEdit" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+placeholder_text = "輸入使用者名稱"
+
+[node name="EmailLabel" type="Label" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "電子郵件"
+
+[node name="EmailInput" type="LineEdit" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+placeholder_text = "example@email.com"
+
+[node name="PasswordLabel" type="Label" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "密碼"
+
+[node name="PasswordInput" type="LineEdit" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+placeholder_text = "至少 8 個字元"
+secret = true
+
+[node name="ConfirmLabel" type="Label" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "確認密碼"
+
+[node name="ConfirmInput" type="LineEdit" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+placeholder_text = "再次輸入密碼"
+secret = true
+
+[node name="Spacer2" type="Control" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+
+[node name="ErrorLabel" type="Label" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+
+[node name="RegisterButton" type="Button" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 52)
+text = "註冊"
+
+[node name="LoginLink" type="Button" parent="CenterContainer/ScrollContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+flat = true
+text = "已有帳號？返回登入"
