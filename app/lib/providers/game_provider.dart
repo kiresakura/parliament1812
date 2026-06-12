@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/game_state.dart';
@@ -157,7 +158,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     final success = _wsSender.sendMessage(const ClientMessage.endTurn());
 
     if (!success) {
-      print('Failed to end turn');
+      debugPrint('Failed to end turn');
     }
   }
 
@@ -191,7 +192,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     if (!success) {
       // TODO: 處理發送失敗
-      print('Failed to use card: $cardId');
+      debugPrint('Failed to use card: $cardId');
     }
   }
 
@@ -201,7 +202,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     // 檢查手牌是否已滿
     if (state!.hand.length >= 10) {
-      print('Hand is full, cannot draw more cards');
+      debugPrint('Hand is full, cannot draw more cards');
       return;
     }
 
@@ -210,7 +211,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     if (!success) {
       // TODO: 處理發送失敗
-      print('Failed to draw card');
+      debugPrint('Failed to draw card');
     }
   }
 
@@ -227,7 +228,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     if (!success) {
       // TODO: 處理發送失敗
-      print('Failed to discard card: $cardId');
+      debugPrint('Failed to discard card: $cardId');
     }
   }
 
@@ -241,7 +242,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     if (!success) {
       // TODO: 處理發送失敗
-      print('Failed to vote: $choice');
+      debugPrint('Failed to vote: $choice');
     }
   }
 
@@ -254,7 +255,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     if (!success) {
       // TODO: 處理發送失敗
-      print('Failed to challenge: $targetId');
+      debugPrint('Failed to challenge: $targetId');
     }
   }
 
@@ -266,7 +267,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     if (!success) {
       // TODO: 處理發送失敗
-      print('Failed to counter');
+      debugPrint('Failed to counter');
     }
   }
 
@@ -351,7 +352,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     final success = _wsSender.sendMessage(ClientMessage.useSkill(targetId: targetId));
 
     if (!success) {
-      print('Failed to use skill');
+      debugPrint('Failed to use skill');
     }
   }
 
@@ -499,7 +500,7 @@ final gameWebSocketHandlerProvider = Provider<void>((ref) {
         },
         loading: () {},
         error: (error, _) {
-          print('Game WebSocket message error: $error');
+          debugPrint('Game WebSocket message error: $error');
         },
       );
     },
@@ -545,7 +546,7 @@ void _handleGameWebSocketMessage(ServerMessage message, GameStateNotifier notifi
         notifier.handleRoomUpdate(room);
       } catch (e) {
         // ignore: avoid_print
-        print('Failed to parse room state in game: $e');
+        debugPrint('Failed to parse room state in game: $e');
       }
       break;
 
@@ -789,7 +790,7 @@ GamePhase _parseGamePhase(String phaseStr) {
     case 'result':
       return GamePhase.result;
     default:
-      print('Unknown game phase: $phaseStr');
+      debugPrint('Unknown game phase: $phaseStr');
       return GamePhase.waiting;
   }
 }

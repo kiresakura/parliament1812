@@ -260,6 +260,7 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
       // 退還行動力
       await staminaService.purchase(StaminaService.costCampaign, 0);
       ref.invalidate(currentStaminaProvider);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('無法開始戰役，請稍後再試。'),

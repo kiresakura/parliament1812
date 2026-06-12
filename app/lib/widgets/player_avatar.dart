@@ -62,7 +62,7 @@ class PlayerAvatar extends StatelessWidget {
                   child: Image.asset(
                     _getCharacterPortrait(character)!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(
+                    errorBuilder: (_, _, _) => Center(
                       child: Text(
                         _getCharacterEmoji(character),
                         style: TextStyle(fontSize: size * 0.4),

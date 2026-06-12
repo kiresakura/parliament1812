@@ -24,7 +24,6 @@ class LocalGameEngine {
   String _sessionId = '';
 
   // 回合制狀態
-  int _currentTurnIndex = 0;
   int _actionPointsRemaining = 3;
   static const int actionPointsPerTurn = 3;
 
@@ -68,7 +67,6 @@ class LocalGameEngine {
     _result = null;
     _currentRound = 1;
     _phase = 'player_turn';
-    _currentTurnIndex = 0;
     _actionPointsRemaining = actionPointsPerTurn;
 
     // 建立牌庫
@@ -442,240 +440,6 @@ class LocalGameEngine {
     }
   }
 
-  /// AI 在密謀階段的行動
-  void _aiConspiracyActions() {
-    for (final ai in _aiPlayers) {
-      if (!ai.isAlive) continue;
-      // 根據難度決定是否結盟
-      if (difficulty == AiDifficulty.easy) continue;
-
-      // Normal+: 嘗試與合適的角色結盟
-      final potentialAlly = _findBestAlly(ai);
-      if (potentialAlly != null && !ai.allies.contains(potentialAlly.id)) {
-        if (_random.nextDouble() < 0.4) {
-          ai.allies.add(potentialAlly.id);
-          potentialAlly.allies.add(ai.id);
-          _aiActionsLog.add('🤝 ${ai.name} 和 ${potentialAlly.name} 結盟了');
-        }
-      }
-    }
-  }
-
-  /// AI 回合
-  void _aiTurn() {
-    for (final ai in _aiPlayers) {
-      if (!ai.isAlive) continue;
-
-      // 每回合開始自動抽牌
-      if (ai.drawnThisTurn == false) {
-        _drawCardForPlayer(ai);
-        ai.drawnThisTurn = true;
-      }
-
-      switch (difficulty) {
-        case AiDifficulty.easy:
-          _aiTurnEasy(ai);
-          break;
-        case AiDifficulty.normal:
-          _aiTurnNormal(ai);
-          break;
-        case AiDifficulty.hard:
-          _aiTurnHard(ai);
-          break;
-        case AiDifficulty.expert:
-          _aiTurnExpert(ai);
-          break;
-      }
-    }
-  }
-
-  /// Easy AI: 隨機出牌
-  void _aiTurnEasy(_InternalPlayer ai) {
-    if (ai.hand.isEmpty || _random.nextDouble() < 0.4) return;
-
-    final card = ai.hand[_random.nextInt(ai.hand.length)];
-    final target = _getRandomTarget(ai);
-    ai.hand.remove(card);
-    _applyCard(ai, card, target?.id);
-  }
-
-  /// Normal AI: 基本策略
-  void _aiTurnNormal(_InternalPlayer ai) {
-    if (ai.hand.isEmpty) return;
-
-    // 優先策略
-    // 1. 如果聲望低，用治療卡
-    if (ai.reputation < 40) {
-      final healCard = ai.hand.where((c) => c.type == CardType.healing).firstOrNull;
-      if (healCard != null) {
-        ai.hand.remove(healCard);
-        _applyCard(ai, healCard, ai.id);
-        return;
-      }
-    }
-
-    // 2. 攻擊聲望最高的對手
-    if (_random.nextDouble() < 0.6) {
-      final attackCard = ai.hand.where((c) => c.type == CardType.attack).firstOrNull;
-      if (attackCard != null) {
-        final target = _getHighestReputationTarget(ai);
-        if (target != null) {
-          ai.hand.remove(attackCard);
-          _applyCard(ai, attackCard, target.id);
-          return;
-        }
-      }
-    }
-
-    // 3. 隨機出一張
-    if (_random.nextDouble() < 0.3 && ai.hand.isNotEmpty) {
-      final card = ai.hand[_random.nextInt(ai.hand.length)];
-      final target = _getRandomTarget(ai);
-      ai.hand.remove(card);
-      _applyCard(ai, card, target?.id);
-    }
-  }
-
-  /// Hard AI: 進階策略
-  void _aiTurnHard(_InternalPlayer ai) {
-    if (ai.hand.isEmpty) return;
-
-    // 1. 防禦優先：如果剛被攻擊，使用防禦牌
-    if (ai.damagedThisTurn && _random.nextDouble() < 0.7) {
-      final defCard = ai.hand.where((c) => c.type == CardType.defense).firstOrNull;
-      if (defCard != null) {
-        ai.hand.remove(defCard);
-        _applyCard(ai, defCard, null);
-        return;
-      }
-    }
-
-    // 2. 低血量時治療
-    if (ai.reputation < 50) {
-      final healCard = ai.hand.where((c) => c.type == CardType.healing).firstOrNull;
-      if (healCard != null) {
-        ai.hand.remove(healCard);
-        _applyCard(ai, healCard, ai.id);
-        return;
-      }
-    }
-
-    // 3. 使用 buff
-    if (_random.nextDouble() < 0.4) {
-      final buffCard = ai.hand.where((c) => c.type == CardType.buff).firstOrNull;
-      if (buffCard != null) {
-        ai.hand.remove(buffCard);
-        _applyCard(ai, buffCard, ai.id);
-        return;
-      }
-    }
-
-    // 4. 聯盟策略：攻擊非盟友中聲望最高的
-    final attackCard = ai.hand.where((c) => c.type == CardType.attack).firstOrNull;
-    if (attackCard != null) {
-      final targets = _alivePlayers
-          .where((p) => p.id != ai.id && !ai.allies.contains(p.id))
-          .toList();
-      if (targets.isNotEmpty) {
-        targets.sort((a, b) => b.reputation.compareTo(a.reputation));
-        ai.hand.remove(attackCard);
-        _applyCard(ai, attackCard, targets.first.id);
-        return;
-      }
-    }
-
-    // 5. 控制卡
-    if (_random.nextDouble() < 0.5) {
-      final ctrlCard = ai.hand.where((c) => c.type == CardType.control).firstOrNull;
-      if (ctrlCard != null) {
-        final target = _getHighestReputationTarget(ai);
-        if (target != null) {
-          ai.hand.remove(ctrlCard);
-          _applyCard(ai, ctrlCard, target.id);
-          return;
-        }
-      }
-    }
-  }
-
-  /// Expert AI: 最優化策略
-  void _aiTurnExpert(_InternalPlayer ai) {
-    if (ai.hand.isEmpty) return;
-
-    // Expert 與 Hard 類似，但更精準
-    // 1. 始終保留一張防禦牌
-    final defCards = ai.hand.where((c) => c.type == CardType.defense).toList();
-    final hasDefenseReserve = defCards.length > 1;
-
-    // 2. 計算最佳行動
-    if (ai.reputation < 40) {
-      // 急需治療
-      final healCard = ai.hand.where((c) => c.type == CardType.healing).firstOrNull;
-      if (healCard != null) {
-        ai.hand.remove(healCard);
-        _applyCard(ai, healCard, ai.id);
-        return;
-      }
-    }
-
-    // 3. 如果是最後回合，全力攻擊
-    if (_currentRound >= maxRounds - 1) {
-      final attackCards = ai.hand.where((c) => c.type == CardType.attack).toList();
-      if (attackCards.isNotEmpty) {
-        // 攻擊最大威脅（與自己聲望差距最小的）
-        final threats = _alivePlayers
-            .where((p) => p.id != ai.id)
-            .toList()
-          ..sort((a, b) => (b.reputation - ai.reputation).abs()
-              .compareTo((a.reputation - ai.reputation).abs()));
-        if (threats.isNotEmpty) {
-          final bestAttack = attackCards.reduce((a, b) =>
-              a.baseValue > b.baseValue ? a : b);
-          ai.hand.remove(bestAttack);
-          _applyCard(ai, bestAttack, threats.first.id);
-          return;
-        }
-      }
-    }
-
-    // 4. 使用 buff 強化自己
-    if (_random.nextDouble() < 0.5) {
-      final buffCard = ai.hand.where((c) => c.type == CardType.buff).firstOrNull;
-      if (buffCard != null) {
-        ai.hand.remove(buffCard);
-        _applyCard(ai, buffCard, ai.id);
-        return;
-      }
-    }
-
-    // 5. 攻擊非盟友中聲望最高的對手
-    final attackCard = ai.hand.where((c) =>
-        c.type == CardType.attack &&
-        (!hasDefenseReserve || c.type != CardType.defense)).firstOrNull;
-    if (attackCard != null) {
-      final targets = _alivePlayers
-          .where((p) => p.id != ai.id && !ai.allies.contains(p.id))
-          .toList();
-      if (targets.isNotEmpty) {
-        targets.sort((a, b) => b.reputation.compareTo(a.reputation));
-        ai.hand.remove(attackCard);
-        _applyCard(ai, attackCard, targets.first.id);
-        return;
-      }
-    }
-
-    // 6. 隨機出牌（Expert 不會浪費太多牌）
-    if (ai.hand.length > 5 && ai.hand.isNotEmpty) {
-      final card = ai.hand.where((c) =>
-          c.type != CardType.defense).firstOrNull;
-      if (card != null) {
-        final target = _getRandomTarget(ai);
-        ai.hand.remove(card);
-        _applyCard(ai, card, target?.id);
-      }
-    }
-  }
-
   /// 記錄 AI 行動（如果 source 是 AI，加入 pendingAiActions）
   void _recordAiAction(_InternalPlayer source, String actionType, String description, {
     _InternalPlayer? target,
@@ -888,7 +652,6 @@ class LocalGameEngine {
     }
 
     _phase = 'player_turn';
-    _currentTurnIndex = 0;
     _actionPointsRemaining = actionPointsPerTurn;
     _currentBill = bills[(_currentRound - 1) % bills.length];
 
@@ -1011,18 +774,6 @@ class LocalGameEngine {
     if (targets.isEmpty) return null;
     targets.sort((a, b) => b.reputation.compareTo(a.reputation));
     return targets.first;
-  }
-
-  _InternalPlayer? _findBestAlly(_InternalPlayer ai) {
-    // 根據陣營偏好選擇盟友
-    final sameFaction = _alivePlayers.where((p) =>
-        p.id != ai.id &&
-        !ai.allies.contains(p.id) &&
-        p.character.faction == ai.character.faction).toList();
-    if (sameFaction.isNotEmpty) {
-      return sameFaction[_random.nextInt(sameFaction.length)];
-    }
-    return null;
   }
 }
 

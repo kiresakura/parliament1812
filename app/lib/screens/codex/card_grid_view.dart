@@ -166,7 +166,7 @@ class _CardTile extends ConsumerWidget {
       width: double.infinity,
       height: double.infinity,
       cacheWidth: config.imageCacheWidth,
-      errorBuilder: (_, __, ___) => Icon(
+      errorBuilder: (_, _, _) => Icon(
         _typeIcon(card.cardType),
         size: 32,
         color: color,

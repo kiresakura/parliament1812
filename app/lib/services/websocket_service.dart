@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
@@ -56,7 +57,7 @@ class WebSocketService {
       _isConnecting = true;
       _updateConnectionState(ConnectionState.connecting);
 
-      print('WebSocket connecting to: $url');
+      debugPrint('WebSocket connecting to: $url');
       _channel = WebSocketChannel.connect(Uri.parse(url));
 
       // 監聽訊息
@@ -74,13 +75,13 @@ class WebSocketService {
         _updateConnectionState(ConnectionState.connected);
         _startHeartbeat();
         _resetReconnectAttempts();
-        print('WebSocket connected successfully');
+        debugPrint('WebSocket connected successfully');
         return true;
       } else {
         throw Exception('Connection failed');
       }
     } catch (e) {
-      print('WebSocket connection error: $e');
+      debugPrint('WebSocket connection error: $e');
       _updateConnectionState(ConnectionState.error);
       _errorController.add('連接失敗: $e');
       return false;
@@ -91,7 +92,7 @@ class WebSocketService {
 
   /// 斷開連接
   void disconnect() {
-    print('WebSocket disconnecting...');
+    debugPrint('WebSocket disconnecting...');
     _stopHeartbeat();
     _stopReconnecting();
     _channel?.sink.close(status.goingAway);
@@ -102,17 +103,17 @@ class WebSocketService {
   /// 發送訊息到伺服器
   bool sendMessage(ClientMessage message) {
     if (_connectionState != ConnectionState.connected || _channel == null) {
-      print('WebSocket not connected, cannot send message');
+      debugPrint('WebSocket not connected, cannot send message');
       return false;
     }
 
     try {
       final json = jsonEncode(message.toJson());
       _channel!.sink.add(json);
-      print('WebSocket sent: ${message.runtimeType}');
+      debugPrint('WebSocket sent: ${message.runtimeType}');
       return true;
     } catch (e) {
-      print('WebSocket send error: $e');
+      debugPrint('WebSocket send error: $e');
       _errorController.add('發送訊息失敗: $e');
       return false;
     }
@@ -135,17 +136,17 @@ class WebSocketService {
       
       final message = ServerMessage.fromJson(jsonData);
       
-      print('WebSocket received: ${message.runtimeType}');
+      debugPrint('WebSocket received: ${message.runtimeType}');
       
       // 處理心跳回應
       if (message.type == 'pong') {
-        print('Heartbeat pong received');
+        debugPrint('Heartbeat pong received');
         return;
       }
       
       _messageController.add(message);
     } catch (e) {
-      print('WebSocket message parse error: $e');
+      debugPrint('WebSocket message parse error: $e');
       _errorController.add('訊息解析錯誤: $e');
     }
   }
@@ -153,7 +154,6 @@ class WebSocketService {
   void _handleWrappedMessage(Map<String, dynamic> jsonData) {
     try {
       final seq = jsonData['seq'] as int;
-      final timestamp = jsonData['timestamp'] as int;
       final messageData = jsonData['message'] as Map<String, dynamic>;
       
       final message = ServerMessage.fromJson(messageData);
@@ -174,7 +174,7 @@ class WebSocketService {
       } else if (seq > _expectedSeq) {
         // 亂序消息，暫存
         _pendingMessages[seq] = message;
-        print('Message out of order: expected $_expectedSeq, got $seq');
+        debugPrint('Message out of order: expected $_expectedSeq, got $seq');
         
         // 如果積壓太多，請求重新同步
         if (_pendingMessages.length > 10) {
@@ -182,10 +182,10 @@ class WebSocketService {
         }
       } else {
         // 重複或過期消息，忽略
-        print('Duplicate or old message: seq $seq (expected $_expectedSeq)');
+        debugPrint('Duplicate or old message: seq $seq (expected $_expectedSeq)');
       }
     } catch (e) {
-      print('Error handling wrapped message: $e');
+      debugPrint('Error handling wrapped message: $e');
     }
   }
   
@@ -198,12 +198,12 @@ class WebSocketService {
   }
   
   void _processMessage(ServerMessage message) {
-    print('Processing message: ${message.runtimeType}');
+    debugPrint('Processing message: ${message.runtimeType}');
     _messageController.add(message);
   }
   
   void _requestResync() {
-    print('Requesting resync due to too many out-of-order messages');
+    debugPrint('Requesting resync due to too many out-of-order messages');
     // 清空待處理消息
     _pendingMessages.clear();
     // 重置序列號期望（將由重連或重新同步處理）
@@ -211,14 +211,14 @@ class WebSocketService {
   }
 
   void _onError(dynamic error) {
-    print('WebSocket error: $error');
+    debugPrint('WebSocket error: $error');
     _updateConnectionState(ConnectionState.error);
     _errorController.add('連接錯誤: $error');
     _attemptReconnect();
   }
 
   void _onDisconnected() {
-    print('WebSocket disconnected');
+    debugPrint('WebSocket disconnected');
     _stopHeartbeat();
     
     if (_connectionState != ConnectionState.disconnected) {
@@ -231,7 +231,7 @@ class WebSocketService {
     if (_connectionState != newState) {
       _connectionState = newState;
       _connectionStateController.add(newState);
-      print('WebSocket state changed to: $newState');
+      debugPrint('WebSocket state changed to: $newState');
     }
   }
 
@@ -266,7 +266,7 @@ class WebSocketService {
         ),
     );
     
-    print('WebSocket attempting reconnect $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s');
+    debugPrint('WebSocket attempting reconnect $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s');
     
     _updateConnectionState(ConnectionState.reconnecting);
 
@@ -282,7 +282,7 @@ class WebSocketService {
         _attemptReconnect();
       } else {
         // 達到最大重連次數，停止嘗試
-        print('Max reconnect attempts reached, giving up');
+        debugPrint('Max reconnect attempts reached, giving up');
         _updateConnectionState(ConnectionState.error);
       }
     });
@@ -294,7 +294,7 @@ class WebSocketService {
     _expectedSeq = 1;
     _latestSeq = 0;
     _pendingMessages.clear();
-    print('Requesting reconnect data after successful reconnection');
+    debugPrint('Requesting reconnect data after successful reconnection');
   }
 
   void _stopReconnecting() {

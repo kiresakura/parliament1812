@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/websocket_service.dart';
@@ -41,7 +42,7 @@ final connectionLatencyProvider = StateProvider<int?>((ref) {
       return null;
     },
     loading: () => null,
-    error: (_, __) => null,
+    error: (_, _) => null,
   );
 });
 
@@ -156,7 +157,7 @@ final autoConnectProvider = Provider<void>((ref) {
       error: (error, _) {
         // 連線錯誤時記錄
         // ignore: avoid_print
-        print('Connection error: $error');
+        debugPrint('Connection error: $error');
       },
     );
   });
@@ -171,7 +172,7 @@ class WebSocketMessageSender {
   /// 發送訊息，檢查連線狀態
   bool sendMessage(ClientMessage message) {
     if (_wsService.connectionState != ConnectionState.connected) {
-      print('Cannot send message: not connected');
+      debugPrint('Cannot send message: not connected');
       return false;
     }
     

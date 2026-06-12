@@ -103,7 +103,7 @@ class StaminaBar extends ConsumerWidget {
                     ),
                   ),
                   loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                 ),
               ],
             ],
@@ -114,7 +114,7 @@ class StaminaBar extends ConsumerWidget {
         height: 50,
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 

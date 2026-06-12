@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/api_service.dart';
@@ -421,7 +422,7 @@ final roomWebSocketHandlerProvider = Provider<void>((ref) {
         },
         loading: () {},
         error: (error, _) {
-          print('WebSocket message error: $error');
+          debugPrint('WebSocket message error: $error');
         },
       );
     },
@@ -438,7 +439,7 @@ void _handleWebSocketMessage(ServerMessage message, CurrentRoomNotifier notifier
         notifier.handleRoomStateUpdate(room, players);
       } catch (e) {
         // ignore: avoid_print
-        print('Failed to parse room state: $e');
+        debugPrint('Failed to parse room state: $e');
       }
       break;
 
@@ -448,7 +449,7 @@ void _handleWebSocketMessage(ServerMessage message, CurrentRoomNotifier notifier
         notifier.handlePlayerJoined(player);
       } catch (e) {
         // ignore: avoid_print
-        print('Failed to parse player joined: $e');
+        debugPrint('Failed to parse player joined: $e');
       }
       break;
 
@@ -458,7 +459,7 @@ void _handleWebSocketMessage(ServerMessage message, CurrentRoomNotifier notifier
 
     case ErrorMessage():
       // ignore: avoid_print
-      print('Server error: ${message.code} - ${message.message}');
+      debugPrint('Server error: ${message.code} - ${message.message}');
       break;
 
     default:

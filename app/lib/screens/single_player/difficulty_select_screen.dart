@@ -240,6 +240,7 @@ class _DifficultyCard extends ConsumerWidget {
       // 退還行動力
       await staminaService.purchase(StaminaService.costQuickMatch, 0);
       ref.invalidate(currentStaminaProvider);
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('無法開始對戰，請稍後再試。'),
