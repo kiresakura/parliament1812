@@ -146,6 +146,21 @@ pub enum ClientMessage {
         emoji: String,
     },
 
+    /// 觀戰者加入房間
+    SpectatorJoin {
+        /// 房間代碼
+        room_code: String,
+    },
+
+    /// 觀戰者離開
+    SpectatorLeave,
+
+    /// 觀戰者聊天
+    SpectatorChat {
+        /// 聊天內容
+        message: String,
+    },
+
     /// 心跳
     Ping,
 }
@@ -427,6 +442,42 @@ pub enum ServerMessage {
         content: String,
         /// 訊息類型
         message_type: SystemMessageType,
+    },
+
+    /// 觀戰者遊戲狀態更新（延遲 10 秒）
+    SpectatorUpdate {
+        /// 經過淨化的遊戲狀態
+        game_state: serde_json::Value,
+        /// 觀戰者人數
+        spectator_count: u32,
+        /// 當前回合
+        round: i32,
+        /// 當前階段
+        phase: String,
+    },
+
+    /// 觀戰者聊天廣播
+    SpectatorChatBroadcast {
+        /// 發送者名稱
+        user_name: String,
+        /// 聊天內容
+        message: String,
+        /// 時間戳
+        timestamp: String,
+    },
+
+    /// 觀戰者人數更新
+    SpectatorCountUpdate {
+        /// 觀戰者人數
+        count: u32,
+    },
+
+    /// 觀戰者加入確認
+    SpectatorJoined {
+        /// 房間代碼
+        room_code: String,
+        /// 觀戰者人數
+        spectator_count: u32,
     },
 
     /// 心跳回應
@@ -728,7 +779,12 @@ impl ServerMessage {
 impl ClientMessage {
     /// 檢查訊息是否需要在房間內
     pub fn requires_room(&self) -> bool {
-        !matches!(self, ClientMessage::JoinRoom { .. } | ClientMessage::Ping)
+        !matches!(
+            self,
+            ClientMessage::JoinRoom { .. }
+                | ClientMessage::Ping
+                | ClientMessage::SpectatorJoin { .. }
+        )
     }
 
     /// 檢查訊息是否需要遊戲進行中

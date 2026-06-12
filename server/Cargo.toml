@@ -45,6 +45,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 thiserror = "1"
 anyhow = "1"
 
+# 模板引擎
+tera = "1"
+
 # 設定
 dotenvy = "0.15"
 

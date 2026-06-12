@@ -978,7 +978,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       children: [
         // 回合制資訊列（行動點數 + 輪到誰）
         if (phase == GamePhase.playerTurn && gameState != null) ...[
-          _buildTurnInfoBar(gameState!, theme),
+          _buildTurnInfoBar(gameState, theme),
           const SizedBox(height: 8),
         ],
         Row(

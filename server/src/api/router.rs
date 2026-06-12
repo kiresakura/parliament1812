@@ -267,6 +267,203 @@ pub fn create_router(state: AppState) -> Router {
         .merge(campaign_public_routes)
         .merge(campaign_protected_routes);
 
+    // 邀請連結路由
+    // 公開路由
+    let public_invite_routes = Router::new()
+        .route("/resolve/:token", post(handlers::invite::resolve_invite));
+
+    // 受保護的邀請路由
+    let protected_invite_routes = Router::new()
+        .route("/generate", post(handlers::invite::generate_invite))
+        .route("/stats", get(handlers::invite::get_invite_stats))
+        .route("/convert", post(handlers::invite::mark_conversion))
+        .route("/summons", post(handlers::invite::create_summons))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 合併邀請路由
+    let invite_routes = Router::new()
+        .merge(public_invite_routes)
+        .merge(protected_invite_routes);
+
+    // 推薦獎勵路由
+    // 公開路由
+    let public_referral_routes = Router::new()
+        .route("/milestones", get(handlers::referral::get_milestones));
+
+    // 受保護的推薦路由
+    let protected_referral_routes = Router::new()
+        .route("/progress", get(handlers::referral::get_referral_progress))
+        .route("/claim", post(handlers::referral::claim_referral_reward))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 合併推薦路由
+    let referral_routes = Router::new()
+        .merge(public_referral_routes)
+        .merge(protected_referral_routes);
+
+    // 賽季通行證路由
+    let public_season_pass_routes = Router::new()
+        .route("/leaderboard", get(handlers::season_pass::get_season_leaderboard));
+
+    let protected_season_pass_routes = Router::new()
+        .route("/", get(handlers::season_pass::get_pass_status))
+        .route("/claim", post(handlers::season_pass::claim_season_reward))
+        .route("/premium", post(handlers::season_pass::purchase_premium))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    let season_pass_routes = Router::new()
+        .merge(public_season_pass_routes)
+        .merge(protected_season_pass_routes);
+
+    // 每週法案路由（全公開）
+    let weekly_bill_routes = Router::new()
+        .route("/current-bill", get(handlers::weekly_bills::get_current_bill))
+        .route("/history", get(handlers::weekly_bills::get_bill_history));
+
+    // 玩家自創法案路由（UGC）
+    // 公開路由
+    let public_ugc_routes = Router::new()
+        .route("/", get(handlers::ugc_bills::list_bills))
+        .route("/:bill_id", get(handlers::ugc_bills::get_bill));
+
+    // 受保護路由
+    let protected_ugc_routes = Router::new()
+        .route("/", post(handlers::ugc_bills::create_bill))
+        .route("/:bill_id/vote", post(handlers::ugc_bills::vote_bill))
+        .route("/mine", get(handlers::ugc_bills::get_my_bills))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 合併 UGC 路由
+    let ugc_routes = Router::new()
+        .merge(public_ugc_routes)
+        .merge(protected_ugc_routes);
+
+    // 實況主路由
+    // 公開路由（OBS Browser Source 使用）
+    let public_streamer_routes = Router::new()
+        .route("/overlay/:token", get(handlers::streamer::get_overlay_data));
+
+    // 受保護的實況主路由（需要認證）
+    let protected_streamer_routes = Router::new()
+        .route("/enable", post(handlers::streamer::enable_streamer))
+        .route("/disable", post(handlers::streamer::disable_streamer))
+        .route("/settings", get(handlers::streamer::get_streamer_settings))
+        .route("/settings", put(handlers::streamer::update_streamer_settings))
+        .route("/regenerate-token", post(handlers::streamer::regenerate_overlay_token))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 合併實況主路由
+    let streamer_routes = Router::new()
+        .merge(public_streamer_routes)
+        .merge(protected_streamer_routes);
+
+    // 串流整合路由
+    // 公開路由
+    let public_streaming_routes = Router::new()
+        .route("/live", get(handlers::streaming::get_live_streamers));
+
+    // 受保護的串流路由
+    let protected_streaming_routes = Router::new()
+        .route("/link", post(handlers::streaming::link_streaming))
+        .route(
+            "/link/:platform",
+            delete(handlers::streaming::unlink_streaming),
+        )
+        .route("/status", get(handlers::streaming::get_streaming_status))
+        .route(
+            "/settings/:platform",
+            put(handlers::streaming::update_streaming_settings),
+        )
+        .route("/live", post(handlers::streaming::set_live))
+        .route(
+            "/analytics",
+            get(handlers::streaming::get_streaming_analytics),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 合併串流路由
+    let streaming_routes = Router::new()
+        .merge(public_streaming_routes)
+        .merge(protected_streaming_routes);
+
+    // 玩家關係路由（全部需要認證）
+    let relationship_routes = Router::new()
+        .route("/", get(handlers::relationship::get_relationships))
+        .route("/nemeses", get(handlers::relationship::get_nemeses))
+        .route("/allies", get(handlers::relationship::get_allies))
+        .route(
+            "/:user_id",
+            get(handlers::relationship::get_relationship_with),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 遊戲摘要路由（需認證）
+    let game_routes = Router::new()
+        .route(
+            "/:game_id/summary",
+            get(handlers::summary::get_game_summary),
+        )
+        .route(
+            "/:game_id/replay",
+            get(handlers::summary::get_replay_data),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // 分享路由（公開）
+    let share_routes = Router::new().route(
+        "/:share_token",
+        get(handlers::summary::get_shared_summary),
+    );
+
+    // Discord 整合路由
+    // 公開端點（Bot 直接呼叫）
+    let discord_public_routes = Router::new()
+        .route("/stats/:discord_user_id", get(handlers::discord::get_discord_stats))
+        .route("/weekly", get(handlers::discord::get_discord_weekly));
+
+    // 需要 JWT 認證的端點（玩家透過 App 操作）
+    let discord_auth_routes = Router::new()
+        .route("/link", post(handlers::discord::link_discord))
+        .route("/link", delete(handlers::discord::unlink_discord))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    // Bot 專用端點（透過 X-Bot-Token header 驗證，在 handler 內處理）
+    let discord_bot_routes = Router::new()
+        .route("/challenge", post(handlers::discord::create_discord_challenge))
+        .route("/guild", post(handlers::discord::register_discord_guild));
+
+    let discord_routes = Router::new()
+        .merge(discord_public_routes)
+        .merge(discord_auth_routes)
+        .merge(discord_bot_routes);
+
     // API v1 路由
     let api_v1_routes = Router::new()
         .nest("/auth", auth_routes)
@@ -278,11 +475,24 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/iap", iap_routes)
         .nest("/single", single_player_routes)
         .nest("/tutorial", tutorial_routes)
-        .nest("/campaign", campaign_routes);
+        .nest("/campaign", campaign_routes)
+        .nest("/invite", invite_routes)
+        .nest("/referral", referral_routes)
+        .nest("/season-pass", season_pass_routes)
+        .nest("/weekly", weekly_bill_routes)
+        .nest("/bills", ugc_routes)
+        .nest("/relationships", relationship_routes)
+        .nest("/streaming", streaming_routes)
+        .nest("/streamer", streamer_routes)
+        .nest("/games", game_routes)
+        .nest("/share", share_routes)
+        .nest("/discord", discord_routes);
 
     // 組合所有路由
     Router::new()
         .route("/", get(root))
+        // 國會公報 HTML 頁面（頂層路由，公開）
+        .route("/gazette/:share_token", get(handlers::gazette::gazette_page))
         // WebSocket 端點
         // GET /ws - 一般 WebSocket 連線（不指定房間）
         .route("/ws", any(handlers::ws_handler_general))

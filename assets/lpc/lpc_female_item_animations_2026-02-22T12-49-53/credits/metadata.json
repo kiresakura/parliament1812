@@ -1,0 +1,206 @@
+{
+  "exportTimestamp": "2026-02-22T12-49-53",
+  "bodyType": "female",
+  "standardAnimations": {
+    "exported": {
+      "spellcast": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "thrust": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "walk": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "slash": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "shoot": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "hurt": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "climb": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "idle": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "jump": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "sit": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "emote": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "run": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "combat": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "1h_backslash": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ],
+      "1h_halfslash": [
+        "010 body_color__light_.png",
+        "100 human_female__light_.png",
+        "101 neutral__light_.png",
+        "035 longsleeve_2__navy_.png",
+        "025 basic_boots__brown_.png",
+        "014 high_socks__black_.png",
+        "115 secretary_glasses__black_.png",
+        "120 bangs_bun__navy_.png",
+        "020 cuffed_pants__leather_.png"
+      ]
+    },
+    "failed": {
+      "spellcast": [],
+      "thrust": [],
+      "walk": [],
+      "slash": [],
+      "shoot": [],
+      "hurt": [],
+      "climb": [],
+      "idle": [],
+      "jump": [],
+      "sit": [],
+      "emote": [],
+      "run": [],
+      "combat": [],
+      "1h_backslash": [],
+      "1h_halfslash": []
+    }
+  },
+  "customAnimations": {
+    "exported": {
+      "wheelchair": [
+        "0-2 wheelchair_.png",
+        "140 wheelchair_.png"
+      ],
+      "sit": []
+    },
+    "failed": {
+      "sit": [
+        "010 body_.png",
+        "100 heads_human_male_.png",
+        "101 face_neutral_.png"
+      ]
+    }
+  },
+  "frameSize": 64,
+  "frameCounts": {}
+}

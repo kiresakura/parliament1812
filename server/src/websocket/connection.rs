@@ -11,7 +11,7 @@ use super::messages::{error_codes, ClientMessage, ServerMessage};
 use crate::domain::{GamePhase, PlayerResponse, RoomResponse};
 use crate::error::AppError;
 use crate::game::cards;
-use crate::services::RoomService;
+use crate::services::{RoomService, SpectatorService};
 use crate::AppState;
 
 /// 處理 WebSocket 連線
@@ -154,6 +154,26 @@ pub async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     }
 
     // 清理連線
+    // 處理觀戰者離開
+    if let Some(room_code) = state.ws_hub.remove_spectator(conn_id).await {
+        let count = state.ws_hub.get_spectator_count(&room_code).await;
+        state
+            .ws_hub
+            .broadcast_to_spectators(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+        // 同時通知遊戲內玩家觀戰人數變更
+        state
+            .ws_hub
+            .broadcast_to_room(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+    }
+
     // 處理玩家離開房間
     if let Some((room_code, player_id)) = state.ws_hub.leave_room(conn_id).await {
         handle_player_disconnect(&state, &room_code, player_id).await;
@@ -436,6 +456,18 @@ pub async fn process_message(
 
         ClientMessage::ReactToMessage { message_seq, emoji } => {
             handle_message_reaction(conn_id, message_seq, &emoji, state, sender).await?;
+        }
+
+        ClientMessage::SpectatorJoin { room_code } => {
+            handle_spectator_join(conn_id, user_id, &room_code, state, sender).await?;
+        }
+
+        ClientMessage::SpectatorLeave => {
+            handle_spectator_leave(conn_id, state, sender).await?;
+        }
+
+        ClientMessage::SpectatorChat { message } => {
+            handle_spectator_chat(conn_id, &message, state, sender).await?;
         }
     }
 
@@ -1386,6 +1418,214 @@ async fn handle_end_turn(
             let _ = sender.send(ServerMessage::error(error_codes::INVALID_ACTION, e));
         }
     }
+
+    Ok(())
+}
+
+// ============================================================
+// 觀戰者訊息處理
+// ============================================================
+
+/// 處理觀戰者加入
+async fn handle_spectator_join(
+    conn_id: Uuid,
+    user_id: Uuid,
+    room_code: &str,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    // 檢查是否已經是觀戰者
+    if state.ws_hub.is_spectator(conn_id).await {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "您已經在觀戰中",
+        ));
+        return Ok(());
+    }
+
+    // 檢查房間是否存在且允許觀戰
+    let can_spectate = SpectatorService::can_spectate(state, room_code).await?;
+    if !can_spectate {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "房間不存在或遊戲尚未開始，無法觀戰",
+        ));
+        return Ok(());
+    }
+
+    // 取得使用者名稱
+    let user_name = {
+        let users = state.users.read().await;
+        users
+            .get(&user_id)
+            .map(|u| u.username.clone())
+            .unwrap_or_else(|| format!("觀戰者_{}", &user_id.to_string()[..8]))
+    };
+
+    // 加入觀戰者集合
+    state
+        .ws_hub
+        .add_spectator(room_code, conn_id, user_id, user_name, sender.clone())
+        .await;
+
+    let spectator_count = state.ws_hub.get_spectator_count(room_code).await;
+
+    // 發送加入確認給觀戰者
+    let _ = sender.send(ServerMessage::SpectatorJoined {
+        room_code: room_code.to_string(),
+        spectator_count,
+    });
+
+    // 廣播觀戰人數更新給所有觀戰者
+    state
+        .ws_hub
+        .broadcast_to_spectators(
+            room_code,
+            ServerMessage::SpectatorCountUpdate {
+                count: spectator_count,
+            },
+        )
+        .await;
+
+    // 同時通知遊戲內玩家觀戰人數變更
+    state
+        .ws_hub
+        .broadcast_to_room(
+            room_code,
+            ServerMessage::SpectatorCountUpdate {
+                count: spectator_count,
+            },
+        )
+        .await;
+
+    // 發送當前遊戲狀態（延遲 10 秒後推送）
+    let state_clone = state.clone();
+    let room_code_owned = room_code.to_string();
+    let sender_clone = sender.clone();
+    tokio::spawn(async move {
+        // 延遲 10 秒推送遊戲狀態
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
+        if let Some((game_state, round, phase)) =
+            SpectatorService::get_spectator_game_state(&state_clone, &room_code_owned).await
+        {
+            let count = state_clone
+                .ws_hub
+                .get_spectator_count(&room_code_owned)
+                .await;
+            let _ = sender_clone.send(ServerMessage::SpectatorUpdate {
+                game_state,
+                spectator_count: count,
+                round,
+                phase,
+            });
+        }
+    });
+
+    tracing::info!(
+        conn_id = %conn_id,
+        room_code = %room_code,
+        user_id = %user_id,
+        "觀戰者加入房間"
+    );
+
+    Ok(())
+}
+
+/// 處理觀戰者離開
+async fn handle_spectator_leave(
+    conn_id: Uuid,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    if let Some(room_code) = state.ws_hub.remove_spectator(conn_id).await {
+        let count = state.ws_hub.get_spectator_count(&room_code).await;
+
+        // 廣播觀戰人數更新
+        state
+            .ws_hub
+            .broadcast_to_spectators(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+
+        // 同時通知遊戲內玩家
+        state
+            .ws_hub
+            .broadcast_to_room(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+
+        let _ = sender.send(ServerMessage::info("已離開觀戰"));
+    } else {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "您不在觀戰中",
+        ));
+    }
+
+    Ok(())
+}
+
+/// 處理觀戰者聊天
+async fn handle_spectator_chat(
+    conn_id: Uuid,
+    message: &str,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    // 檢查是否為觀戰者
+    let room_code = match state.ws_hub.get_spectator_room(conn_id).await {
+        Some(code) => code,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "您不在觀戰中",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 限制訊息長度（最多 200 字）
+    if message.chars().count() > 200 {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "觀戰聊天訊息不能超過 200 字",
+        ));
+        return Ok(());
+    }
+
+    // 空訊息檢查
+    let trimmed = message.trim();
+    if trimmed.is_empty() {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "訊息不能為空",
+        ));
+        return Ok(());
+    }
+
+    // 取得觀戰者名稱
+    let user_name = state
+        .ws_hub
+        .get_spectator_name(conn_id)
+        .await
+        .unwrap_or_else(|| "匿名觀戰者".to_string());
+
+    // 廣播聊天訊息給所有觀戰者（聊天隔離：只在觀戰者之間可見）
+    let chat_msg = ServerMessage::SpectatorChatBroadcast {
+        user_name,
+        message: trimmed.to_string(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+
+    state
+        .ws_hub
+        .broadcast_to_spectators(&room_code, chat_msg)
+        .await;
 
     Ok(())
 }

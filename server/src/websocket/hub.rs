@@ -46,6 +46,19 @@ impl ConnectionHandle {
     }
 }
 
+/// 觀戰者句柄
+#[derive(Debug, Clone)]
+pub struct SpectatorHandle {
+    /// 連線 ID
+    pub conn_id: Uuid,
+    /// 使用者 ID
+    pub user_id: Uuid,
+    /// 觀戰者名稱
+    pub name: String,
+    /// 訊息發送器
+    pub sender: mpsc::UnboundedSender<ServerMessage>,
+}
+
 /// WebSocket Hub
 ///
 /// 管理所有活動的 WebSocket 連線
@@ -65,6 +78,8 @@ pub struct WebSocketHub {
     redis_pool: RwLock<Option<RedisPool>>,
     /// 訂閱中的房間頻道
     subscribed_rooms: RwLock<HashSet<String>>,
+    /// 觀戰者映射（房間代碼 -> 觀戰者集合）
+    spectators: RwLock<HashMap<String, HashMap<Uuid, SpectatorHandle>>>,
 }
 
 impl WebSocketHub {
@@ -80,6 +95,7 @@ impl WebSocketHub {
             shutdown_tx,
             redis_pool: RwLock::new(None),
             subscribed_rooms: RwLock::new(HashSet::new()),
+            spectators: RwLock::new(HashMap::new()),
         })
     }
 
@@ -95,6 +111,7 @@ impl WebSocketHub {
             shutdown_tx,
             redis_pool: RwLock::new(Some(redis_pool)),
             subscribed_rooms: RwLock::new(HashSet::new()),
+            spectators: RwLock::new(HashMap::new()),
         })
     }
 
@@ -701,6 +718,136 @@ impl WebSocketHub {
             tracing::info!(player_id = %player_id, "玩家重連，移除斷線記錄");
         }
     }
+
+    // ============================================================
+    // 觀戰者管理
+    // ============================================================
+
+    /// 新增觀戰者到房間
+    pub async fn add_spectator(
+        &self,
+        room_code: &str,
+        conn_id: Uuid,
+        user_id: Uuid,
+        name: String,
+        sender: mpsc::UnboundedSender<ServerMessage>,
+    ) {
+        let handle = SpectatorHandle {
+            conn_id,
+            user_id,
+            name: name.clone(),
+            sender,
+        };
+
+        let mut spectators = self.spectators.write().await;
+        spectators
+            .entry(room_code.to_string())
+            .or_insert_with(HashMap::new)
+            .insert(conn_id, handle);
+
+        tracing::info!(
+            room_code = %room_code,
+            conn_id = %conn_id,
+            user_id = %user_id,
+            name = %name,
+            "觀戰者已加入房間"
+        );
+    }
+
+    /// 移除觀戰者
+    ///
+    /// 返回觀戰者所在的房間代碼（如果有的話）
+    pub async fn remove_spectator(&self, conn_id: Uuid) -> Option<String> {
+        let mut spectators = self.spectators.write().await;
+        let mut found_room = None;
+
+        for (room_code, room_spectators) in spectators.iter_mut() {
+            if room_spectators.remove(&conn_id).is_some() {
+                found_room = Some(room_code.clone());
+                break;
+            }
+        }
+
+        // 清理空的房間觀戰者集合
+        if let Some(ref room_code) = found_room {
+            if spectators
+                .get(room_code)
+                .map(|s| s.is_empty())
+                .unwrap_or(false)
+            {
+                spectators.remove(room_code);
+            }
+
+            tracing::info!(
+                room_code = %room_code,
+                conn_id = %conn_id,
+                "觀戰者已離開房間"
+            );
+        }
+
+        found_room
+    }
+
+    /// 取得房間觀戰者人數
+    pub async fn get_spectator_count(&self, room_code: &str) -> u32 {
+        let spectators = self.spectators.read().await;
+        spectators
+            .get(room_code)
+            .map(|s| s.len() as u32)
+            .unwrap_or(0)
+    }
+
+    /// 向房間內所有觀戰者廣播訊息
+    pub async fn broadcast_to_spectators(&self, room_code: &str, message: ServerMessage) {
+        let spectators = self.spectators.read().await;
+        if let Some(room_spectators) = spectators.get(room_code) {
+            let mut sent_count = 0;
+            for handle in room_spectators.values() {
+                if handle.sender.send(message.clone()).is_ok() {
+                    sent_count += 1;
+                }
+            }
+
+            tracing::trace!(
+                room_code = %room_code,
+                sent_count = sent_count,
+                "廣播訊息到觀戰者"
+            );
+        }
+    }
+
+    /// 檢查連線是否為觀戰者
+    pub async fn is_spectator(&self, conn_id: Uuid) -> bool {
+        let spectators = self.spectators.read().await;
+        for room_spectators in spectators.values() {
+            if room_spectators.contains_key(&conn_id) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// 取得觀戰者所在的房間代碼
+    pub async fn get_spectator_room(&self, conn_id: Uuid) -> Option<String> {
+        let spectators = self.spectators.read().await;
+        for (room_code, room_spectators) in spectators.iter() {
+            if room_spectators.contains_key(&conn_id) {
+                return Some(room_code.clone());
+            }
+        }
+        None
+    }
+
+    /// 取得觀戰者名稱
+    pub async fn get_spectator_name(&self, conn_id: Uuid) -> Option<String> {
+        let spectators = self.spectators.read().await;
+        for room_spectators in spectators.values() {
+            if let Some(handle) = room_spectators.get(&conn_id) {
+                return Some(handle.name.clone());
+            }
+        }
+        None
+    }
 }
 
 impl Default for WebSocketHub {
@@ -714,6 +861,7 @@ impl Default for WebSocketHub {
             shutdown_tx,
             redis_pool: RwLock::new(None),
             subscribed_rooms: RwLock::new(HashSet::new()),
+            spectators: RwLock::new(HashMap::new()),
         }
     }
 }

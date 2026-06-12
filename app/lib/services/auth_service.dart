@@ -196,7 +196,7 @@ class AuthService {
   }) async {
     final result = await _post('/api/v1/auth/oauth/apple', {
       'token': identityToken,
-      if (displayName != null) 'display_name': displayName,
+      'display_name': ?displayName,
     });
 
     if (result.success && result.data != null) {

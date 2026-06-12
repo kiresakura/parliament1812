@@ -56,7 +56,7 @@ class SinglePlayerNotifier extends StateNotifier<SinglePlayerState?> {
     return performAction({
       'type': 'play_card',
       'card_id': cardId,
-      if (targetId != null) 'target_id': targetId,
+      'target_id': ?targetId,
     });
   }
 

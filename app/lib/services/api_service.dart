@@ -146,7 +146,7 @@ class ApiService {
       final response = await _makeRequest('POST', uri, body: body);
       
       if (response.success && response.data != null) {
-        final player = Player.fromJson(response.data! as Map<String, dynamic>);
+        final player = Player.fromJson(response.data!);
         return ApiResult.success(player);
       } else {
         return ApiResult.error(response.error!);

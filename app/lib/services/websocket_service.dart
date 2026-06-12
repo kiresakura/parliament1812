@@ -138,7 +138,7 @@ class WebSocketService {
       print('WebSocket received: ${message.runtimeType}');
       
       // 處理心跳回應
-      if (message is ServerMessage && message.type == 'pong') {
+      if (message.type == 'pong') {
         print('Heartbeat pong received');
         return;
       }

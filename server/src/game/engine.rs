@@ -1681,6 +1681,197 @@ impl GameEngine {
     pub fn cleanup_expired_alliances(&mut self) {
         self.alliance_manager.cleanup_expired_proposals();
     }
+
+    // ============================================================
+    // 事件收集系統
+    // ============================================================
+
+    /// 從回合結果中收集事件日誌
+    ///
+    /// 遍歷 action_log 收集當前回合的所有事件，轉換為 `CreateEventLog` 格式。
+    /// 此方法為純讀取輔助方法，不修改任何遊戲狀態。
+    ///
+    /// # Arguments
+    /// * `game_id` - 遊戲 ID（對應 rooms 表的 id）
+    ///
+    /// # Returns
+    /// 當前回合產生的事件日誌列表
+    pub fn collect_round_events(&self, game_id: Uuid) -> Vec<crate::domain::event::CreateEventLog> {
+        use crate::domain::event::CreateEventLog;
+
+        let round = self.state.current_round;
+        let phase = format!("{}", self.state.phase);
+        let mut events = Vec::new();
+
+        for action in &self.state.action_log {
+            match action {
+                GameAction::CardUsed {
+                    player_id,
+                    card_name,
+                    target_id,
+                    ..
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "card_played".to_string(),
+                        actor_id: Some(*player_id),
+                        target_id: *target_id,
+                        card_type: Some(card_name.clone()),
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Challenge {
+                    attacker_id,
+                    target_id,
+                    damage,
+                    was_countered,
+                } => {
+                    let event_type = if *was_countered {
+                        "challenge_blocked"
+                    } else {
+                        "challenge_success"
+                    };
+                    // 檢查攻擊者與目標是否曾為盟友
+                    let was_ally = self.state.are_allies(*attacker_id, *target_id);
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: event_type.to_string(),
+                        actor_id: Some(*attacker_id),
+                        target_id: Some(*target_id),
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "damage": damage,
+                            "was_countered": was_countered,
+                            "was_ally": was_ally,
+                        }),
+                        reputation_change: if *was_countered { 0 } else { -*damage },
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Counter { defender_id } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "challenge_blocked".to_string(),
+                        actor_id: Some(*defender_id),
+                        target_id: None,
+                        card_type: None,
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::UseSkill {
+                    player_id,
+                    skill,
+                    target_id,
+                    effect,
+                } => {
+                    let event_type = match skill.as_str() {
+                        "爆料" => "expose",
+                        "收買" => "skill_used",
+                        "怒火" => "skill_used",
+                        _ => "skill_used",
+                    };
+                    let was_ally = target_id
+                        .map(|tid| self.state.are_allies(*player_id, tid))
+                        .unwrap_or(false);
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: event_type.to_string(),
+                        actor_id: Some(*player_id),
+                        target_id: *target_id,
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "skill": skill,
+                            "effect": effect,
+                            "was_ally": was_ally,
+                        }),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Vote { player_id, choice } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "vote_cast".to_string(),
+                        actor_id: Some(*player_id),
+                        target_id: None,
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "choice": format!("{:?}", choice),
+                        }),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::FormAlliance {
+                    player_a,
+                    player_b,
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "alliance_formed".to_string(),
+                        actor_id: Some(*player_a),
+                        target_id: Some(*player_b),
+                        card_type: None,
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Betray {
+                    betrayer_id,
+                    target_id,
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "alliance_betrayed".to_string(),
+                        actor_id: Some(*betrayer_id),
+                        target_id: Some(*target_id),
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "was_ally": true,
+                        }),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Chat {
+                    from_id,
+                    content: _,
+                    is_private: _,
+                    to_id,
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "speech".to_string(),
+                        actor_id: Some(*from_id),
+                        target_id: *to_id,
+                        card_type: None,
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                // 抽牌、棄牌、結束回合不記錄為事件
+                GameAction::CardDrawn { .. }
+                | GameAction::CardDiscarded { .. }
+                | GameAction::EndTurn { .. } => {}
+            }
+        }
+
+        events
+    }
 }
 
 #[cfg(test)]

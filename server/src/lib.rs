@@ -46,11 +46,13 @@ pub use config::{
     DatabaseSettings, JwtSettings, RedisSettings, ServerSettings, Settings, SettingsError,
 };
 pub use domain::{
-    ActionType, CharacterType, CreateRoomRequest, CreateUserRequest, ForgotPasswordRequest,
-    GameActionRecord, GameEvent, GamePhase, GameResponse, GameState, JoinRoomRequest, LoginRequest,
-    MessageResponse, OAuthLoginRequest, Player, PlayerResponse, RefreshTokenRequest,
-    ResetPasswordRequest, Room, RoomResponse, RoomStatus, TokenResponse, User, UserResponse, Vote,
-    VoteChoice, VoteRequest, VoteResult,
+    ActionType, CharacterType, CreateEventLog, CreateRoomRequest, CreateUserRequest,
+    DramaScore, ForgotPasswordRequest, GameActionRecord, GameEvent, GameEventLog, GamePhase,
+    GameResponse, GameState, GameSummary, Highlight, JoinRoomRequest, LoginRequest,
+    MessageResponse, NewspaperData, OAuthLoginRequest, Player, PlayerRelationship,
+    PlayerResponse, RefreshTokenRequest, RelationshipListResponse, RelationshipResponse,
+    ReplayData, ResetPasswordRequest, Room, RoomResponse, RoomStatus, TokenResponse, User,
+    UserResponse, Vote, VoteChoice, VoteRequest, VoteResult,
 };
 pub use error::{AppError, AppResult, ErrorResponse};
 pub use game::{
@@ -74,8 +76,11 @@ pub use game::{
 pub use repository::{FullUserRecord, PlayerRepository, RoomRepository, UserRepository};
 pub use services::{
     room_service::{LeaveRoomResult, StartGameResult},
-    CampaignService, FriendService, GameService, IapService, RoomService, SinglePlayerService,
-    TutorialService,
+    AttributionService, CampaignService, DiscordService, EventService, FriendService,
+    GameService, IapService, ReferralService, RelationshipService, RoomService,
+    SeasonPassService, SinglePlayerService, SpectatorService, StreamerService,
+    StreamingService, SummaryService, SummonsService, TutorialService, UgcBillService,
+    WeeklyBillService,
 };
 pub use state::{AppState, GameStore};
 pub use websocket::{
