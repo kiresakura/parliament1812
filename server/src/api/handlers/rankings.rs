@@ -90,16 +90,53 @@ pub struct SeasonEntry {
     pub is_active: bool,
 }
 
+/// 當前賽季回應
+#[derive(Debug, Serialize)]
+pub struct CurrentSeasonResponse {
+    pub id: i32,
+    pub name: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub is_active: bool,
+    pub days_remaining: i64,
+    pub total_players: i64,
+}
+
 // ============================================================
 // Handlers
 // ============================================================
+
+/// GET /api/v1/rankings/season — 當前賽季資訊
+pub async fn current_season(
+    State(state): State<AppState>,
+) -> Result<Json<CurrentSeasonResponse>, AppError> {
+    let current = season::get_current_season(&state.db).await?;
+
+    match current {
+        Some(s) => {
+            let total = RankingDb::get_total_ranked(&state.db, s.id).await?;
+            let days_remaining = (s.end_date - chrono::Utc::now()).num_days().max(0);
+
+            Ok(Json(CurrentSeasonResponse {
+                id: s.id,
+                name: s.name,
+                start_date: s.start_date.to_rfc3339(),
+                end_date: s.end_date.to_rfc3339(),
+                is_active: s.is_active,
+                days_remaining,
+                total_players: total,
+            }))
+        }
+        None => Err(AppError::NotFound("目前沒有活躍賽季".to_string())),
+    }
+}
 
 /// GET /api/rankings/global
 pub async fn global_rankings(
     State(state): State<AppState>,
     Query(query): Query<GlobalRankingsQuery>,
 ) -> Result<Json<LeaderboardResponse>, AppError> {
-    let limit = query.limit.unwrap_or(50).min(100).max(1);
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
 
     // 取得賽季
@@ -187,7 +224,10 @@ pub async fn list_seasons(
 // ============================================================
 
 /// 解析賽季 ID：指定了就用指定的，否則取當前活躍賽季
-async fn resolve_season(state: &AppState, season_id: Option<i32>) -> Result<(i32, String), AppError> {
+async fn resolve_season(
+    state: &AppState,
+    season_id: Option<i32>,
+) -> Result<(i32, String), AppError> {
     if let Some(id) = season_id {
         // 查詢指定賽季的名稱
         let season = sqlx::query_as::<_, season::Season>(

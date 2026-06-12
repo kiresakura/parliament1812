@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../config/theme.dart';
 import '../../providers/rankings_provider.dart';
@@ -48,12 +49,20 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     super.dispose();
   }
 
+  Future<void> _onRefresh() async {
+    await ref.read(rankingsProvider.notifier).loadInitial();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(rankingsProvider);
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/menu'),
+        ),
         title: const Text('排行榜'),
         bottom: TabBar(
           controller: _tabController,
@@ -98,12 +107,21 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
         controller: _tabController,
         children: [
           // Tab 1: 全球排行
-          _GlobalRankingsTab(
-            state: state,
-            scrollController: _scrollController,
+          RefreshIndicator(
+            onRefresh: _onRefresh,
+            color: Parliament1812Theme.gold,
+            child: _GlobalRankingsTab(
+              state: state,
+              scrollController: _scrollController,
+              currentUserId: state.myRanking?.rank,
+            ),
           ),
           // Tab 2: 我的排名
-          _MyRankingTab(state: state),
+          RefreshIndicator(
+            onRefresh: _onRefresh,
+            color: Parliament1812Theme.gold,
+            child: _MyRankingTab(state: state),
+          ),
         ],
       ),
     );
@@ -117,10 +135,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
 class _GlobalRankingsTab extends StatelessWidget {
   final RankingsState state;
   final ScrollController scrollController;
+  final int? currentUserId;
 
   const _GlobalRankingsTab({
     required this.state,
     required this.scrollController,
+    this.currentUserId,
   });
 
   @override
@@ -166,13 +186,17 @@ class _GlobalRankingsTab extends StatelessWidget {
         }
 
         final entry = state.rankings[index];
+        final isCurrentPlayer =
+            currentUserId != null && entry.rank == currentUserId;
 
         // TOP 3 特殊樣式
         if (entry.rank <= 3) {
-          return _TopRankCard(entry: entry);
+          return _TopRankCard(
+              entry: entry, isCurrentPlayer: isCurrentPlayer);
         }
 
-        return _RankingListTile(entry: entry);
+        return _RankingListTile(
+            entry: entry, isCurrentPlayer: isCurrentPlayer);
       },
     );
   }
@@ -184,8 +208,9 @@ class _GlobalRankingsTab extends StatelessWidget {
 
 class _TopRankCard extends StatelessWidget {
   final RankingEntry entry;
+  final bool isCurrentPlayer;
 
-  const _TopRankCard({required this.entry});
+  const _TopRankCard({required this.entry, this.isCurrentPlayer = false});
 
   @override
   Widget build(BuildContext context) {
@@ -202,11 +227,18 @@ class _TopRankCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
           colors: [
-            color.withValues(alpha: 0.2),
-            Parliament1812Theme.charcoal,
+            color.withValues(alpha: isCurrentPlayer ? 0.35 : 0.2),
+            isCurrentPlayer
+                ? Parliament1812Theme.charcoal.withValues(alpha: 0.9)
+                : Parliament1812Theme.charcoal,
           ],
         ),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+        border: Border.all(
+          color: isCurrentPlayer
+              ? Parliament1812Theme.gold
+              : color.withValues(alpha: 0.5),
+          width: isCurrentPlayer ? 2.5 : 1.5,
+        ),
       ),
       child: ListTile(
         contentPadding:
@@ -274,8 +306,10 @@ class _TopRankCard extends StatelessWidget {
 
 class _RankingListTile extends StatelessWidget {
   final RankingEntry entry;
+  final bool isCurrentPlayer;
 
-  const _RankingListTile({required this.entry});
+  const _RankingListTile(
+      {required this.entry, this.isCurrentPlayer = false});
 
   @override
   Widget build(BuildContext context) {
@@ -283,7 +317,14 @@ class _RankingListTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        color: Parliament1812Theme.charcoal,
+        color: isCurrentPlayer
+            ? Parliament1812Theme.darkRed.withValues(alpha: 0.25)
+            : Parliament1812Theme.charcoal,
+        border: isCurrentPlayer
+            ? Border.all(
+                color: Parliament1812Theme.gold.withValues(alpha: 0.6),
+                width: 1.5)
+            : null,
       ),
       child: ListTile(
         dense: true,

@@ -979,4 +979,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get connectionConnecting => 'Connecting...';
+
+  @override
+  String get graphicsQuality => 'Graphics Quality';
 }

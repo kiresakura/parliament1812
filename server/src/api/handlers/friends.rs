@@ -63,7 +63,7 @@ pub struct SearchUsersResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct MessageResponse {
+pub struct FriendActionResponse {
     pub message: String,
 }
 
@@ -110,13 +110,13 @@ pub async fn send_friend_request(
     State(state): State<AppState>,
     auth: AuthUser,
     Json(req): Json<TargetUserRequest>,
-) -> AppResult<Json<MessageResponse>> {
+) -> AppResult<Json<FriendActionResponse>> {
     let target_id = Uuid::parse_str(&req.target_user_id)
         .map_err(|_| AppError::BadRequest("無效的用戶 ID".to_string()))?;
 
     FriendService::send_friend_request(&state, auth.user_id, target_id).await?;
 
-    Ok(Json(MessageResponse {
+    Ok(Json(FriendActionResponse {
         message: "好友請求已發送".to_string(),
     }))
 }
@@ -130,13 +130,13 @@ pub async fn accept_friend_request(
     State(state): State<AppState>,
     auth: AuthUser,
     Json(req): Json<FriendUserRequest>,
-) -> AppResult<Json<MessageResponse>> {
+) -> AppResult<Json<FriendActionResponse>> {
     let from_user_id = Uuid::parse_str(&req.user_id)
         .map_err(|_| AppError::BadRequest("無效的用戶 ID".to_string()))?;
 
     FriendService::accept_friend_request(&state, auth.user_id, from_user_id).await?;
 
-    Ok(Json(MessageResponse {
+    Ok(Json(FriendActionResponse {
         message: "已接受好友請求".to_string(),
     }))
 }
@@ -150,13 +150,13 @@ pub async fn reject_friend_request(
     State(state): State<AppState>,
     auth: AuthUser,
     Json(req): Json<FriendUserRequest>,
-) -> AppResult<Json<MessageResponse>> {
+) -> AppResult<Json<FriendActionResponse>> {
     let from_user_id = Uuid::parse_str(&req.user_id)
         .map_err(|_| AppError::BadRequest("無效的用戶 ID".to_string()))?;
 
     FriendService::reject_friend_request(&state, auth.user_id, from_user_id).await?;
 
-    Ok(Json(MessageResponse {
+    Ok(Json(FriendActionResponse {
         message: "已拒絕好友請求".to_string(),
     }))
 }
@@ -170,13 +170,13 @@ pub async fn remove_friend(
     State(state): State<AppState>,
     auth: AuthUser,
     Path(friend_id_str): Path<String>,
-) -> AppResult<Json<MessageResponse>> {
+) -> AppResult<Json<FriendActionResponse>> {
     let friend_id = Uuid::parse_str(&friend_id_str)
         .map_err(|_| AppError::BadRequest("無效的用戶 ID".to_string()))?;
 
     FriendService::remove_friend(&state, auth.user_id, friend_id).await?;
 
-    Ok(Json(MessageResponse {
+    Ok(Json(FriendActionResponse {
         message: "已刪除好友".to_string(),
     }))
 }
@@ -190,13 +190,13 @@ pub async fn block_user(
     State(state): State<AppState>,
     auth: AuthUser,
     Json(req): Json<TargetUserRequest>,
-) -> AppResult<Json<MessageResponse>> {
+) -> AppResult<Json<FriendActionResponse>> {
     let target_id = Uuid::parse_str(&req.target_user_id)
         .map_err(|_| AppError::BadRequest("無效的用戶 ID".to_string()))?;
 
     FriendService::block_user(&state, auth.user_id, target_id).await?;
 
-    Ok(Json(MessageResponse {
+    Ok(Json(FriendActionResponse {
         message: "已封鎖用戶".to_string(),
     }))
 }
@@ -206,13 +206,13 @@ pub async fn unblock_user(
     State(state): State<AppState>,
     auth: AuthUser,
     Json(req): Json<TargetUserRequest>,
-) -> AppResult<Json<MessageResponse>> {
+) -> AppResult<Json<FriendActionResponse>> {
     let target_id = Uuid::parse_str(&req.target_user_id)
         .map_err(|_| AppError::BadRequest("無效的用戶 ID".to_string()))?;
 
     FriendService::unblock_user(&state, auth.user_id, target_id).await?;
 
-    Ok(Json(MessageResponse {
+    Ok(Json(FriendActionResponse {
         message: "已解除封鎖".to_string(),
     }))
 }
@@ -230,8 +230,7 @@ pub async fn invite_game(
     let friend_id = Uuid::parse_str(&req.target_user_id)
         .map_err(|_| AppError::BadRequest("無效的用戶 ID".to_string()))?;
 
-    let room_code =
-        FriendService::invite_friend_to_game(&state, auth.user_id, friend_id).await?;
+    let room_code = FriendService::invite_friend_to_game(&state, auth.user_id, friend_id).await?;
 
     Ok(Json(InviteGameResponse {
         message: "對戰邀請已發送".to_string(),

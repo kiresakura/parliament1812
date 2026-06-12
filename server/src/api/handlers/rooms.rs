@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     auth::AuthUser,
-    domain::{CreateRoomRequest, JoinRoomRequest, Player, PlayerResponse, Room, RoomResponse},
+    domain::{CreateRoomRequest, JoinRoomRequest, Player, PlayerResponse, Room, RoomResponse, User},
     error::{AppError, AppResult},
     AppState,
 };
@@ -34,13 +34,37 @@ pub async fn create_room(
     auth: AuthUser,
     Json(req): Json<CreateRoomRequest>,
 ) -> AppResult<Json<RoomDetailResponse>> {
-    // 檢查用戶是否存在
+    // 檢查用戶是否存在（先查記憶體，fallback 查 DB）
     let user = {
-        let users = state.users.read().await;
-        users
-            .get(&auth.user_id)
-            .cloned()
-            .ok_or_else(|| AppError::NotFound("用戶不存在".to_string()))?
+        let mem_user = {
+            let users = state.users.read().await;
+            users.get(&auth.user_id).cloned()
+        };
+        match mem_user {
+            Some(u) => u,
+            None => {
+                // 記憶體沒有（可能在另一台實例註冊），從 DB 查
+                let repo = state.user_repo();
+                let record = repo
+                    .find_by_id(auth.user_id)
+                    .await
+                    .map_err(|e| AppError::DatabaseError(e.to_string()))?
+                    .ok_or_else(|| AppError::NotFound("用戶不存在".to_string()))?;
+                // 回填記憶體 store
+                let user = User::new(record.username.clone(), String::new());
+                let user_with_id = User {
+                    id: record.id,
+                    username: user.username,
+                    password_hash: user.password_hash,
+                    created_at: user.created_at,
+                };
+                {
+                    let mut users = state.users.write().await;
+                    users.insert(record.id, user_with_id.clone());
+                }
+                user_with_id
+            }
+        }
     };
 
     // 檢查用戶是否已在其他房間
@@ -340,13 +364,35 @@ pub async fn quick_match(
     auth: AuthUser,
     Json(req): Json<QuickMatchRequest>,
 ) -> AppResult<Json<RoomDetailResponse>> {
-    // 檢查用戶是否存在
+    // 檢查用戶是否存在（先查記憶體，fallback 查 DB）
     let _user = {
-        let users = state.users.read().await;
-        users
-            .get(&auth.user_id)
-            .cloned()
-            .ok_or_else(|| AppError::NotFound("用戶不存在".to_string()))?
+        let mem_user = {
+            let users = state.users.read().await;
+            users.get(&auth.user_id).cloned()
+        };
+        match mem_user {
+            Some(u) => u,
+            None => {
+                let repo = state.user_repo();
+                let record = repo
+                    .find_by_id(auth.user_id)
+                    .await
+                    .map_err(|e| AppError::DatabaseError(e.to_string()))?
+                    .ok_or_else(|| AppError::NotFound("用戶不存在".to_string()))?;
+                let user = User::new(record.username.clone(), String::new());
+                let user_with_id = User {
+                    id: record.id,
+                    username: user.username,
+                    password_hash: user.password_hash,
+                    created_at: user.created_at,
+                };
+                {
+                    let mut users = state.users.write().await;
+                    users.insert(record.id, user_with_id.clone());
+                }
+                user_with_id
+            }
+        }
     };
 
     // 檢查用戶是否已在其他房間
@@ -361,20 +407,19 @@ pub async fn quick_match(
     let suitable_room = {
         let rooms = state.rooms.read().await;
         let players = state.players.read().await;
-        
-        rooms.values()
+
+        rooms
+            .values()
             .filter(|room| {
                 // 房間必須是等待狀態
                 room.can_join() &&
                 // 檢查最大玩家數偏好
-                (req.preferred_max_players.is_none() || 
+                (req.preferred_max_players.is_none() ||
                  req.preferred_max_players == Some(room.max_players as u32))
             })
             .find(|room| {
                 // 檢查房間是否有空位
-                let current_count = players.values()
-                    .filter(|p| p.room_id == room.id)
-                    .count();
+                let current_count = players.values().filter(|p| p.room_id == room.id).count();
                 current_count < room.max_players as usize
             })
             .cloned()
@@ -491,13 +536,16 @@ pub async fn spectate_room(
     // 檢查房間是否可以觀戰
     let current_spectator_count = {
         let players = state.players.read().await;
-        players.values()
+        players
+            .values()
             .filter(|p| p.room_id == room.id && p.is_spectator)
             .count()
     };
 
     if !room.can_spectate(current_spectator_count) {
-        return Err(AppError::BadRequest("觀戰席已滿或房間不允許觀戰".to_string()));
+        return Err(AppError::BadRequest(
+            "觀戰席已滿或房間不允許觀戰".to_string(),
+        ));
     }
 
     // 創建觀戰者

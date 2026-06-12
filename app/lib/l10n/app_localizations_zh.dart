@@ -957,6 +957,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get connectionConnecting => '連線中...';
+
+  @override
+  String get graphicsQuality => '畫面品質';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -1912,6 +1915,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get connectionConnecting => '连线中...';
+
+  @override
+  String get graphicsQuality => '画面品质';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -2867,4 +2873,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get connectionConnecting => '連線中...';
+
+  @override
+  String get graphicsQuality => '畫面品質';
 }

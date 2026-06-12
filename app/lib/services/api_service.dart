@@ -146,7 +146,7 @@ class ApiService {
       final response = await _makeRequest('POST', uri, body: body);
       
       if (response.success && response.data != null) {
-        final player = Player.fromJson(response.data! as Map<String, dynamic>);
+        final player = Player.fromJson(response.data!);
         return ApiResult.success(player);
       } else {
         return ApiResult.error(response.error!);
@@ -219,7 +219,7 @@ class ApiService {
       final request = await _httpClient.openUrl(method, uri);
       
       // 設定標頭
-      request.headers.set('Content-Type', 'application/json');
+      request.headers.set('Content-Type', 'application/json; charset=utf-8');
       if (_authToken != null) {
         request.headers.set('Authorization', 'Bearer $_authToken');
       }
@@ -227,7 +227,7 @@ class ApiService {
       // 添加請求體
       if (body != null) {
         final bodyStr = jsonEncode(body);
-        request.write(bodyStr);
+        request.add(utf8.encode(bodyStr));
       }
       
       final response = await request.close();
@@ -333,6 +333,337 @@ class ApiService {
     return List.generate(6, (index) => 
       chars[DateTime.now().millisecond % chars.length]
     ).join();
+  }
+
+  // ==================== 單人模式 API ====================
+
+  /// 開始 AI 快速對戰
+  Future<ApiResult<Map<String, dynamic>>> startSinglePlayer({
+    required String difficulty,
+    String? character,
+    required String playerName,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'difficulty': difficulty,
+        'player_name': playerName,
+      };
+      if (character != null) body['character'] = character;
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/api/v1/single/start');
+      final response = await _makeRequest('POST', uri, body: body);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '啟動失敗');
+    } catch (e) {
+      return ApiResult.error('啟動單人對戰失敗: $e');
+    }
+  }
+
+  /// 執行單人遊戲行動
+  Future<ApiResult<Map<String, dynamic>>> singlePlayerAction({
+    required String sessionId,
+    required Map<String, dynamic> action,
+  }) async {
+    try {
+      final body = {
+        'session_id': sessionId,
+        'action': action,
+      };
+      final uri = Uri.parse('${AppConstants.baseUrl}/api/v1/single/action');
+      final response = await _makeRequest('POST', uri, body: body);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '行動失敗');
+    } catch (e) {
+      return ApiResult.error('行動失敗: $e');
+    }
+  }
+
+  /// 取得單人遊戲狀態
+  Future<ApiResult<Map<String, dynamic>>> getSinglePlayerState(
+    String sessionId,
+  ) async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}/api/v1/single/state/$sessionId');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得狀態失敗');
+    } catch (e) {
+      return ApiResult.error('取得狀態失敗: $e');
+    }
+  }
+
+  // ==================== 戰役 API ====================
+
+  /// 取得戰役進度
+  Future<ApiResult<Map<String, dynamic>>> getCampaignProgress() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}/api/v1/campaign/progress');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得進度失敗');
+    } catch (e) {
+      return ApiResult.error('取得戰役進度失敗: $e');
+    }
+  }
+
+  /// 開始戰役章節
+  Future<ApiResult<Map<String, dynamic>>> startCampaignChapter({
+    required int chapter,
+    int? stage,
+    required String playerName,
+    String? character,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'chapter': chapter,
+        'player_name': playerName,
+      };
+      if (stage != null) body['stage'] = stage;
+      if (character != null) body['character'] = character;
+
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}/api/v1/single/campaign/start');
+      final response = await _makeRequest('POST', uri, body: body);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '啟動戰役失敗');
+    } catch (e) {
+      return ApiResult.error('啟動戰役失敗: $e');
+    }
+  }
+
+  // ==================== 教學 API ====================
+
+  /// 取得教學進度
+  Future<ApiResult<Map<String, dynamic>>> getTutorialProgress() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}/api/v1/tutorial/progress');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得教學進度失敗');
+    } catch (e) {
+      return ApiResult.error('取得教學進度失敗: $e');
+    }
+  }
+
+  /// 完成教學步驟
+  Future<ApiResult<Map<String, dynamic>>> completeTutorialStep(
+    int step,
+  ) async {
+    try {
+      final body = {'step': step};
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}/api/v1/tutorial/complete');
+      final response = await _makeRequest('POST', uri, body: body);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '完成步驟失敗');
+    } catch (e) {
+      return ApiResult.error('完成教學步驟失敗: $e');
+    }
+  }
+
+  /// 檢查是否需要教學
+  Future<ApiResult<Map<String, dynamic>>> checkNeedsTutorial() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}/api/v1/tutorial/check');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '檢查失敗');
+    } catch (e) {
+      return ApiResult.error('檢查教學狀態失敗: $e');
+    }
+  }
+
+  // ==================== IAP API ====================
+
+  /// 取得寶石餘額
+  Future<ApiResult<Map<String, dynamic>>> getGemBalance() async {
+    try {
+      final uri = Uri.parse('${AppConstants.baseUrl}/api/v1/iap/balance');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得餘額失敗');
+    } catch (e) {
+      return ApiResult.error('取得寶石餘額失敗: $e');
+    }
+  }
+
+  // ==================== 排行榜 API ====================
+
+  /// 取得全球排行榜
+  Future<ApiResult<Map<String, dynamic>>> getGlobalRankings({
+    int? season,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'limit': '$limit',
+        'offset': '$offset',
+      };
+      if (season != null) queryParams['season'] = '$season';
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/api/v1/rankings/global')
+          .replace(queryParameters: queryParams);
+
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得排行榜失敗');
+    } catch (e) {
+      return ApiResult.error('取得排行榜失敗: $e');
+    }
+  }
+
+  /// 取得我的排名
+  Future<ApiResult<Map<String, dynamic>>> getMyRanking({int? season}) async {
+    try {
+      final queryParams = <String, String>{};
+      if (season != null) queryParams['season'] = '$season';
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/api/v1/rankings/me')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得排名失敗');
+    } catch (e) {
+      return ApiResult.error('取得排名失敗: $e');
+    }
+  }
+
+  /// 取得賽季列表
+  Future<ApiResult<Map<String, dynamic>>> getSeasons() async {
+    try {
+      final uri =
+          Uri.parse('${AppConstants.baseUrl}/api/v1/rankings/seasons');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得賽季列表失敗');
+    } catch (e) {
+      return ApiResult.error('取得賽季列表失敗: $e');
+    }
+  }
+
+  /// 取得當前賽季資訊
+  Future<ApiResult<Map<String, dynamic>>> getCurrentSeason() async {
+    try {
+      final uri =
+          Uri.parse('${AppConstants.baseUrl}/api/v1/rankings/season');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得賽季資訊失敗');
+    } catch (e) {
+      return ApiResult.error('取得賽季資訊失敗: $e');
+    }
+  }
+
+  // ==================== 圖鑑 API ====================
+
+  /// 取得全卡牌列表（含收藏狀態）
+  Future<ApiResult<Map<String, dynamic>>> getCodexCards() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/cards');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得卡牌列表失敗');
+    } catch (e) {
+      return ApiResult.error('取得卡牌列表失敗: $e');
+    }
+  }
+
+  /// 取得我的收藏
+  Future<ApiResult<Map<String, dynamic>>> getCollection() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/collection');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得收藏失敗');
+    } catch (e) {
+      return ApiResult.error('取得收藏失敗: $e');
+    }
+  }
+
+  /// 取得圖鑑統計
+  Future<ApiResult<Map<String, dynamic>>> getCodexStats() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/stats');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得統計失敗');
+    } catch (e) {
+      return ApiResult.error('取得圖鑑統計失敗: $e');
+    }
+  }
+
+  /// 取得成就列表（含進度）
+  Future<ApiResult<Map<String, dynamic>>> getAchievements() async {
+    try {
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/achievements');
+      final response = await _makeRequest('GET', uri);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '取得成就失敗');
+    } catch (e) {
+      return ApiResult.error('取得成就列表失敗: $e');
+    }
+  }
+
+  /// 領取成就獎勵
+  Future<ApiResult<Map<String, dynamic>>> claimAchievement(
+    String achievementId,
+  ) async {
+    try {
+      final body = {'achievement_id': achievementId};
+      final uri = Uri.parse(
+          '${AppConstants.baseUrl}${AppConstants.codexEndpoint}/achievements/claim');
+      final response = await _makeRequest('POST', uri, body: body);
+      if (response.success && response.data != null) {
+        return ApiResult.success(response.data!);
+      }
+      return ApiResult.error(response.error ?? '領取獎勵失敗');
+    } catch (e) {
+      return ApiResult.error('領取成就獎勵失敗: $e');
+    }
   }
 
   void dispose() {

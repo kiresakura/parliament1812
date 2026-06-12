@@ -341,5 +341,6 @@
 
   "connectionConnected": "已連線",
   "connectionDisconnected": "已斷線",
-  "connectionConnecting": "連線中..."
+  "connectionConnecting": "連線中...",
+  "graphicsQuality": "畫面品質"
 }

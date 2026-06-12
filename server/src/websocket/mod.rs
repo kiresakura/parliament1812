@@ -5,8 +5,10 @@
 pub mod connection;
 pub mod hub;
 pub mod messages;
+pub mod timer;
 
 // 重新匯出常用類型
 pub use connection::{handle_socket, process_message};
-pub use hub::{ConnectionHandle, Hub, WebSocketHub};
+pub use hub::{ConnectionHandle, Hub, SpectatorHandle, WebSocketHub};
 pub use messages::{error_codes, ClientMessage, PlayerRanking, ServerMessage, SystemMessageType};
+pub use timer::{GameTimerManager, SharedTimerManager};

@@ -131,10 +131,7 @@ pub async fn check_and_rotate_season(pool: &PgPool) -> Result<Option<Season>, sq
 
     match current {
         Some(season) if Utc::now() >= season.end_date => {
-            tracing::info!(
-                season_id = season.id,
-                "賽季已過期，自動開始新賽季"
-            );
+            tracing::info!(season_id = season.id, "賽季已過期，自動開始新賽季");
             let new_season = start_new_season(pool).await?;
             Ok(Some(new_season))
         }

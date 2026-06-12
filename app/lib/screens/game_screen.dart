@@ -9,8 +9,14 @@ import '../models/room.dart';
 import '../models/card.dart';
 import '../services/audio_service.dart';
 import '../services/haptic_service.dart';
+import '../services/performance_service.dart';
+import '../ui/theme/game_colors.dart' as gc;
+import '../ui/theme/game_fonts.dart';
+import '../ui/theme/game_animations.dart';
+import '../ui/theme/game_spacing.dart';
 import '../widgets/game_card_widget.dart';
-import '../widgets/animations/reputation_change_animation.dart';
+import '../widgets/performance_aware.dart';
+import '../widgets/parliament/parliament_battle_view.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   final String roomCode;
@@ -55,7 +61,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
       vsync: this,
     );
 
-    // 階段轉場動畫初始化
+    // 階段轉場動畫初始化（時長由效能設定控制）
     _phaseTransitionController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -129,28 +135,40 @@ class _GameScreenState extends ConsumerState<GameScreen>
       return _buildLoadingScreen(theme);
     }
 
+    // 議會回合制模式：使用新的 ParliamentBattleView
+    final useParliamentLayout = gameState.phase == GamePhase.playerTurn ||
+        (gameState.turnOrder.isNotEmpty &&
+            gameState.phase != GamePhase.waiting &&
+            gameState.phase != GamePhase.result);
+
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: gc.GameColors.bgPrimary,
       body: Stack(
         children: [
-          Column(
-            children: [
-              _buildTopInfoBar(gameState, theme),
-              Expanded(
-                child: Column(
-                  children: [
-                    if (gameState.phase == GamePhase.voting ||
-                        gameState.phase == GamePhase.debate)
-                      _buildBillArea(gameState, theme),
-                    Expanded(
-                      child: _buildGameArea(gameState, theme),
-                    ),
-                  ],
+          if (useParliamentLayout)
+            SafeArea(
+              bottom: false,
+              child: ParliamentBattleView(gameState: gameState),
+            )
+          else
+            Column(
+              children: [
+                _buildTopInfoBar(gameState, theme),
+                Expanded(
+                  child: Column(
+                    children: [
+                      if (gameState.phase == GamePhase.voting ||
+                          gameState.phase == GamePhase.debate)
+                        _buildBillArea(gameState, theme),
+                      Expanded(
+                        child: _buildGameArea(gameState, theme),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              _buildBottomActionArea(gameState, theme),
-            ],
-          ),
+                _buildBottomActionArea(gameState, theme),
+              ],
+            ),
           _buildChatOverlay(gameState, theme),
           if (_isShowingPhaseTransition)
             _buildPhaseTransitionOverlay(theme),
@@ -179,10 +197,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
     return Container(
       height: 80,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: gc.GameColors.bgSecondary,
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+            color: gc.GameColors.victorianGold.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
@@ -223,36 +241,42 @@ class _GameScreenState extends ConsumerState<GameScreen>
       case GamePhase.conspiracy:
         phaseText = '密謀階段';
         phaseIcon = Icons.visibility_off;
-        phaseColor = theme.colorScheme.secondary;
+        phaseColor = gc.GameColors.raritySR; // 薰衣草紫
         break;
       case GamePhase.debate:
         phaseText = '辯論階段';
         phaseIcon = Icons.forum;
-        phaseColor = theme.colorScheme.primary;
+        phaseColor = gc.GameColors.roseRed; // 玫瑰紅
         break;
       case GamePhase.voting:
         phaseText = '投票階段';
         phaseIcon = Icons.how_to_vote;
-        phaseColor = const Color(0xFF4CAF50);
+        phaseColor = gc.GameColors.actionAlliance; // 翠綠
         break;
       case GamePhase.result:
         phaseText = '結果階段';
         phaseIcon = Icons.emoji_events;
-        phaseColor = theme.colorScheme.secondary;
+        phaseColor = gc.GameColors.victorianGold;
         break;
       default:
         phaseText = '準備中';
         phaseIcon = Icons.hourglass_empty;
-        phaseColor = theme.colorScheme.outline;
+        phaseColor = gc.GameColors.textMuted;
         break;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: phaseColor.withValues(alpha: 0.15),
+        color: phaseColor.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: phaseColor.withValues(alpha: 0.4), width: 1),
+        border: Border.all(color: phaseColor.withValues(alpha: 0.6), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: phaseColor.withValues(alpha: 0.3),
+            blurRadius: 6,
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -260,8 +284,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           Icon(phaseIcon, size: 16, color: phaseColor),
           const SizedBox(width: 6),
           Text(phaseText,
-              style: theme.textTheme.bodySmall?.copyWith(
-                  color: phaseColor, fontWeight: FontWeight.w600)),
+              style: GameFont.turnPhase.copyWith(
+                  color: phaseColor)),
         ],
       ),
     );
@@ -271,6 +295,14 @@ class _GameScreenState extends ConsumerState<GameScreen>
     final minutes = remainingSeconds ~/ 60;
     final seconds = remainingSeconds % 60;
     final isUrgent = remainingSeconds <= 30;
+    final config = ref.watch(qualityConfigProvider);
+
+    // 低品質：不使用 border 動畫色，固定顏色
+    final borderColor = isUrgent && config.enableAnimations
+        ? theme.colorScheme.error
+        : isUrgent
+            ? theme.colorScheme.error.withValues(alpha: 0.6)
+            : theme.colorScheme.outline.withValues(alpha: 0.4);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -280,9 +312,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isUrgent
-              ? theme.colorScheme.error
-              : theme.colorScheme.outline.withValues(alpha: 0.4),
+          color: borderColor,
           width: 1,
         ),
       ),
@@ -314,123 +344,328 @@ class _GameScreenState extends ConsumerState<GameScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: gc.GameColors.bgSecondary,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.3), width: 1),
+            color: gc.GameColors.victorianGold.withValues(alpha: 0.3), width: 1),
       ),
-      child: Text('第$round回合',
-          style:
-              theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('第', style: GameFont.uiLabel.copyWith(
+              color: gc.GameColors.textSecondary)),
+          Text('$round', style: GameFont.turnCounter.copyWith(
+              color: gc.GameColors.textGold, fontSize: 16)),
+          Text('回合', style: GameFont.uiLabel.copyWith(
+              color: gc.GameColors.textSecondary)),
+        ],
+      ),
     );
   }
 
   Widget _buildGameArea(GameState gameState, ThemeData theme) {
-    return Row(
+    return Column(
       children: [
-        Expanded(flex: 2, child: _buildPlayersArea(gameState, theme)),
-        Expanded(flex: 3, child: _buildCentralArea(gameState, theme)),
+        // 頂部：玩家卡三欄 + 回合順序列
+        _buildPlayersArea(gameState, theme),
+        _buildTurnOrderBar(gameState, theme),
+        // 中間：議案區 + 事件日誌
+        Expanded(child: _buildCentralArea(gameState, theme)),
       ],
     );
   }
 
   Widget _buildPlayersArea(GameState gameState, ThemeData theme) {
     final players = gameState.room.players;
+    final currentTurnId = gameState.currentTurnPlayerId;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: GameSpacing.screenPadding,
+        vertical: 8,
+      ),
+      child: Row(
         children: [
-          if (players.length > 1)
-            Expanded(child: _buildPlayerCard(players[1], false, theme)),
-          const SizedBox(height: 16),
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                if (players.length > 2)
-                  Expanded(
-                      child: _buildPlayerCard(players[2], false, theme)),
-                if (players.length > 3) const SizedBox(width: 16),
-                if (players.length > 3)
-                  Expanded(
-                      child: _buildPlayerCard(players[3], false, theme)),
-              ],
+          for (int i = 0; i < players.length; i++) ...[
+            if (i > 0) const SizedBox(width: GameSpacing.cardGap),
+            Expanded(
+              child: _buildPlayerCard(
+                players[i],
+                players[i].id == currentTurnId,
+                theme,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          if (players.isNotEmpty)
-            Expanded(child: _buildPlayerCard(players[0], true, theme)),
+          ],
         ],
       ),
     );
   }
 
+  /// 取得派系對應的頭像背景色（羅塞蒂設計規範）
+  Color _getFactionAvatarColor(String faction) {
+    switch (faction.toLowerCase()) {
+      case 'whig':
+      case 'labor':
+        return const Color(0xFF3D7CC9);
+      case 'tory':
+      case 'capital':
+        return const Color(0xFFC0392B);
+      case 'radical':
+      case 'reform':
+        return const Color(0xFF6B3FA0);
+      case 'independent':
+      case 'neutral':
+      case 'crown':
+        return const Color(0xFFC9A84C);
+      default:
+        return const Color(0xFFC9A84C);
+    }
+  }
+
   Widget _buildPlayerCard(
-      Player player, bool isCurrentPlayer, ThemeData theme) {
+      Player player, bool isActiveTurn, ThemeData theme) {
+    final faction = player.character?.faction ?? 'neutral';
+    final factionColor = gc.GameColors.getFactionColor(faction);
+    final avatarBg = _getFactionAvatarColor(faction);
+    final reputationPct = (player.reputation / 100).clamp(0.0, 1.0);
+
+    // 影響力進度條顏色：綠→橙→紅
+    Color barColor;
+    if (reputationPct > 0.6) {
+      barColor = gc.GameColors.actionAlliance; // 翠綠
+    } else if (reputationPct > 0.3) {
+      barColor = gc.GameColors.actionDraw; // 琥珀橙
+    } else {
+      barColor = gc.GameColors.roseRed; // 玫瑰紅
+    }
+
     return Container(
+      padding: const EdgeInsets.all(GameSpacing.cardPadding),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: gc.GameColors.bgCard,
+        borderRadius: GameSpacing.cardBorderRadius,
         border: Border.all(
-          color: isCurrentPlayer
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outline.withValues(alpha: 0.3),
-          width: isCurrentPlayer ? 2 : 1,
+          color: isActiveTurn
+              ? gc.GameColors.victorianGold
+              : Colors.transparent,
+          width: isActiveTurn ? 1.5 : 0,
         ),
-        boxShadow: isCurrentPlayer
-            ? [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
+        boxShadow: [
+          const BoxShadow(
+            offset: Offset(0, 4),
+            blurRadius: 12,
+            color: Color(0x80000000),
+          ),
+          if (isActiveTurn)
+            BoxShadow(
+              offset: Offset.zero,
+              blurRadius: 16,
+              color: gc.GameColors.victorianGold.withValues(alpha: 0.4),
+            ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 「行動中」badge（僅當前行動玩家）
+          if (isActiveTurn)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: gc.GameColors.victorianGold,
+                borderRadius: GameSpacing.badgeBorderRadius,
+              ),
               child: Text(
-                player.name.isNotEmpty ? player.name.substring(0, 1) : '?',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
+                '行動中',
+                style: GameFont.factionBadge.copyWith(
+                  color: gc.GameColors.bgPrimary,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              player.name,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          // 圓形字母頭像 + 姓名 + 黨派
+          Row(
+            children: [
+              // 圓形頭像 40px
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: avatarBg,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  player.name.isNotEmpty
+                      ? player.name.substring(0, 1).toUpperCase()
+                      : '?',
+                  style: GameFont.factionBadge.copyWith(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 姓名 + 黨派
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      player.name,
+                      style: GameFont.playerName.copyWith(
+                        color: gc.GameColors.textPrimary,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      gc.GameColors.getFactionLabel(faction).toUpperCase(),
+                      style: GameFont.factionBadge.copyWith(
+                        color: factionColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 影響力進度條（4px 高）
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: SizedBox(
+              height: 4,
+              child: LinearProgressIndicator(
+                value: reputationPct,
+                backgroundColor: gc.GameColors.bgPrimary,
+                valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              ),
             ),
-            Text(
-              player.character?.displayName ?? '',
-              style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            // 使用動畫聲望條
-            AnimatedReputationBar(reputation: player.reputation),
-            const SizedBox(height: 4),
-            Text(
-              '手牌: ${player.handCards.length}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
-            ),
+          ),
+          const SizedBox(height: 6),
+          // 手牌數（右對齊）
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Icon(
+                Icons.style,
+                size: 12,
+                color: gc.GameColors.textSecondary,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                '${player.handCards.length}',
+                style: GameFont.factionBadge.copyWith(
+                  color: gc.GameColors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 回合順序指示器
+  /// 格式：● Wellington YOU › ● Palmerston › ● Peel
+  Widget _buildTurnOrderBar(GameState gameState, ThemeData theme) {
+    final players = gameState.room.players;
+    final currentTurnId = gameState.currentTurnPlayerId;
+    final myId = gameState.currentPlayerId;
+
+    // 按 turnOrder 排序（如果有）；否則用 players 順序
+    final orderedPlayers = gameState.turnOrder.isNotEmpty
+        ? gameState.turnOrder
+            .map((id) => players.where((p) => p.id == id).firstOrNull)
+            .whereType<Player>()
+            .toList()
+        : players;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: GameSpacing.screenPadding, vertical: 6),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (int i = 0; i < orderedPlayers.length; i++) ...[
+              if (i > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '›',
+                    style: GameFont.factionBadge.copyWith(
+                      color: gc.GameColors.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              _buildTurnOrderItem(
+                orderedPlayers[i],
+                isActive: orderedPlayers[i].id == currentTurnId,
+                isMe: orderedPlayers[i].id == myId,
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTurnOrderItem(Player player, {required bool isActive, required bool isMe}) {
+    final faction = player.character?.faction ?? 'neutral';
+    final dotColor = isActive
+        ? gc.GameColors.victorianGold
+        : gc.GameColors.getFactionColor(faction);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: dotColor,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          player.name,
+          style: GameFont.factionBadge.copyWith(
+            color: isActive
+                ? gc.GameColors.victorianGold
+                : gc.GameColors.textSecondary,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 11,
+          ),
+        ),
+        if (isMe) ...[
+          const SizedBox(width: 3),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: gc.GameColors.victorianGold.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(
+              'YOU',
+              style: GameFont.factionBadge.copyWith(
+                color: gc.GameColors.victorianGold,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -504,6 +739,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   Widget _buildEventLog(List<GameEvent> events, ThemeData theme) {
+    final config = ref.watch(qualityConfigProvider);
+    final maxEvents = config.maxGameEvents;
+    final displayEvents = events.length > maxEvents
+        ? events.sublist(events.length - maxEvents)
+        : events;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -532,9 +773,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: events.length,
+              itemCount: displayEvents.length,
+              addAutomaticKeepAlives: false,
               itemBuilder: (context, index) =>
-                  _buildEventItem(events[index], theme),
+                  _buildEventItem(displayEvents[index], theme),
             ),
           ),
         ],
@@ -586,10 +828,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
   Widget _buildBottomActionArea(GameState gameState, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: gc.GameColors.bgSecondary,
         border: Border(
           top: BorderSide(
-              color: theme.colorScheme.outline.withValues(alpha: 0.3),
+              color: gc.GameColors.victorianGold.withValues(alpha: 0.2),
               width: 1),
         ),
       ),
@@ -660,9 +902,30 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   Widget _buildActionButtons(GamePhase phase, ThemeData theme) {
+    final gameState = ref.read(gameStateProvider);
     List<Widget> buttons = [];
 
     switch (phase) {
+      case GamePhase.playerTurn:
+        final isMyTurn = gameState?.isMyTurn ?? false;
+        if (isMyTurn) {
+          buttons = [
+            _buildActionButton('質詢', Icons.gavel, theme, () {
+              _showChallengeDialog(context);
+            }),
+            _buildActionButton('結盟', Icons.handshake, theme, () {}),
+            _buildActionButton('技能', Icons.flash_on, theme, () {
+              _showSkillDialog(context);
+            }),
+            _buildEndTurnButton(theme),
+          ];
+        } else {
+          final turnPlayerName = gameState?.currentTurnPlayerName ?? '其他玩家';
+          buttons = [
+            _buildActionButton('等待 $turnPlayerName', Icons.hourglass_empty, theme, null),
+          ];
+        }
+        break;
       case GamePhase.conspiracy:
         buttons = [
           _buildActionButton('調查', Icons.search, theme, () {}),
@@ -672,9 +935,16 @@ class _GameScreenState extends ConsumerState<GameScreen>
         break;
       case GamePhase.debate:
         buttons = [
-          _buildActionButton('質詢', Icons.gavel, theme, () {}),
-          _buildActionButton('反駁', Icons.shield, theme, () {}),
-          _buildActionButton('技能', Icons.flash_on, theme, () {}),
+          _buildActionButton('質詢', Icons.gavel, theme, () {
+            _showChallengeDialog(context);
+          }),
+          _buildActionButton('反駁', Icons.shield, theme, () {
+            HapticService.cardPlayed();
+            ref.read(gameActionsProvider).counter();
+          }),
+          _buildActionButton('技能', Icons.flash_on, theme, () {
+            _showSkillDialog(context);
+          }),
         ];
         break;
       case GamePhase.voting:
@@ -682,14 +952,17 @@ class _GameScreenState extends ConsumerState<GameScreen>
           _buildActionButton('支持', Icons.thumb_up, theme, () {
             HapticService.voteConfirmed();
             ref.read(audioServiceProvider).playSfx(SfxType.vote);
+            ref.read(gameActionsProvider).vote(VoteChoice.a);
           }),
           _buildActionButton('反對', Icons.thumb_down, theme, () {
             HapticService.voteConfirmed();
             ref.read(audioServiceProvider).playSfx(SfxType.vote);
+            ref.read(gameActionsProvider).vote(VoteChoice.b);
           }),
           _buildActionButton('棄權', Icons.remove, theme, () {
             HapticService.voteConfirmed();
             ref.read(audioServiceProvider).playSfx(SfxType.vote);
+            ref.read(gameActionsProvider).vote(VoteChoice.abstain);
           }),
         ];
         break;
@@ -700,9 +973,94 @@ class _GameScreenState extends ConsumerState<GameScreen>
         break;
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: buttons,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 回合制資訊列（行動點數 + 輪到誰）
+        if (phase == GamePhase.playerTurn && gameState != null) ...[
+          _buildTurnInfoBar(gameState, theme),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: buttons,
+        ),
+      ],
+    );
+  }
+
+  /// 回合制資訊列：顯示輪到誰、剩餘行動點數
+  Widget _buildTurnInfoBar(GameState gameState, ThemeData theme) {
+    final isMyTurn = gameState.isMyTurn;
+    final turnPlayerName = gameState.currentTurnPlayerName ?? '等待中';
+    final actionPoints = gameState.actionPointsRemaining;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isMyTurn
+            ? theme.colorScheme.primaryContainer
+            : theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: isMyTurn
+            ? Border.all(color: theme.colorScheme.primary, width: 2)
+            : null,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isMyTurn ? Icons.play_circle_filled : Icons.hourglass_top,
+            size: 18,
+            color: isMyTurn
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isMyTurn ? '🎯 輪到你了！' : '⏳ $turnPlayerName 行動中',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: isMyTurn ? FontWeight.bold : FontWeight.normal,
+              color: isMyTurn
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (isMyTurn) ...[
+            const SizedBox(width: 12),
+            // 行動點數指示器
+            Row(
+              children: List.generate(3, (i) => Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Icon(
+                  i < actionPoints ? Icons.circle : Icons.circle_outlined,
+                  size: 12,
+                  color: i < actionPoints
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline,
+                ),
+              )),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$actionPoints AP',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 結束回合按鈕 — 金色漸層大按鈕
+  Widget _buildEndTurnButton(ThemeData theme) {
+    return _EndTurnButton(
+      onTap: () {
+        HapticService.cardPlayed();
+        ref.read(gameActionsProvider).endTurn();
+      },
     );
   }
 
@@ -779,8 +1137,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   Widget _buildChatContent(List<ChatMessage> messages, ThemeData theme) {
+    final config = ref.watch(qualityConfigProvider);
+    final maxMessages = config.maxChatMessages;
+    final displayMessages = messages.length > maxMessages
+        ? messages.sublist(messages.length - maxMessages)
+        : messages;
+
     return Container(
-      decoration: BoxDecoration(
+      decoration: PerformanceAwareDecoration.build(
+        config: config,
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
@@ -819,9 +1184,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
             flex: 3,
             child: ListView.builder(
               padding: const EdgeInsets.all(8),
-              itemCount: messages.length,
+              itemCount: displayMessages.length,
+              addAutomaticKeepAlives: false,
               itemBuilder: (context, index) =>
-                  _buildChatMessage(messages[index], theme),
+                  _buildChatMessage(displayMessages[index], theme),
             ),
           ),
           Divider(
@@ -942,6 +1308,36 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
   void _triggerPhaseTransition(GamePhase newPhase) {
     if (!mounted) return;
+
+    final config = ref.read(qualityConfigProvider);
+
+    // 低品質：跳過轉場動畫
+    if (config.skipPhaseTransition) {
+      return;
+    }
+
+    // 根據品質調整動畫參數
+    _phaseTransitionController.duration = config.phaseTransitionDuration;
+
+    if (config.enableElasticCurves) {
+      _phaseTransitionScale = Tween<double>(
+        begin: 0.8,
+        end: 1.2,
+      ).animate(CurvedAnimation(
+        parent: _phaseTransitionController,
+        curve: const Interval(0.2, 0.8, curve: Curves.elasticOut),
+      ));
+    } else {
+      // 中品質：去掉 elasticOut，用 easeOut
+      _phaseTransitionScale = Tween<double>(
+        begin: 0.9,
+        end: 1.1,
+      ).animate(CurvedAnimation(
+        parent: _phaseTransitionController,
+        curve: const Interval(0.2, 0.8, curve: Curves.easeOut),
+      ));
+    }
+
     setState(() {
       _currentPhase = newPhase;
       _isShowingPhaseTransition = true;
@@ -1031,8 +1427,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           subtitle: '策劃你的行動',
           icon: Icons.visibility_off,
           colors: [
-            const Color(0xFF2C3E50).withValues(alpha: 0.9),
-            const Color(0xFF34495E).withValues(alpha: 0.9),
+            gc.GameColors.bgPrimary.withValues(alpha: 0.95),
+            gc.GameColors.bgCard.withValues(alpha: 0.95),
           ],
         );
       case GamePhase.debate:
@@ -1041,8 +1437,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           subtitle: '展開激烈的政治攻防',
           icon: Icons.campaign,
           colors: [
-            const Color(0xFF8B0000).withValues(alpha: 0.9),
-            const Color(0xFFDC143C).withValues(alpha: 0.9),
+            gc.GameColors.deepCrimson.withValues(alpha: 0.9),
+            gc.GameColors.roseRed.withValues(alpha: 0.9),
           ],
         );
       case GamePhase.voting:
@@ -1051,8 +1447,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           subtitle: '決定議案的命運',
           icon: Icons.how_to_vote,
           colors: [
-            const Color(0xFFD4AF37).withValues(alpha: 0.9),
-            const Color(0xFFFFD700).withValues(alpha: 0.9),
+            gc.GameColors.victorianGold.withValues(alpha: 0.9),
+            gc.GameColors.goldLight.withValues(alpha: 0.9),
           ],
         );
       case GamePhase.result:
@@ -1061,8 +1457,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           subtitle: '統計投票結果',
           icon: Icons.analytics,
           colors: [
-            const Color(0xFF4A90E2).withValues(alpha: 0.9),
-            const Color(0xFF7B68EE).withValues(alpha: 0.9),
+            gc.GameColors.raritySR.withValues(alpha: 0.9),
+            gc.GameColors.rarityR.withValues(alpha: 0.9),
           ],
         );
       default:
@@ -1071,8 +1467,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
           subtitle: '',
           icon: Icons.play_arrow,
           colors: [
-            const Color(0xFF2C3E50).withValues(alpha: 0.9),
-            const Color(0xFF34495E).withValues(alpha: 0.9),
+            gc.GameColors.bgPrimary.withValues(alpha: 0.9),
+            gc.GameColors.bgSecondary.withValues(alpha: 0.9),
           ],
         );
     }
@@ -1245,6 +1641,112 @@ class _GameScreenState extends ConsumerState<GameScreen>
     gameActions.useCard(card);
   }
 
+  void _showChallengeDialog(BuildContext context) {
+    final gameState = ref.read(gameStateProvider);
+    if (gameState == null) return;
+
+    final currentId = gameState.currentPlayerId;
+    final targets = gameState.room.alivePlayers
+        .where((p) => p.id != currentId)
+        .toList();
+
+    if (targets.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('選擇質詢目標'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: targets.length,
+            itemBuilder: (_, index) {
+              final target = targets[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  child: Text(target.name.isNotEmpty
+                      ? target.name.substring(0, 1)
+                      : '?'),
+                ),
+                title: Text(target.name),
+                subtitle: Text(target.character?.displayName ?? ''),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  HapticService.cardPlayed();
+                  ref.read(gameActionsProvider).challengePlayer(target);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSkillDialog(BuildContext context) {
+    final gameState = ref.read(gameStateProvider);
+    if (gameState == null) return;
+
+    final currentId = gameState.currentPlayerId;
+    final targets = gameState.room.alivePlayers
+        .where((p) => p.id != currentId)
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('使用技能'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 無目標技能
+              ListTile(
+                leading: const Icon(Icons.flash_on),
+                title: const Text('對自己使用（無目標）'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  HapticService.cardPlayed();
+                  ref.read(gameStateProvider.notifier).sendUseSkill(null);
+                },
+              ),
+              const Divider(),
+              const Text('或選擇目標：'),
+              ...targets.map((target) => ListTile(
+                    leading: CircleAvatar(
+                      child: Text(target.name.isNotEmpty
+                          ? target.name.substring(0, 1)
+                          : '?'),
+                    ),
+                    title: Text(target.name),
+                    subtitle: Text(target.character?.displayName ?? ''),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      HapticService.cardPlayed();
+                      ref.read(gameStateProvider.notifier).sendUseSkill(target.id);
+                    },
+                  )),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showGameSettings(BuildContext context) {
     showDialog(
       context: context,
@@ -1320,4 +1822,104 @@ class PhaseTransitionInfo {
     required this.icon,
     required this.colors,
   });
+}
+
+/// 結束回合按鈕 — 金色漸層 + 待機脈衝光暈
+///
+/// 規格：
+/// - 尺寸：140×52pt，圓角 12pt
+/// - 背景：goldLight → victorianGold → goldDim 漸層
+/// - 文字：深色（bgPrimary）在金色底上
+/// - 待機脈衝：邊框 opacity 0.3↔0.9, scaleEffect 1.0↔1.04, 1.2s 週期
+class _EndTurnButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _EndTurnButton({required this.onTap});
+
+  @override
+  State<_EndTurnButton> createState() => _EndTurnButtonState();
+}
+
+class _EndTurnButtonState extends State<_EndTurnButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: GameAnimation.endTurnPulseDuration,
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        final pulseValue = _pulseAnimation.value;
+        final borderOpacity = 0.3 + pulseValue * 0.6;
+        final scale = _isPressed ? 0.92 : (1.0 + pulseValue * 0.04);
+        final shadowRadius = 6.0 + pulseValue * 6.0;
+
+        return GestureDetector(
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) {
+            setState(() => _isPressed = false);
+            widget.onTap();
+          },
+          onTapCancel: () => setState(() => _isPressed = false),
+          child: AnimatedScale(
+            scale: scale,
+            duration: GameAnimation.buttonPressDuration,
+            curve: GameAnimation.buttonPressCurve,
+            child: Container(
+              width: 140,
+              height: 52,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: gc.GameColors.goldButtonGradient,
+                border: Border.all(
+                  color: gc.GameColors.goldLight.withValues(alpha: borderOpacity),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: gc.GameColors.victorianGold.withValues(alpha: 0.5),
+                    blurRadius: shadowRadius,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.shield, size: 18,
+                      color: gc.GameColors.bgPrimary),
+                  const SizedBox(width: 6),
+                  Text(
+                    '結束回合',
+                    style: GameFont.endTurnButton.copyWith(
+                      color: gc.GameColors.bgPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

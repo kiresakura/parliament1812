@@ -112,10 +112,7 @@ impl GameDb {
     }
 
     /// 取消遊戲
-    pub async fn cancel_game(
-        pool: &PgPool,
-        game_id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
+    pub async fn cancel_game(pool: &PgPool, game_id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             UPDATE games

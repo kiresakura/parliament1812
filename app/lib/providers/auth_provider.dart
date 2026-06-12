@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/auth_service.dart';
@@ -54,29 +56,75 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _tryAutoLogin();
   }
 
+  /// 同步 auth token 到 ApiService（供 rooms/single player/campaign 等使用）
+  void _syncTokenToApiService() {
+    final token = _authService.accessToken;
+    ApiService().setAuthToken(token);
+  }
+
   /// 嘗試自動登入
   Future<void> _tryAutoLogin() async {
-    if (!_authService.hasStoredTokens) return;
+    final hasTokens = _authService.hasStoredTokens;
+    final loginMethod = _authService.getLoginMethod();
+
+    if (!hasTokens && loginMethod == null) return;
 
     state = state.copyWith(isLoading: true, clearError: true);
 
-    try {
-      final success = await _authService.tryAutoLogin();
-      if (success) {
-        final meResult = await _authService.getMe();
-        if (meResult.success && meResult.data != null) {
-          state = state.copyWith(
-            isAuthenticated: true,
-            isLoading: false,
-            user: meResult.data,
-            clearError: true,
-          );
-          return;
+    // 1. 先嘗試用已儲存的 token 自動登入
+    if (hasTokens) {
+      try {
+        final success = await _authService.tryAutoLogin();
+        if (success) {
+          final meResult = await _authService.getMe();
+          if (meResult.success && meResult.data != null) {
+            state = state.copyWith(
+              isAuthenticated: true,
+              isLoading: false,
+              user: meResult.data,
+              clearError: true,
+            );
+            _syncTokenToApiService();
+            return;
+          }
         }
+      } catch (e) {
+        // Token 自動登入失敗，繼續嘗試 OAuth
       }
-    } catch (e) {
-      // 自動登入失敗，靜默處理
     }
+
+    // 2. Token 失敗，嘗試用記憶的登入方式重新登入
+    if (loginMethod == 'google') {
+      try {
+        final googleSignIn = GoogleSignIn(
+          scopes: ['email', 'profile'],
+          serverClientId:
+              '1071586546991-0v65rkt7ud4jsp77jk121ta9prjvl6ti.apps.googleusercontent.com',
+        );
+        final account = await googleSignIn.signInSilently();
+        if (account != null) {
+          final auth = await account.authentication;
+          final idToken = auth.idToken;
+          if (idToken != null) {
+            final result = await _authService.loginWithGoogle(idToken);
+            if (result.success && result.data != null) {
+              state = state.copyWith(
+                isAuthenticated: true,
+                isLoading: false,
+                isGuest: false,
+                user: result.data!.user,
+                clearError: true,
+              );
+              _syncTokenToApiService();
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Google silent sign-in failed: $e');
+      }
+    }
+    // Apple 和 password 無法在背景靜默登入，留給登入畫面處理
 
     state = state.copyWith(isLoading: false);
   }
@@ -101,6 +149,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: result.data!.user,
         clearError: true,
       );
+      _syncTokenToApiService();
       return true;
     }
 
@@ -133,6 +182,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: result.data!.user,
         clearError: true,
       );
+      _syncTokenToApiService();
       return true;
     }
 
@@ -157,6 +207,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: result.data!.user,
         clearError: true,
       );
+      _syncTokenToApiService();
       return true;
     }
 
@@ -185,6 +236,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: result.data!.user,
         clearError: true,
       );
+      _syncTokenToApiService();
       return true;
     }
 
@@ -193,6 +245,101 @@ class AuthNotifier extends StateNotifier<AuthState> {
       error: result.error ?? 'Apple 登入失敗',
     );
     return false;
+  }
+
+  /// 更新個人檔案
+  Future<bool> updateProfile({String? displayName, String? avatarUrl}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.updateProfile(
+      displayName: displayName,
+      avatarUrl: avatarUrl,
+    );
+
+    if (result.success && result.data != null) {
+      state = state.copyWith(
+        isLoading: false,
+        user: result.data,
+        clearError: true,
+      );
+      _syncTokenToApiService();
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? '更新個人檔案失敗',
+    );
+    return false;
+  }
+
+  // ============================================================
+  // OAuth 帳號綁定
+  // ============================================================
+
+  /// 綁定 Google 帳號
+  Future<bool> linkGoogleAccount(String idToken) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.linkGoogle(idToken);
+
+    if (result.success) {
+      state = state.copyWith(isLoading: false, clearError: true);
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? 'Google 帳號綁定失敗',
+    );
+    return false;
+  }
+
+  /// 綁定 Apple 帳號
+  Future<bool> linkAppleAccount(String identityToken) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.linkApple(identityToken);
+
+    if (result.success) {
+      state = state.copyWith(isLoading: false, clearError: true);
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? 'Apple 帳號綁定失敗',
+    );
+    return false;
+  }
+
+  /// 解綁 OAuth 帳號
+  Future<bool> unlinkAccount(String provider) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
+    final result = await _authService.unlinkProvider(provider);
+
+    if (result.success) {
+      state = state.copyWith(isLoading: false, clearError: true);
+      return true;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error ?? '帳號解綁失敗',
+    );
+    return false;
+  }
+
+  /// 取得已綁定帳號列表
+  Future<List<LinkedAccount>> fetchLinkedAccounts() async {
+    final result = await _authService.getLinkedAccounts();
+
+    if (result.success && result.data != null) {
+      return result.data!;
+    }
+
+    return [];
   }
 
   /// 忘記密碼

@@ -1,0 +1,62 @@
+[gd_scene format=3 uid="uid://bv3fblfukk3qy"]
+
+[ext_resource type="Script" path="res://scripts/ui/notification.gd" id="1"]
+
+[sub_resource type="Animation" id="anim_slide_in"]
+resource_name = "slide_in"
+length = 0.35
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:modulate:a")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.25),
+"transitions": PackedFloat32Array(0.5, 1),
+"update": 0,
+"values": [0.0, 1.0]
+}
+
+[sub_resource type="AnimationLibrary" id="anim_lib"]
+_data = {
+"slide_in": SubResource("anim_slide_in")
+}
+
+[node name="Notification" type="PanelContainer"]
+custom_minimum_size = Vector2(300, 50)
+script = ExtResource("1")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="HBox" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="IconLabel" type="Label" parent="MarginContainer/HBox"]
+layout_mode = 2
+text = "ℹ️"
+theme_override_font_sizes/font_size = 20
+
+[node name="MessageLabel" type="Label" parent="MarginContainer/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "通知內容"
+autowrap_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.835, 0.718, 1)
+
+[node name="CloseButton" type="Button" parent="MarginContainer/HBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(30, 30)
+text = "✕"
+flat = true
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("anim_lib")
+}

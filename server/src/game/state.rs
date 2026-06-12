@@ -13,7 +13,7 @@ use crate::domain::{CharacterType, GamePhase, VoteChoice};
 
 /// 遊戲狀態
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameState {
+pub struct EngineState {
     /// 房間代碼
     pub room_code: String,
     /// 當前遊戲階段
@@ -38,6 +38,14 @@ pub struct GameState {
     pub card_pool: Vec<GameCard>,
     /// 棄牌堆
     pub discard_pile: Vec<GameCard>,
+    /// 回合順序（玩家 ID 列表）
+    pub turn_order: Vec<Uuid>,
+    /// 當前行動玩家索引
+    pub current_turn_index: usize,
+    /// 當前行動玩家剩餘行動點數
+    pub action_points_remaining: i32,
+    /// 每回合行動點數上限
+    pub max_action_points: i32,
 }
 
 /// 待處理的質詢
@@ -53,9 +61,11 @@ pub struct PendingChallenge {
     pub timestamp: DateTime<Utc>,
 }
 
-impl GameState {
+impl EngineState {
     /// 建立新的遊戲狀態
     pub fn new(room_code: String, players: Vec<PlayerState>) -> Self {
+        // 建立回合順序（按加入順序）
+        let turn_order: Vec<Uuid> = players.iter().map(|p| p.id).collect();
         let player_map: HashMap<Uuid, PlayerState> =
             players.into_iter().map(|p| (p.id, p)).collect();
 
@@ -72,6 +82,10 @@ impl GameState {
             pending_challenge: None,
             card_pool: Vec::new(),
             discard_pile: Vec::new(),
+            turn_order,
+            current_turn_index: 0,
+            action_points_remaining: 3,
+            max_action_points: 3,
         }
     }
 
@@ -179,6 +193,76 @@ impl GameState {
     /// 將卡牌加入棄牌堆
     pub fn discard_card(&mut self, card: GameCard) {
         self.discard_pile.push(card);
+    }
+
+    /// 取得當前行動玩家 ID
+    pub fn current_turn_player(&self) -> Option<Uuid> {
+        self.turn_order.get(self.current_turn_index).copied()
+    }
+
+    /// 推進到下一位玩家（跳過政治死亡的玩家）
+    /// 回傳 true 表示還有玩家可以行動，false 表示所有玩家都行動完畢
+    pub fn advance_to_next_player(&mut self) -> bool {
+        let player_count = self.turn_order.len();
+        if player_count == 0 {
+            return false;
+        }
+
+        let start_index = self.current_turn_index;
+        loop {
+            self.current_turn_index = (self.current_turn_index + 1) % player_count;
+
+            // 繞了一圈回到起點，所有人都行動完畢
+            if self.current_turn_index == 0 {
+                // 重置行動點數
+                self.action_points_remaining = self.max_action_points;
+                return false; // 一輪結束
+            }
+
+            // 找到一位存活的玩家
+            if let Some(player_id) = self.turn_order.get(self.current_turn_index) {
+                if let Some(player) = self.players.get(player_id) {
+                    if !player.is_politically_dead {
+                        self.action_points_remaining = self.max_action_points;
+                        return true;
+                    }
+                }
+            }
+
+            // 防止無限迴圈
+            if self.current_turn_index == start_index {
+                return false;
+            }
+        }
+    }
+
+    /// 重置回合順序到第一位存活玩家
+    pub fn reset_turn_order(&mut self) {
+        self.current_turn_index = 0;
+        self.action_points_remaining = self.max_action_points;
+
+        // 跳到第一位存活玩家
+        let player_count = self.turn_order.len();
+        for _ in 0..player_count {
+            if let Some(player_id) = self.turn_order.get(self.current_turn_index) {
+                if let Some(player) = self.players.get(player_id) {
+                    if !player.is_politically_dead {
+                        return;
+                    }
+                }
+            }
+            self.current_turn_index = (self.current_turn_index + 1) % player_count;
+        }
+    }
+
+    /// 消耗行動點數
+    pub fn consume_action_point(&mut self) -> bool {
+        if self.action_points_remaining > 0 {
+            self.action_points_remaining -= 1;
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -352,7 +436,7 @@ mod tests {
     #[test]
     fn test_game_state_creation() {
         let players = create_test_players();
-        let state = GameState::new("ABC123".to_string(), players);
+        let state = EngineState::new("ABC123".to_string(), players);
 
         assert_eq!(state.room_code, "ABC123");
         assert_eq!(state.phase, GamePhase::Waiting);
@@ -386,7 +470,7 @@ mod tests {
     #[test]
     fn test_alliance() {
         let players = create_test_players();
-        let mut state = GameState::new("ABC123".to_string(), players);
+        let mut state = EngineState::new("ABC123".to_string(), players);
 
         let player_ids: Vec<Uuid> = state.players.keys().cloned().collect();
         let player_a = player_ids[0];

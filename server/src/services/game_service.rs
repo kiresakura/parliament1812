@@ -11,7 +11,7 @@ use crate::domain::{GamePhase, VoteChoice};
 use crate::error::AppError;
 use crate::game::elo::{self, MultiPlayerInfo};
 use crate::game::season;
-use crate::game::{ActionResult, GameEngine, GameResult, GameState};
+use crate::game::{ActionResult, EngineState, GameEngine, GameResult};
 use crate::AppState;
 
 /// 遊戲狀態 Redis 快取 TTL（秒）
@@ -33,7 +33,7 @@ impl GameService {
     ///
     /// # Returns
     /// 回傳初始遊戲狀態
-    pub async fn start_game(state: &AppState, room_code: &str) -> Result<GameState, AppError> {
+    pub async fn start_game(state: &AppState, room_code: &str) -> Result<EngineState, AppError> {
         // 取得房間內的玩家
         let players = {
             let room_players = state.room_players.read().await;
@@ -106,7 +106,10 @@ impl GameService {
     ///
     /// # Returns
     /// 回傳當前遊戲狀態
-    pub async fn get_game_state(state: &AppState, room_code: &str) -> Result<GameState, AppError> {
+    pub async fn get_game_state(
+        state: &AppState,
+        room_code: &str,
+    ) -> Result<EngineState, AppError> {
         // 優先從 Redis 讀取
         match state.game_cache().get_game_state(room_code).await {
             Ok(Some(cached_state)) => {
@@ -149,7 +152,7 @@ impl GameService {
     /// * `state` - 應用程式狀態
     /// * `room_code` - 房間代碼
     /// * `game_state` - 遊戲狀態
-    async fn sync_to_redis(state: &AppState, room_code: &str, game_state: &GameState) {
+    async fn sync_to_redis(state: &AppState, room_code: &str, game_state: &EngineState) {
         if let Err(e) = state
             .game_cache()
             .set_game_state(room_code, game_state, Some(GAME_STATE_TTL))
@@ -180,7 +183,7 @@ impl GameService {
             let engine = Self::get_engine_mut(&mut games, room_code).await?;
 
             // 檢查階段
-            if engine.state.phase != GamePhase::Debate {
+            if engine.state.phase != GamePhase::PlayerTurn {
                 return Err(AppError::BadRequest("只能在辯論階段發起質詢".to_string()));
             }
 
@@ -224,7 +227,7 @@ impl GameService {
             let engine = Self::get_engine_mut(&mut games, room_code).await?;
 
             // 檢查階段
-            if engine.state.phase != GamePhase::Debate {
+            if engine.state.phase != GamePhase::PlayerTurn {
                 return Err(AppError::BadRequest("只能在辯論階段反駁".to_string()));
             }
 
@@ -361,11 +364,9 @@ impl GameService {
             let mut games = state.games.write().await;
             let engine = Self::get_engine_mut(&mut games, room_code).await?;
 
-            // 結盟可在密謀或辯論階段進行
-            if engine.state.phase != GamePhase::Conspiracy
-                && engine.state.phase != GamePhase::Debate
-            {
-                return Err(AppError::BadRequest("只能在密謀或辯論階段結盟".to_string()));
+            // 結盟在行動階段進行
+            if engine.state.phase != GamePhase::PlayerTurn {
+                return Err(AppError::BadRequest("只能在行動階段結盟".to_string()));
             }
 
             let result = engine
@@ -747,8 +748,7 @@ impl GameService {
             match games.get(room_code) {
                 Some(engine) => {
                     let duration = match new_phase {
-                        GamePhase::Conspiracy => engine.config.conspiracy_duration_secs,
-                        GamePhase::Debate => engine.config.debate_duration_secs,
+                        GamePhase::PlayerTurn => 0, // 回合制不計時
                         GamePhase::Voting => engine.config.voting_duration_secs,
                         GamePhase::Result => engine.config.result_duration_secs,
                         _ => 0,
@@ -1054,7 +1054,7 @@ mod tests {
         assert!(result.is_ok());
 
         let game_state = result.unwrap();
-        assert_eq!(game_state.phase, GamePhase::Conspiracy);
+        assert_eq!(game_state.phase, GamePhase::PlayerTurn);
         assert_eq!(game_state.current_round, 1);
     }
 
@@ -1086,8 +1086,7 @@ mod tests {
         {
             let mut games = state.games.write().await;
             let engine = games.get_mut(&room_code).unwrap();
-            engine.advance_phase(); // Conspiracy -> Debate
-            engine.advance_phase(); // Debate -> Voting
+            engine.advance_phase(); // PlayerTurn -> Voting
         }
 
         // 投票

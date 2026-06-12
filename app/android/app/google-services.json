@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1071586546991",
+    "project_id": "parliament-1812",
+    "storage_bucket": "parliament-1812.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1071586546991:android:4b2e3ae1f1dee8444e3dda",
+        "android_client_info": {
+          "package_name": "com.parliament1812.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1071586546991-d0aov6gbpj4rgnc1hlff1d58r8vgebt7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.parliament1812.app",
+            "certificate_hash": "05d2512a797dac36c3c6a838088f7804c86dc702"
+          }
+        },
+        {
+          "client_id": "1071586546991-lglhakpba06p2ts3j5b50d2joa8ou7hj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAUTJJQBG2XnpU4gEx_PhiDTmXBZ-YPiOI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1071586546991-6cilt6v33t9k37i7gaip27ma9msi43rf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.parliament1812"
+              }
+            },
+            {
+              "client_id": "1071586546991-lglhakpba06p2ts3j5b50d2joa8ou7hj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

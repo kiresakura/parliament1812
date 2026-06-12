@@ -34,6 +34,18 @@ mixin _$GameState {
   String? get currentBill => throw _privateConstructorUsedError;
   GameResult? get result => throw _privateConstructorUsedError;
 
+  /// 回合制：當前行動玩家 ID
+  String? get currentTurnPlayerId => throw _privateConstructorUsedError;
+
+  /// 回合制：當前行動玩家名稱
+  String? get currentTurnPlayerName => throw _privateConstructorUsedError;
+
+  /// 回合制：剩餘行動點數
+  int get actionPointsRemaining => throw _privateConstructorUsedError;
+
+  /// 回合制：回合順序
+  List<String> get turnOrder => throw _privateConstructorUsedError;
+
   /// Serializes this GameState to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -62,6 +74,10 @@ abstract class $GameStateCopyWith<$Res> {
     String? currentSpeakerId,
     String? currentBill,
     GameResult? result,
+    String? currentTurnPlayerId,
+    String? currentTurnPlayerName,
+    int actionPointsRemaining,
+    List<String> turnOrder,
   });
 
   $RoomCopyWith<$Res> get room;
@@ -95,6 +111,10 @@ class _$GameStateCopyWithImpl<$Res, $Val extends GameState>
     Object? currentSpeakerId = freezed,
     Object? currentBill = freezed,
     Object? result = freezed,
+    Object? currentTurnPlayerId = freezed,
+    Object? currentTurnPlayerName = freezed,
+    Object? actionPointsRemaining = null,
+    Object? turnOrder = null,
   }) {
     return _then(
       _value.copyWith(
@@ -146,6 +166,22 @@ class _$GameStateCopyWithImpl<$Res, $Val extends GameState>
                 ? _value.result
                 : result // ignore: cast_nullable_to_non_nullable
                       as GameResult?,
+            currentTurnPlayerId: freezed == currentTurnPlayerId
+                ? _value.currentTurnPlayerId
+                : currentTurnPlayerId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            currentTurnPlayerName: freezed == currentTurnPlayerName
+                ? _value.currentTurnPlayerName
+                : currentTurnPlayerName // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            actionPointsRemaining: null == actionPointsRemaining
+                ? _value.actionPointsRemaining
+                : actionPointsRemaining // ignore: cast_nullable_to_non_nullable
+                      as int,
+            turnOrder: null == turnOrder
+                ? _value.turnOrder
+                : turnOrder // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
           )
           as $Val,
     );
@@ -198,6 +234,10 @@ abstract class _$$GameStateImplCopyWith<$Res>
     String? currentSpeakerId,
     String? currentBill,
     GameResult? result,
+    String? currentTurnPlayerId,
+    String? currentTurnPlayerName,
+    int actionPointsRemaining,
+    List<String> turnOrder,
   });
 
   @override
@@ -232,6 +272,10 @@ class __$$GameStateImplCopyWithImpl<$Res>
     Object? currentSpeakerId = freezed,
     Object? currentBill = freezed,
     Object? result = freezed,
+    Object? currentTurnPlayerId = freezed,
+    Object? currentTurnPlayerName = freezed,
+    Object? actionPointsRemaining = null,
+    Object? turnOrder = null,
   }) {
     return _then(
       _$GameStateImpl(
@@ -283,6 +327,22 @@ class __$$GameStateImplCopyWithImpl<$Res>
             ? _value.result
             : result // ignore: cast_nullable_to_non_nullable
                   as GameResult?,
+        currentTurnPlayerId: freezed == currentTurnPlayerId
+            ? _value.currentTurnPlayerId
+            : currentTurnPlayerId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        currentTurnPlayerName: freezed == currentTurnPlayerName
+            ? _value.currentTurnPlayerName
+            : currentTurnPlayerName // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        actionPointsRemaining: null == actionPointsRemaining
+            ? _value.actionPointsRemaining
+            : actionPointsRemaining // ignore: cast_nullable_to_non_nullable
+                  as int,
+        turnOrder: null == turnOrder
+            ? _value._turnOrder
+            : turnOrder // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
       ),
     );
   }
@@ -304,10 +364,15 @@ class _$GameStateImpl implements _GameState {
     this.currentSpeakerId,
     this.currentBill,
     this.result,
+    this.currentTurnPlayerId,
+    this.currentTurnPlayerName,
+    this.actionPointsRemaining = 3,
+    final List<String> turnOrder = const [],
   }) : _hand = hand,
        _chatMessages = chatMessages,
        _gameEvents = gameEvents,
-       _votes = votes;
+       _votes = votes,
+       _turnOrder = turnOrder;
 
   factory _$GameStateImpl.fromJson(Map<String, dynamic> json) =>
       _$$GameStateImplFromJson(json);
@@ -364,9 +429,34 @@ class _$GameStateImpl implements _GameState {
   @override
   final GameResult? result;
 
+  /// 回合制：當前行動玩家 ID
+  @override
+  final String? currentTurnPlayerId;
+
+  /// 回合制：當前行動玩家名稱
+  @override
+  final String? currentTurnPlayerName;
+
+  /// 回合制：剩餘行動點數
+  @override
+  @JsonKey()
+  final int actionPointsRemaining;
+
+  /// 回合制：回合順序
+  final List<String> _turnOrder;
+
+  /// 回合制：回合順序
+  @override
+  @JsonKey()
+  List<String> get turnOrder {
+    if (_turnOrder is EqualUnmodifiableListView) return _turnOrder;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_turnOrder);
+  }
+
   @override
   String toString() {
-    return 'GameState(room: $room, currentPlayerId: $currentPlayerId, hand: $hand, phase: $phase, round: $round, remainingSeconds: $remainingSeconds, chatMessages: $chatMessages, gameEvents: $gameEvents, votes: $votes, currentSpeakerId: $currentSpeakerId, currentBill: $currentBill, result: $result)';
+    return 'GameState(room: $room, currentPlayerId: $currentPlayerId, hand: $hand, phase: $phase, round: $round, remainingSeconds: $remainingSeconds, chatMessages: $chatMessages, gameEvents: $gameEvents, votes: $votes, currentSpeakerId: $currentSpeakerId, currentBill: $currentBill, result: $result, currentTurnPlayerId: $currentTurnPlayerId, currentTurnPlayerName: $currentTurnPlayerName, actionPointsRemaining: $actionPointsRemaining, turnOrder: $turnOrder)';
   }
 
   @override
@@ -395,7 +485,17 @@ class _$GameStateImpl implements _GameState {
                 other.currentSpeakerId == currentSpeakerId) &&
             (identical(other.currentBill, currentBill) ||
                 other.currentBill == currentBill) &&
-            (identical(other.result, result) || other.result == result));
+            (identical(other.result, result) || other.result == result) &&
+            (identical(other.currentTurnPlayerId, currentTurnPlayerId) ||
+                other.currentTurnPlayerId == currentTurnPlayerId) &&
+            (identical(other.currentTurnPlayerName, currentTurnPlayerName) ||
+                other.currentTurnPlayerName == currentTurnPlayerName) &&
+            (identical(other.actionPointsRemaining, actionPointsRemaining) ||
+                other.actionPointsRemaining == actionPointsRemaining) &&
+            const DeepCollectionEquality().equals(
+              other._turnOrder,
+              _turnOrder,
+            ));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -414,6 +514,10 @@ class _$GameStateImpl implements _GameState {
     currentSpeakerId,
     currentBill,
     result,
+    currentTurnPlayerId,
+    currentTurnPlayerName,
+    actionPointsRemaining,
+    const DeepCollectionEquality().hash(_turnOrder),
   );
 
   /// Create a copy of GameState
@@ -444,6 +548,10 @@ abstract class _GameState implements GameState {
     final String? currentSpeakerId,
     final String? currentBill,
     final GameResult? result,
+    final String? currentTurnPlayerId,
+    final String? currentTurnPlayerName,
+    final int actionPointsRemaining,
+    final List<String> turnOrder,
   }) = _$GameStateImpl;
 
   factory _GameState.fromJson(Map<String, dynamic> json) =
@@ -473,6 +581,22 @@ abstract class _GameState implements GameState {
   String? get currentBill;
   @override
   GameResult? get result;
+
+  /// 回合制：當前行動玩家 ID
+  @override
+  String? get currentTurnPlayerId;
+
+  /// 回合制：當前行動玩家名稱
+  @override
+  String? get currentTurnPlayerName;
+
+  /// 回合制：剩餘行動點數
+  @override
+  int get actionPointsRemaining;
+
+  /// 回合制：回合順序
+  @override
+  List<String> get turnOrder;
 
   /// Create a copy of GameState
   /// with the given fields replaced by the non-null parameter values.

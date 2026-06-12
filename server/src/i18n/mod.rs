@@ -13,9 +13,10 @@ use axum::http::HeaderMap;
 use serde::{Deserialize, Serialize};
 
 /// 支援的語言
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum Locale {
     /// 繁體中文（預設）
+    #[default]
     ZhTw,
     /// English
     En,
@@ -43,7 +44,11 @@ impl Locale {
             if tag.starts_with("zh-tw") || tag.starts_with("zh_tw") || tag == "zh-hant" {
                 return Locale::ZhTw;
             }
-            if tag.starts_with("zh-cn") || tag.starts_with("zh_cn") || tag == "zh-hans" || tag.starts_with("zh-sg") {
+            if tag.starts_with("zh-cn")
+                || tag.starts_with("zh_cn")
+                || tag == "zh-hans"
+                || tag.starts_with("zh-sg")
+            {
                 return Locale::ZhCn;
             }
             if tag.starts_with("en") {
@@ -72,12 +77,6 @@ impl std::fmt::Display for Locale {
     }
 }
 
-impl Default for Locale {
-    fn default() -> Self {
-        Locale::ZhTw
-    }
-}
-
 // 重新匯出
 pub use translations::I18n;
 
@@ -102,7 +101,10 @@ mod tests {
     #[test]
     fn test_locale_from_accept_language() {
         let mut headers = HeaderMap::new();
-        headers.insert("Accept-Language", "en-US,en;q=0.9,zh-TW;q=0.8".parse().unwrap());
+        headers.insert(
+            "Accept-Language",
+            "en-US,en;q=0.9,zh-TW;q=0.8".parse().unwrap(),
+        );
         assert_eq!(Locale::from_accept_language(&headers), Locale::En);
 
         let mut headers2 = HeaderMap::new();

@@ -15,10 +15,8 @@ pub enum GamePhase {
     /// 等待中
     #[default]
     Waiting,
-    /// 密謀階段
-    Conspiracy,
-    /// 辯論階段
-    Debate,
+    /// 玩家行動階段（回合制核心：玩家輪流行動）
+    PlayerTurn,
     /// 投票階段
     Voting,
     /// 結果階段
@@ -31,8 +29,7 @@ impl std::fmt::Display for GamePhase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             GamePhase::Waiting => write!(f, "等待中"),
-            GamePhase::Conspiracy => write!(f, "密謀階段"),
-            GamePhase::Debate => write!(f, "辯論階段"),
+            GamePhase::PlayerTurn => write!(f, "玩家行動"),
             GamePhase::Voting => write!(f, "投票階段"),
             GamePhase::Result => write!(f, "結果階段"),
             GamePhase::Finished => write!(f, "已結束"),
@@ -105,7 +102,7 @@ impl std::fmt::Display for ActionType {
 
 /// 遊戲動作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GameAction {
+pub struct GameActionRecord {
     /// 動作 ID
     pub id: Uuid,
     /// 執行者 ID
@@ -122,7 +119,7 @@ pub struct GameAction {
     pub description: String,
 }
 
-impl GameAction {
+impl GameActionRecord {
     /// 建立新動作
     pub fn new(
         actor_id: Uuid,
@@ -190,18 +187,26 @@ pub struct GameState {
     pub phase: GamePhase,
     /// 當前回合
     pub round: i32,
-    /// 階段剩餘時間（秒）
+    /// 階段剩餘時間（秒）— 僅投票階段使用
     pub phase_time_remaining: i32,
     /// 當前議案
     pub current_bill: String,
     /// 遊戲動作歷史
-    pub actions: Vec<GameAction>,
+    pub actions: Vec<GameActionRecord>,
     /// 投票記錄
     pub votes: Vec<Vote>,
     /// 開始時間
     pub started_at: Option<DateTime<Utc>>,
     /// 結束時間
     pub ended_at: Option<DateTime<Utc>>,
+    /// 回合順序（玩家 ID 列表）
+    pub turn_order: Vec<Uuid>,
+    /// 當前行動玩家索引（在 turn_order 中的位置）
+    pub current_turn_index: usize,
+    /// 當前行動玩家剩餘行動點數
+    pub action_points_remaining: i32,
+    /// 每回合行動點數上限
+    pub max_action_points: i32,
 }
 
 impl GameState {
@@ -218,31 +223,36 @@ impl GameState {
             votes: Vec::new(),
             started_at: None,
             ended_at: None,
+            turn_order: Vec::new(),
+            current_turn_index: 0,
+            action_points_remaining: 3,
+            max_action_points: 3,
         }
     }
 
     /// 開始遊戲
     pub fn start(&mut self) {
-        self.phase = GamePhase::Conspiracy;
+        self.phase = GamePhase::PlayerTurn;
         self.round = 1;
-        self.phase_time_remaining = 120; // 密謀階段 2 分鐘
+        self.phase_time_remaining = 0;
         self.started_at = Some(Utc::now());
+    }
+
+    /// 取得當前行動玩家 ID
+    pub fn current_turn_player(&self) -> Option<Uuid> {
+        self.turn_order.get(self.current_turn_index).copied()
     }
 
     /// 進入下一階段
     pub fn next_phase(&mut self) {
         match self.phase {
             GamePhase::Waiting => {
-                self.phase = GamePhase::Conspiracy;
-                self.phase_time_remaining = 120;
+                self.phase = GamePhase::PlayerTurn;
+                self.phase_time_remaining = 0;
             }
-            GamePhase::Conspiracy => {
-                self.phase = GamePhase::Debate;
-                self.phase_time_remaining = 300; // 辯論階段 5 分鐘
-            }
-            GamePhase::Debate => {
+            GamePhase::PlayerTurn => {
                 self.phase = GamePhase::Voting;
-                self.phase_time_remaining = 120; // 投票階段 2 分鐘
+                self.phase_time_remaining = 60; // 投票階段 60 秒
             }
             GamePhase::Voting => {
                 self.phase = GamePhase::Result;
@@ -258,7 +268,7 @@ impl GameState {
     }
 
     /// 記錄動作
-    pub fn record_action(&mut self, action: GameAction) {
+    pub fn record_action(&mut self, action: GameActionRecord) {
         self.actions.push(action);
     }
 
@@ -308,14 +318,20 @@ pub struct GameResponse {
     pub phase: GamePhase,
     /// 當前回合
     pub round: i32,
-    /// 階段剩餘時間
+    /// 階段剩餘時間（僅投票階段）
     pub phase_time_remaining: i32,
     /// 當前議案
     pub current_bill: String,
     /// 玩家列表
     pub players: Vec<PlayerResponse>,
     /// 最近動作
-    pub recent_actions: Vec<GameAction>,
+    pub recent_actions: Vec<GameActionRecord>,
+    /// 當前行動玩家 ID（回合制）
+    pub current_turn_player_id: Option<Uuid>,
+    /// 當前玩家剩餘行動點數
+    pub action_points_remaining: i32,
+    /// 回合順序
+    pub turn_order: Vec<Uuid>,
 }
 
 /// 遊戲事件（WebSocket 推送）
@@ -333,8 +349,13 @@ pub enum GameEvent {
         phase: GamePhase,
         time_remaining: i32,
     },
+    /// 回合變更（輪到某玩家行動）
+    TurnChanged {
+        player_id: Uuid,
+        action_points: i32,
+    },
     /// 動作執行
-    ActionPerformed { action: GameAction },
+    ActionPerformed { action: GameActionRecord },
     /// 玩家狀態更新
     PlayerUpdated { player: PlayerResponse },
     /// 投票提交
@@ -395,10 +416,7 @@ mod tests {
         assert_eq!(state.phase, GamePhase::Waiting);
 
         state.start();
-        assert_eq!(state.phase, GamePhase::Conspiracy);
-
-        state.next_phase();
-        assert_eq!(state.phase, GamePhase::Debate);
+        assert_eq!(state.phase, GamePhase::PlayerTurn);
 
         state.next_phase();
         assert_eq!(state.phase, GamePhase::Voting);

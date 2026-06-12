@@ -87,10 +87,7 @@ impl FriendService {
             .to_string(),
             crate::websocket::messages::SystemMessageType::Success,
         );
-        state
-            .ws_hub
-            .send_to_user(from_user_id, notification)
-            .await;
+        state.ws_hub.send_to_user(from_user_id, notification).await;
 
         Ok(())
     }
@@ -113,11 +110,7 @@ impl FriendService {
     // ============================================================
 
     /// 刪除好友
-    pub async fn remove_friend(
-        state: &AppState,
-        user_id: Uuid,
-        friend_id: Uuid,
-    ) -> AppResult<()> {
+    pub async fn remove_friend(state: &AppState, user_id: Uuid, friend_id: Uuid) -> AppResult<()> {
         let removed = FriendDb::remove_friend(&state.db, user_id, friend_id).await?;
         if !removed {
             return Err(AppError::NotFound("不是好友關係".to_string()));
@@ -126,11 +119,7 @@ impl FriendService {
     }
 
     /// 封鎖用戶
-    pub async fn block_user(
-        state: &AppState,
-        user_id: Uuid,
-        target_id: Uuid,
-    ) -> AppResult<()> {
+    pub async fn block_user(state: &AppState, user_id: Uuid, target_id: Uuid) -> AppResult<()> {
         if user_id == target_id {
             return Err(AppError::BadRequest("不能封鎖自己".to_string()));
         }
@@ -139,11 +128,7 @@ impl FriendService {
     }
 
     /// 解除封鎖
-    pub async fn unblock_user(
-        state: &AppState,
-        user_id: Uuid,
-        target_id: Uuid,
-    ) -> AppResult<()> {
+    pub async fn unblock_user(state: &AppState, user_id: Uuid, target_id: Uuid) -> AppResult<()> {
         let unblocked = FriendDb::unblock_user(&state.db, user_id, target_id).await?;
         if !unblocked {
             return Err(AppError::NotFound("未封鎖此用戶".to_string()));
@@ -158,10 +143,7 @@ impl FriendService {
     /// 取得好友列表（含在線狀態）
     ///
     /// 同時以 WebSocket Hub 的即時連線狀態覆蓋 DB 中的 is_online。
-    pub async fn get_friends_list(
-        state: &AppState,
-        user_id: Uuid,
-    ) -> AppResult<Vec<FriendInfo>> {
+    pub async fn get_friends_list(state: &AppState, user_id: Uuid) -> AppResult<Vec<FriendInfo>> {
         let mut friends = FriendDb::get_friends_list(&state.db, user_id).await?;
 
         // 用 WebSocket Hub 即時狀態覆蓋
@@ -247,7 +229,10 @@ impl FriendService {
         let player = crate::domain::Player::new(
             from_user_id,
             room_id,
-            from_user.display_name.clone().unwrap_or(from_user.username.clone()),
+            from_user
+                .display_name
+                .clone()
+                .unwrap_or(from_user.username.clone()),
             true,
         );
         {

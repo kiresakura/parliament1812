@@ -138,7 +138,7 @@ class WebSocketService {
       print('WebSocket received: ${message.runtimeType}');
       
       // 處理心跳回應
-      if (message is ServerMessage && message.type == 'pong') {
+      if (message.type == 'pong') {
         print('Heartbeat pong received');
         return;
       }
@@ -399,6 +399,9 @@ sealed class ClientMessage {
     required String cardId,
   }) = DiscardCardMessage;
 
+  // 結束回合（回合制）
+  const factory ClientMessage.endTurn() = EndTurnMessage;
+
   // 心跳
   const factory ClientMessage.ping() = PingMessage;
 }
@@ -609,6 +612,13 @@ class ReactToMessageMessage extends ClientMessage {
   };
 }
 
+class EndTurnMessage extends ClientMessage {
+  const EndTurnMessage();
+
+  @override
+  Map<String, dynamic> toJson() => {'type': 'end_turn'};
+}
+
 class PingMessage extends ClientMessage {
   const PingMessage();
 
@@ -679,6 +689,8 @@ sealed class ServerMessage {
         return SystemMessageMessage.fromJson(json);
       case 'timer_update':
         return TimerUpdateMessage.fromJson(json);
+      case 'turn_changed':
+        return TurnChangedMessage.fromJson(json);
       case 'alliance_proposed':
         return AllianceProposedMessage.fromJson(json);
       case 'alliance_accepted':
@@ -794,16 +806,22 @@ class PlayerLeftMessage extends ServerMessage {
 class GameStartedMessage extends ServerMessage {
   final String phase;
   final int durationSecs;
+  final List<String> turnOrder;
 
   const GameStartedMessage({
     required this.phase,
     required this.durationSecs,
+    this.turnOrder = const [],
   }) : super('game_started');
 
   factory GameStartedMessage.fromJson(Map<String, dynamic> json) {
     return GameStartedMessage(
       phase: json['phase'] as String,
       durationSecs: json['duration_secs'] as int,
+      turnOrder: (json['turn_order'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 }
@@ -1232,6 +1250,33 @@ class TimerUpdateMessage extends ServerMessage {
   factory TimerUpdateMessage.fromJson(Map<String, dynamic> json) {
     return TimerUpdateMessage(
       remainingSecs: json['remaining_secs'] as int,
+    );
+  }
+}
+
+/// 回合變更消息（回合制）
+class TurnChangedMessage extends ServerMessage {
+  final String currentPlayerId;
+  final String currentPlayerName;
+  final int actionPoints;
+  final List<String> turnOrder;
+
+  const TurnChangedMessage({
+    required this.currentPlayerId,
+    required this.currentPlayerName,
+    required this.actionPoints,
+    this.turnOrder = const [],
+  }) : super('turn_changed');
+
+  factory TurnChangedMessage.fromJson(Map<String, dynamic> json) {
+    return TurnChangedMessage(
+      currentPlayerId: json['current_player_id'] as String,
+      currentPlayerName: json['current_player_name'] as String,
+      actionPoints: json['action_points'] as int,
+      turnOrder: (json['turn_order'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 }

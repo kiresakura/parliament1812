@@ -6,37 +6,44 @@ part of 'game_state.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$GameStateImpl _$$GameStateImplFromJson(Map<String, dynamic> json) =>
-    _$GameStateImpl(
-      room: Room.fromJson(json['room'] as Map<String, dynamic>),
-      currentPlayerId: json['currentPlayerId'] as String?,
-      hand: (json['hand'] as List<dynamic>)
-          .map((e) => GameCard.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      phase: $enumDecode(_$GamePhaseEnumMap, json['phase']),
-      round: (json['round'] as num).toInt(),
-      remainingSeconds: (json['remainingSeconds'] as num).toInt(),
-      chatMessages:
-          (json['chatMessages'] as List<dynamic>?)
-              ?.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
-      gameEvents:
-          (json['gameEvents'] as List<dynamic>?)
-              ?.map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
-      votes:
-          (json['votes'] as Map<String, dynamic>?)?.map(
-            (k, e) => MapEntry(k, $enumDecode(_$VoteChoiceEnumMap, e)),
-          ) ??
-          const {},
-      currentSpeakerId: json['currentSpeakerId'] as String?,
-      currentBill: json['currentBill'] as String?,
-      result: json['result'] == null
-          ? null
-          : GameResult.fromJson(json['result'] as Map<String, dynamic>),
-    );
+_$GameStateImpl _$$GameStateImplFromJson(
+  Map<String, dynamic> json,
+) => _$GameStateImpl(
+  room: Room.fromJson(json['room'] as Map<String, dynamic>),
+  currentPlayerId: json['currentPlayerId'] as String?,
+  hand: (json['hand'] as List<dynamic>)
+      .map((e) => GameCard.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  phase: $enumDecode(_$GamePhaseEnumMap, json['phase']),
+  round: (json['round'] as num).toInt(),
+  remainingSeconds: (json['remainingSeconds'] as num).toInt(),
+  chatMessages:
+      (json['chatMessages'] as List<dynamic>?)
+          ?.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
+  gameEvents:
+      (json['gameEvents'] as List<dynamic>?)
+          ?.map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
+  votes:
+      (json['votes'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, $enumDecode(_$VoteChoiceEnumMap, e)),
+      ) ??
+      const {},
+  currentSpeakerId: json['currentSpeakerId'] as String?,
+  currentBill: json['currentBill'] as String?,
+  result: json['result'] == null
+      ? null
+      : GameResult.fromJson(json['result'] as Map<String, dynamic>),
+  currentTurnPlayerId: json['currentTurnPlayerId'] as String?,
+  currentTurnPlayerName: json['currentTurnPlayerName'] as String?,
+  actionPointsRemaining: (json['actionPointsRemaining'] as num?)?.toInt() ?? 3,
+  turnOrder:
+      (json['turnOrder'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
+);
 
 Map<String, dynamic> _$$GameStateImplToJson(
   _$GameStateImpl instance,
@@ -53,11 +60,16 @@ Map<String, dynamic> _$$GameStateImplToJson(
   'currentSpeakerId': instance.currentSpeakerId,
   'currentBill': instance.currentBill,
   'result': instance.result,
+  'currentTurnPlayerId': instance.currentTurnPlayerId,
+  'currentTurnPlayerName': instance.currentTurnPlayerName,
+  'actionPointsRemaining': instance.actionPointsRemaining,
+  'turnOrder': instance.turnOrder,
 };
 
 const _$GamePhaseEnumMap = {
   GamePhase.waiting: 'waiting',
   GamePhase.preparation: 'preparation',
+  GamePhase.playerTurn: 'player_turn',
   GamePhase.conspiracy: 'conspiracy',
   GamePhase.debate: 'debate',
   GamePhase.event: 'event',

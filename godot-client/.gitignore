@@ -1,0 +1,30 @@
+# Godot 4+ specific ignores
+.godot/
+*.translation
+
+# Godot-specific ignores
+*.import
+export_presets.cfg.bak
+
+# Imported translations (for localization)
+*.mo
+
+# Build
+build/
+*.apk
+*.aab
+*.ipa
+*.pck
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+*.code-workspace
+.idea/
+
+# Logs
+*.log

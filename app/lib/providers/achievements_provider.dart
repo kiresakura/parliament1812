@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../services/api_service.dart';
 
 // ═══════════════════════════════════════════
 // 成就資料模型
@@ -33,6 +36,26 @@ class Achievement {
   });
 
   double get progressPercent => target > 0 ? (progress / target).clamp(0.0, 1.0) : 0;
+
+  /// 從 API JSON 建立（Rust snake_case → Dart camelCase）
+  factory Achievement.fromJson(Map<String, dynamic> json) {
+    final rewardsJson = json['rewards'] as List<dynamic>? ?? [];
+    return Achievement(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String,
+      difficulty: json['difficulty'] as String,
+      isHidden: json['is_hidden'] as bool? ?? false,
+      iconHint: json['icon_hint'] as String? ?? '',
+      progress: json['progress'] as int? ?? 0,
+      target: json['target'] as int? ?? 1,
+      completed: json['completed'] as bool? ?? false,
+      claimed: json['claimed'] as bool? ?? false,
+      rewards: rewardsJson
+          .map((r) => AchievementReward.fromJson(r as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 /// 成就獎勵
@@ -48,6 +71,33 @@ class AchievementReward {
     this.title,
     this.amount,
   });
+
+  /// 從 API JSON 建立
+  ///
+  /// Rust 使用 `#[serde(tag = "type", rename_all = "snake_case")]`，
+  /// 產出格式：`{"type": "unlock_card", "card_id": "..."}` 等。
+  factory AchievementReward.fromJson(Map<String, dynamic> json) {
+    final rewardType = json['type'] as String? ?? 'unknown';
+    switch (rewardType) {
+      case 'unlock_card':
+        return AchievementReward(
+          type: 'unlock_card',
+          cardId: json['card_id'] as String?,
+        );
+      case 'gold':
+        return AchievementReward(
+          type: 'gold',
+          amount: json['amount'] as int?,
+        );
+      case 'title':
+        return AchievementReward(
+          type: 'title',
+          title: json['title'] as String?,
+        );
+      default:
+        return const AchievementReward(type: 'unknown');
+    }
+  }
 
   String get displayText {
     switch (type) {
@@ -110,7 +160,45 @@ final achievementsProvider =
 
 class AchievementsNotifier extends StateNotifier<AchievementsState> {
   AchievementsNotifier() : super(const AchievementsState(isLoading: true)) {
-    _loadLocalData();
+    _init();
+  }
+
+  /// 初始化：先嘗試 API，失敗則 fallback 到本地資料
+  Future<void> _init() async {
+    try {
+      await _loadFromApi();
+    } catch (e) {
+      debugPrint('[Achievements] API 載入失敗，使用本地資料: $e');
+      _loadLocalData();
+    }
+  }
+
+  /// 從 API 載入成就列表與進度
+  Future<void> _loadFromApi() async {
+    final result = await ApiService().getAchievements();
+
+    if (!result.success || result.data == null) {
+      throw Exception(result.error ?? 'API 回傳失敗');
+    }
+
+    final achievementsJson = result.data!['achievements'] as List<dynamic>;
+    final achievements = achievementsJson
+        .map((json) => Achievement.fromJson(json as Map<String, dynamic>))
+        .toList();
+
+    final completedCount = result.data!['completed_count'] as int? ??
+        achievements.where((a) => a.completed).length;
+    final totalCount = result.data!['total'] as int? ?? achievements.length;
+    final unclaimedCount = result.data!['unclaimed_count'] as int? ??
+        achievements.where((a) => a.completed && !a.claimed).length;
+
+    state = AchievementsState(
+      achievements: achievements,
+      completedCount: completedCount,
+      totalCount: totalCount,
+      unclaimedCount: unclaimedCount,
+      isLoading: false,
+    );
   }
 
   void _loadLocalData() {
@@ -141,27 +229,58 @@ class AchievementsNotifier extends StateNotifier<AchievementsState> {
     );
   }
 
+  /// 重新載入（API 優先，fallback 本地資料）
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true);
-    _loadLocalData();
+    try {
+      await _loadFromApi();
+    } catch (e) {
+      debugPrint('[Achievements] refresh API 失敗，使用本地資料: $e');
+      _loadLocalData();
+    }
   }
 
+  /// 領取成就獎勵
   Future<bool> claimReward(String achievementId) async {
-    // TODO: API call
-    final updated = state.achievements.map((a) {
-      if (a.id == achievementId && a.completed && !a.claimed) {
-        return Achievement(
-          id: a.id, name: a.name, description: a.description,
-          difficulty: a.difficulty, isHidden: a.isHidden, iconHint: a.iconHint,
-          target: a.target, rewards: a.rewards, progress: a.progress,
-          completed: true, claimed: true,
-        );
+    try {
+      final result = await ApiService().claimAchievement(achievementId);
+      if (result.success) {
+        // API 成功：更新本地狀態
+        final updated = state.achievements.map((a) {
+          if (a.id == achievementId && a.completed && !a.claimed) {
+            return Achievement(
+              id: a.id, name: a.name, description: a.description,
+              difficulty: a.difficulty, isHidden: a.isHidden, iconHint: a.iconHint,
+              target: a.target, rewards: a.rewards, progress: a.progress,
+              completed: true, claimed: true,
+            );
+          }
+          return a;
+        }).toList();
+        final unclaimed = updated.where((a) => a.completed && !a.claimed).length;
+        state = state.copyWith(achievements: updated, unclaimedCount: unclaimed);
+        return true;
       }
-      return a;
-    }).toList();
-    final unclaimed = updated.where((a) => a.completed && !a.claimed).length;
-    state = state.copyWith(achievements: updated, unclaimedCount: unclaimed);
-    return true;
+      debugPrint('[Achievements] claimReward API 失敗: ${result.error}');
+      return false;
+    } catch (e) {
+      debugPrint('[Achievements] claimReward 異常: $e');
+      // fallback：仍然在本地標記為已領取（離線模式）
+      final updated = state.achievements.map((a) {
+        if (a.id == achievementId && a.completed && !a.claimed) {
+          return Achievement(
+            id: a.id, name: a.name, description: a.description,
+            difficulty: a.difficulty, isHidden: a.isHidden, iconHint: a.iconHint,
+            target: a.target, rewards: a.rewards, progress: a.progress,
+            completed: true, claimed: true,
+          );
+        }
+        return a;
+      }).toList();
+      final unclaimed = updated.where((a) => a.completed && !a.claimed).length;
+      state = state.copyWith(achievements: updated, unclaimedCount: unclaimed);
+      return true;
+    }
   }
 }
 

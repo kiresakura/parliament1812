@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/codex_provider.dart';
+import '../../services/performance_service.dart';
+import '../../widgets/performance_aware.dart';
 import 'card_detail_dialog.dart';
 
 /// 稀有度顏色
@@ -62,25 +65,29 @@ class CardGridView extends StatelessWidget {
         mainAxisSpacing: 8,
       ),
       itemCount: cards.length,
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: true,
       itemBuilder: (context, index) => _CardTile(card: cards[index]),
     );
   }
 }
 
-class _CardTile extends StatelessWidget {
+class _CardTile extends ConsumerWidget {
   final CodexCard card;
 
   const _CardTile({required this.card});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final color = _rarityColor(card.rarity);
     final owned = card.owned;
+    final config = ref.watch(qualityConfigProvider);
 
     return GestureDetector(
       onTap: () => showCardDetailDialog(context, card),
       child: Container(
-        decoration: BoxDecoration(
+        decoration: PerformanceAwareDecoration.build(
+          config: config,
           color: owned ? const Color(0xFF2F2F2F) : const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
@@ -99,20 +106,11 @@ class _CardTile extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 圖示
-                  ColorFiltered(
-                    colorFilter: owned
-                        ? const ColorFilter.mode(Colors.transparent, BlendMode.dst)
-                        : const ColorFilter.matrix([
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0, 0, 0, 0.4, 0,
-                          ]),
-                    child: Icon(
-                      _typeIcon(card.cardType),
-                      size: 32,
-                      color: color,
+                  // 卡牌圖片
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: _buildCardImage(config, owned, color),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -159,5 +157,59 @@ class _CardTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildCardImage(QualityConfig config, bool owned, Color color) {
+    final imageWidget = Image.asset(
+      card.imagePath,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      cacheWidth: config.imageCacheWidth,
+      errorBuilder: (_, __, ___) => Icon(
+        _typeIcon(card.cardType),
+        size: 32,
+        color: color,
+      ),
+    );
+
+    if (owned) {
+      return imageWidget;
+    }
+
+    // 未擁有卡牌的濾鏡處理
+    switch (config.unownedCardFilterMode) {
+      case CardFilterMode.opacity:
+        // 低品質：僅用 Opacity
+        return Opacity(
+          opacity: 0.4,
+          child: imageWidget,
+        );
+
+      case CardFilterMode.simpleGrayscale:
+        // 中品質：簡化灰階
+        return ColorFiltered(
+          colorFilter: const ColorFilter.mode(
+            Colors.grey,
+            BlendMode.saturation,
+          ),
+          child: Opacity(
+            opacity: 0.5,
+            child: imageWidget,
+          ),
+        );
+
+      case CardFilterMode.fullGrayscaleMatrix:
+        // 高品質：完整灰階矩陣
+        return ColorFiltered(
+          colorFilter: const ColorFilter.matrix([
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0, 0, 0, 0.4, 0,
+          ]),
+          child: imageWidget,
+        );
+    }
   }
 }

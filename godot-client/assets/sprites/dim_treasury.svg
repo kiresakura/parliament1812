@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="8" fill="#1A1A2E"/>
+  <!-- Coins stack - Treasury -->
+  <!-- Bottom coin -->
+  <ellipse cx="32" cy="40" rx="16" ry="6" fill="none" stroke="#C9A84C" stroke-width="1.5"/>
+  <!-- Middle coin -->
+  <ellipse cx="32" cy="32" rx="14" ry="5" fill="none" stroke="#C9A84C" stroke-width="1.5"/>
+  <line x1="18" y1="32" x2="18" y2="40" stroke="#C9A84C" stroke-width="1.5"/>
+  <line x1="46" y1="32" x2="46" y2="40" stroke="#C9A84C" stroke-width="1.5"/>
+  <!-- Top coin -->
+  <ellipse cx="32" cy="24" rx="12" ry="4" fill="none" stroke="#C9A84C" stroke-width="1.5"/>
+  <line x1="20" y1="24" x2="20" y2="32" stroke="#C9A84C" stroke-width="1.5"/>
+  <line x1="44" y1="24" x2="44" y2="32" stroke="#C9A84C" stroke-width="1.5"/>
+  <!-- Currency symbol on top -->
+  <text x="32" y="27" text-anchor="middle" font-family="serif" font-size="8" fill="#C9A84C" opacity="0.7">¤</text>
+</svg>

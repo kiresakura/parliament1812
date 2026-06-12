@@ -84,6 +84,23 @@ void showCardDetailDialog(BuildContext context, CodexCard card) {
               ),
               const SizedBox(height: 16),
 
+              // 卡牌圖片
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    height: 200,
+                    width: double.infinity,
+                    child: Image.asset(
+                      card.imagePath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
               // 名稱
               Center(
                 child: Text(

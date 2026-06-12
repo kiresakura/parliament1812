@@ -4,7 +4,7 @@
 
 use uuid::Uuid;
 
-use super::state::GameState;
+use super::state::EngineState;
 use crate::domain::CharacterType;
 use crate::error::AppError;
 
@@ -73,7 +73,7 @@ impl CharacterSkills {
     ///
     /// # Returns
     /// 防禦加成值
-    pub fn calculate_defense_bonus(state: &GameState, player_id: Uuid) -> i32 {
+    pub fn calculate_defense_bonus(state: &EngineState, player_id: Uuid) -> i32 {
         let player = match state.get_player(player_id) {
             Some(p) => p,
             None => return 0,
@@ -101,7 +101,7 @@ impl CharacterSkills {
     }
 
     /// 計算 Thomas 受到的實際傷害（考慮團結技能）
-    pub fn calculate_thomas_damage(state: &GameState, player_id: Uuid, base_damage: i32) -> i32 {
+    pub fn calculate_thomas_damage(state: &EngineState, player_id: Uuid, base_damage: i32) -> i32 {
         let defense_bonus = Self::calculate_defense_bonus(state, player_id);
         (base_damage - defense_bonus).max(0)
     }
@@ -136,7 +136,7 @@ mod tests {
     use super::*;
     use crate::game::state::PlayerState;
 
-    fn create_test_game() -> GameState {
+    fn create_test_game() -> EngineState {
         let players = vec![
             PlayerState::new(Uuid::new_v4(), "Thomas".to_string(), CharacterType::Thomas),
             PlayerState::new(
@@ -147,10 +147,10 @@ mod tests {
             PlayerState::new(Uuid::new_v4(), "Edward".to_string(), CharacterType::Edward),
             PlayerState::new(Uuid::new_v4(), "George".to_string(), CharacterType::George),
         ];
-        GameState::new("TEST123".to_string(), players)
+        EngineState::new("TEST123".to_string(), players)
     }
 
-    fn find_player_by_character(state: &GameState, character: CharacterType) -> Uuid {
+    fn find_player_by_character(state: &EngineState, character: CharacterType) -> Uuid {
         state
             .players
             .values()

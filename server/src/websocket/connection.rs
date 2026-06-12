@@ -11,7 +11,7 @@ use super::messages::{error_codes, ClientMessage, ServerMessage};
 use crate::domain::{GamePhase, PlayerResponse, RoomResponse};
 use crate::error::AppError;
 use crate::game::cards;
-use crate::services::RoomService;
+use crate::services::{RoomService, SpectatorService};
 use crate::AppState;
 
 /// 處理 WebSocket 連線
@@ -154,6 +154,26 @@ pub async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     }
 
     // 清理連線
+    // 處理觀戰者離開
+    if let Some(room_code) = state.ws_hub.remove_spectator(conn_id).await {
+        let count = state.ws_hub.get_spectator_count(&room_code).await;
+        state
+            .ws_hub
+            .broadcast_to_spectators(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+        // 同時通知遊戲內玩家觀戰人數變更
+        state
+            .ws_hub
+            .broadcast_to_room(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+    }
+
     // 處理玩家離開房間
     if let Some((room_code, player_id)) = state.ws_hub.leave_room(conn_id).await {
         handle_player_disconnect(&state, &room_code, player_id).await;
@@ -288,7 +308,8 @@ pub async fn process_message(
                                 )
                                 .await;
 
-                            // TODO: 發送更新的遊戲狀態（需要實現 GameStateUpdated ServerMessage）
+                            // 廣播遊戲效果（聲望變更、政治死亡等）
+                            broadcast_game_effects(state, &room_code, &result.effects).await;
                         }
                         Err(e) => {
                             let _ = sender.send(ServerMessage::Error {
@@ -346,11 +367,9 @@ pub async fn process_message(
                                         player_id,
                                         card_count: hand_count,
                                     },
-                                    player_id,
+                                    conn_id,
                                 )
                                 .await;
-
-                            // TODO: 發送更新的遊戲狀態（需要實現 GameStateUpdated ServerMessage）
                         }
                         Err(e) => {
                             let _ = sender.send(ServerMessage::Error {
@@ -402,9 +421,7 @@ pub async fn process_message(
                                 )
                                 .await;
 
-                            // 棄牌成功，只需要更新遊戲狀態即可
-
-                            // TODO: 發送更新的遊戲狀態（需要實現 GameStateUpdated ServerMessage）
+                            // 棄牌成功
                         }
                         Err(e) => {
                             let _ = sender.send(ServerMessage::Error {
@@ -426,12 +443,31 @@ pub async fn process_message(
             handle_propose_alliance(conn_id, target_id, state, sender).await?;
         }
 
-        ClientMessage::RespondToAlliance { proposer_id, accept } => {
+        ClientMessage::RespondToAlliance {
+            proposer_id,
+            accept,
+        } => {
             handle_respond_to_alliance(conn_id, proposer_id, accept, state, sender).await?;
+        }
+
+        ClientMessage::EndTurn => {
+            handle_end_turn(conn_id, state, sender).await?;
         }
 
         ClientMessage::ReactToMessage { message_seq, emoji } => {
             handle_message_reaction(conn_id, message_seq, &emoji, state, sender).await?;
+        }
+
+        ClientMessage::SpectatorJoin { room_code } => {
+            handle_spectator_join(conn_id, user_id, &room_code, state, sender).await?;
+        }
+
+        ClientMessage::SpectatorLeave => {
+            handle_spectator_leave(conn_id, state, sender).await?;
+        }
+
+        ClientMessage::SpectatorChat { message } => {
+            handle_spectator_chat(conn_id, &message, state, sender).await?;
         }
     }
 
@@ -555,6 +591,10 @@ async fn handle_leave_room(
                 },
             )
             .await;
+    } else {
+        // 房間解散時清理所有計時器
+        let mut timers = state.timers.write().await;
+        timers.cancel_all_timers(&room_code);
     }
 
     // 發送確認
@@ -582,6 +622,10 @@ async fn handle_player_disconnect(state: &AppState, room_code: &str, player_id: 
                         },
                     )
                     .await;
+            } else {
+                // 房間解散時清理所有計時器
+                let mut timers = state.timers.write().await;
+                timers.cancel_all_timers(room_code);
             }
         }
         Err(e) => {
@@ -705,14 +749,24 @@ async fn handle_start_game(
         }
     };
 
-    // 廣播遊戲開始
+    // 取得回合順序
+    let turn_order = {
+        let games = state.games.read().await;
+        games
+            .get(&room_code)
+            .map(|game| game.state.turn_order.clone())
+            .unwrap_or_default()
+    };
+
+    // 廣播遊戲開始（回合制：進入 PlayerTurn 階段，無計時）
     state
         .ws_hub
         .broadcast_to_room(
             &room_code,
             ServerMessage::GameStarted {
-                phase: GamePhase::Conspiracy,
-                duration_secs: 120,
+                phase: GamePhase::PlayerTurn,
+                duration_secs: 0, // 回合制不計時
+                turn_order,
             },
         )
         .await;
@@ -731,7 +785,37 @@ async fn handle_start_game(
             .await;
     }
 
-    tracing::info!(room_code = %room_code, "遊戲開始");
+    // 廣播初始回合（輪到誰行動）
+    {
+        let games = state.games.read().await;
+        if let Some(game) = games.get(&room_code) {
+            if let Some(current_player_id) = game.state.current_turn_player() {
+                let current_player_name = game
+                    .state
+                    .get_player(current_player_id)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| "未知玩家".to_string());
+                let turn_order = game.state.turn_order.clone();
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        &room_code,
+                        ServerMessage::TurnChanged {
+                            current_player_id,
+                            current_player_name,
+                            action_points: game.state.action_points_remaining,
+                            turn_order,
+                        },
+                    )
+                    .await;
+            }
+        }
+    }
+
+    // 回合制不需要啟動 phase timer（PlayerTurn 不計時）
+
+    tracing::info!(room_code = %room_code, "遊戲開始（回合制）");
 
     Ok(())
 }
@@ -796,78 +880,7 @@ async fn handle_chat(
 /// 處理質詢
 async fn handle_challenge(
     conn_id: Uuid,
-    _target_id: Uuid,
-    state: &AppState,
-    sender: &mpsc::UnboundedSender<ServerMessage>,
-) -> Result<(), AppError> {
-    let (_room_code, _player_id) = match get_room_and_player(conn_id, state).await {
-        Some(ids) => ids,
-        None => {
-            let _ = sender.send(ServerMessage::error(
-                error_codes::NOT_IN_ROOM,
-                "您不在任何房間中",
-            ));
-            return Ok(());
-        }
-    };
-
-    // TODO: 實作完整的質詢邏輯
-    let _ = sender.send(ServerMessage::info("質詢功能尚未完全實作"));
-
-    Ok(())
-}
-
-/// 處理反駁
-async fn handle_counter(
-    conn_id: Uuid,
-    state: &AppState,
-    sender: &mpsc::UnboundedSender<ServerMessage>,
-) -> Result<(), AppError> {
-    let (_room_code, _player_id) = match get_room_and_player(conn_id, state).await {
-        Some(ids) => ids,
-        None => {
-            let _ = sender.send(ServerMessage::error(
-                error_codes::NOT_IN_ROOM,
-                "您不在任何房間中",
-            ));
-            return Ok(());
-        }
-    };
-
-    // TODO: 實作完整的反駁邏輯
-    let _ = sender.send(ServerMessage::info("反駁功能尚未完全實作"));
-
-    Ok(())
-}
-
-/// 處理使用技能
-async fn handle_use_skill(
-    conn_id: Uuid,
-    _target_id: Option<Uuid>,
-    state: &AppState,
-    sender: &mpsc::UnboundedSender<ServerMessage>,
-) -> Result<(), AppError> {
-    let (_room_code, _player_id) = match get_room_and_player(conn_id, state).await {
-        Some(ids) => ids,
-        None => {
-            let _ = sender.send(ServerMessage::error(
-                error_codes::NOT_IN_ROOM,
-                "您不在任何房間中",
-            ));
-            return Ok(());
-        }
-    };
-
-    // TODO: 實作完整的技能邏輯
-    let _ = sender.send(ServerMessage::info("技能功能尚未完全實作"));
-
-    Ok(())
-}
-
-/// 處理投票
-async fn handle_vote(
-    conn_id: Uuid,
-    _choice: crate::domain::VoteChoice,
+    target_id: Uuid,
     state: &AppState,
     sender: &mpsc::UnboundedSender<ServerMessage>,
 ) -> Result<(), AppError> {
@@ -882,24 +895,736 @@ async fn handle_vote(
         }
     };
 
-    // TODO: 實作完整的投票邏輯
-    // 目前只廣播投票收到
+    let result = {
+        let mut games = state.games.write().await;
+        if let Some(game) = games.get_mut(&room_code) {
+            match game.process_challenge(player_id, target_id) {
+                Ok(result) => Ok(result),
+                Err(e) => Err(e),
+            }
+        } else {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "遊戲不存在",
+            ));
+            return Ok(());
+        }
+    };
 
-    let all_players = RoomService::get_room_players(state, &room_code)
-        .await
-        .unwrap_or_default();
-    let total_players = all_players.len() as u32;
+    match result {
+        Ok(action_result) => {
+            // 獲取玩家名稱
+            let (attacker_name, target_name) = {
+                let players = state.players.read().await;
+                let a = players
+                    .get(&player_id)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| "未知玩家".to_string());
+                let t = players
+                    .get(&target_id)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| "未知玩家".to_string());
+                (a, t)
+            };
 
+            // 從效果中取得實際 damage 值
+            let damage = action_result
+                .effects
+                .iter()
+                .find_map(|e| {
+                    if let crate::game::GameEffect::PendingCounter { damage, .. } = e {
+                        Some(*damage)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0);
+
+            // 廣播質詢事件
+            state
+                .ws_hub
+                .broadcast_to_room(
+                    &room_code,
+                    ServerMessage::ChallengeEvent {
+                        attacker_id: player_id,
+                        attacker_name,
+                        target_id,
+                        target_name,
+                        damage,
+                        countered: false,
+                    },
+                )
+                .await;
+
+            // 廣播狀態變更效果
+            broadcast_game_effects(state, &room_code, &action_result.effects).await;
+
+            // 啟動反駁超時計時器（P1-4）
+            {
+                let counter_timeout = {
+                    let games = state.games.read().await;
+                    games
+                        .get(&room_code)
+                        .map(|g| g.config.counter_timeout_secs)
+                        .unwrap_or(10)
+                };
+                let mut timers = state.timers.write().await;
+                timers.start_counter_timer(
+                    &room_code,
+                    counter_timeout,
+                    state.ws_hub.clone(),
+                    state.games.clone(),
+                );
+            }
+        }
+        Err(e) => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                e.to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// 處理反駁
+async fn handle_counter(
+    conn_id: Uuid,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+        Some(ids) => ids,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::NOT_IN_ROOM,
+                "您不在任何房間中",
+            ));
+            return Ok(());
+        }
+    };
+
+    let (result, pending_damage) = {
+        let mut games = state.games.write().await;
+        if let Some(game) = games.get_mut(&room_code) {
+            // 在 process_counter 前記錄 pending_challenge 的 damage
+            let pending_damage = game
+                .state
+                .pending_challenge
+                .as_ref()
+                .map(|pc| pc.damage)
+                .unwrap_or(0);
+            match game.process_counter(player_id) {
+                Ok(result) => (Ok(result), pending_damage),
+                Err(e) => (Err(e), 0),
+            }
+        } else {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "遊戲不存在",
+            ));
+            return Ok(());
+        }
+    };
+
+    match result {
+        Ok(action_result) => {
+            // 取消反駁超時計時器（P1-4）
+            {
+                let mut timers = state.timers.write().await;
+                timers.cancel_counter_timer(&room_code);
+            }
+
+            // 獲取防禦者名稱
+            let defender_name = {
+                let players = state.players.read().await;
+                players
+                    .get(&player_id)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| "未知玩家".to_string())
+            };
+
+            // 廣播反駁事件
+            state
+                .ws_hub
+                .broadcast_to_room(
+                    &room_code,
+                    ServerMessage::CounterEvent {
+                        defender_id: player_id,
+                        defender_name,
+                        damage_blocked: pending_damage,
+                    },
+                )
+                .await;
+
+            // 廣播狀態變更效果
+            broadcast_game_effects(state, &room_code, &action_result.effects).await;
+        }
+        Err(e) => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                e.to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// 處理使用技能
+async fn handle_use_skill(
+    conn_id: Uuid,
+    target_id: Option<Uuid>,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+        Some(ids) => ids,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::NOT_IN_ROOM,
+                "您不在任何房間中",
+            ));
+            return Ok(());
+        }
+    };
+
+    let result = {
+        let mut games = state.games.write().await;
+        if let Some(game) = games.get_mut(&room_code) {
+            match game.process_skill(player_id, target_id) {
+                Ok(result) => Ok(result),
+                Err(e) => Err(e),
+            }
+        } else {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "遊戲不存在",
+            ));
+            return Ok(());
+        }
+    };
+
+    match result {
+        Ok(action_result) => {
+            // 獲取玩家名稱和技能名稱
+            let (player_name, skill_name, target_name) = {
+                let players = state.players.read().await;
+                let pn = players
+                    .get(&player_id)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| "未知玩家".to_string());
+                let tn = target_id.and_then(|tid| {
+                    players.get(&tid).map(|p| p.name.clone())
+                });
+
+                // 從遊戲狀態獲取角色名作為技能名
+                let games = state.games.read().await;
+                let sn = games.get(&room_code).and_then(|game| {
+                    game.state.get_player(player_id).map(|p| {
+                        match p.character {
+                            crate::domain::CharacterType::Thomas => "團結".to_string(),
+                            crate::domain::CharacterType::Richard => "收買".to_string(),
+                            crate::domain::CharacterType::Edward => "爆料".to_string(),
+                            crate::domain::CharacterType::George => "怒火".to_string(),
+                        }
+                    })
+                }).unwrap_or_else(|| "技能".to_string());
+
+                (pn, sn, tn)
+            };
+
+            // 廣播技能使用事件
+            state
+                .ws_hub
+                .broadcast_to_room(
+                    &room_code,
+                    ServerMessage::SkillUsed {
+                        player_id,
+                        player_name,
+                        skill_name,
+                        target_id,
+                        target_name,
+                        effect_description: action_result.message.clone(),
+                    },
+                )
+                .await;
+
+            // 廣播狀態變更效果
+            broadcast_game_effects(state, &room_code, &action_result.effects).await;
+        }
+        Err(e) => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                e.to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// 處理投票
+async fn handle_vote(
+    conn_id: Uuid,
+    choice: crate::domain::VoteChoice,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+        Some(ids) => ids,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::NOT_IN_ROOM,
+                "您不在任何房間中",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 調用 game engine 處理投票
+    let (result, votes_count, total_players): (
+        Result<crate::game::ActionResult, crate::game::GameError>,
+        u32,
+        u32,
+    ) = {
+        let mut games = state.games.write().await;
+        if let Some(game) = games.get_mut(&room_code) {
+            match game.process_vote(player_id, choice) {
+                Ok(action_result) => {
+                    let vc = game.state.votes.len() as u32;
+                    let tp = game.state.alive_player_count() as u32;
+                    (Ok(action_result), vc, tp)
+                }
+                Err(e) => {
+                    let _ = sender.send(ServerMessage::error(
+                        error_codes::INVALID_ACTION,
+                        e.to_string(),
+                    ));
+                    return Ok(());
+                }
+            }
+        } else {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "遊戲不存在",
+            ));
+            return Ok(());
+        }
+    };
+
+    if let Ok(action_result) = result {
+        // 廣播投票收到
+        state
+            .ws_hub
+            .broadcast_to_room(
+                &room_code,
+                ServerMessage::VoteReceived {
+                    player_id,
+                    votes_count,
+                    total_players,
+                },
+            )
+            .await;
+
+        // 廣播背叛效果（如果有）
+        broadcast_game_effects(state, &room_code, &action_result.effects).await;
+
+        // 檢查是否所有人都已投票
+        if votes_count >= total_players {
+            // 計算投票結果
+            let vote_result = {
+                let games = state.games.read().await;
+                games.get(&room_code).map(|game| game.calculate_results())
+            };
+
+            if let Some(game_result) = vote_result {
+                let winner = game_result
+                    .winning_choice
+                    .unwrap_or(crate::domain::VoteChoice::A);
+
+                let mut votes_map = std::collections::HashMap::new();
+                votes_map.insert("A".to_string(), game_result.vote_counts.option_a);
+                votes_map.insert("B".to_string(), game_result.vote_counts.option_b);
+                votes_map.insert("C".to_string(), game_result.vote_counts.option_c);
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        &room_code,
+                        ServerMessage::VoteResult {
+                            votes: votes_map,
+                            winner,
+                        },
+                    )
+                    .await;
+
+                // 投票完成後推進階段（P1-7）
+                let phase_info = {
+                    let mut games = state.games.write().await;
+                    if let Some(game) = games.get_mut(&room_code) {
+                        let new_phase = game.advance_phase();
+                        let duration = match new_phase {
+                            GamePhase::Waiting | GamePhase::Finished | GamePhase::PlayerTurn => 0,
+                            GamePhase::Voting => game.config.voting_duration_secs,
+                            GamePhase::Result => game.config.result_duration_secs,
+                        };
+                        Some((new_phase, duration, game.state.current_round as u32))
+                    } else {
+                        None
+                    }
+                };
+
+                if let Some((new_phase, duration, round)) = phase_info {
+                    // 廣播階段變更
+                    state
+                        .ws_hub
+                        .broadcast_to_room(
+                            &room_code,
+                            ServerMessage::PhaseChanged {
+                                phase: new_phase,
+                                duration_secs: duration,
+                                round,
+                            },
+                        )
+                        .await;
+
+                    // 取消舊 timer 並啟動新的
+                    if new_phase != GamePhase::Finished && duration > 0 {
+                        let mut timers = state.timers.write().await;
+                        timers.start_phase_timer(
+                            &room_code,
+                            duration,
+                            state.ws_hub.clone(),
+                            state.games.clone(),
+                            state.timers.clone(),
+                        );
+                    } else {
+                        let mut timers = state.timers.write().await;
+                        timers.cancel_all_timers(&room_code);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 處理結束回合（回合制）
+async fn handle_end_turn(
+    conn_id: Uuid,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    let (room_code, player_id) = match get_room_and_player(conn_id, state).await {
+        Some(ids) => ids,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::NOT_IN_ROOM,
+                "您不在任何房間中",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 呼叫引擎結束回合
+    let end_result: Result<bool, String> = {
+        let mut games = state.games.write().await;
+        if let Some(game) = games.get_mut(&room_code) {
+            match game.end_turn(player_id) {
+                Ok(all_done) => Ok(all_done),
+                Err(e) => Err(e.to_string()),
+            }
+        } else {
+            Err("遊戲不存在".to_string())
+        }
+    };
+
+    match end_result {
+        Ok(all_players_done) => {
+            if all_players_done {
+                // 所有玩家行動完畢，已進入投票階段
+                let phase_info = {
+                    let games = state.games.read().await;
+                    games.get(&room_code).map(|game| {
+                        (
+                            game.state.phase,
+                            game.config.voting_duration_secs,
+                            game.state.current_round as u32,
+                        )
+                    })
+                };
+
+                if let Some((phase, duration, round)) = phase_info {
+                    state
+                        .ws_hub
+                        .broadcast_to_room(
+                            &room_code,
+                            ServerMessage::PhaseChanged {
+                                phase,
+                                duration_secs: duration,
+                                round,
+                            },
+                        )
+                        .await;
+
+                    // 啟動投票計時器
+                    if duration > 0 {
+                        let mut timers = state.timers.write().await;
+                        timers.start_phase_timer(
+                            &room_code,
+                            duration,
+                            state.ws_hub.clone(),
+                            state.games.clone(),
+                            state.timers.clone(),
+                        );
+                    }
+                }
+            } else {
+                // 還有玩家需要行動，廣播回合變更
+                let turn_info = {
+                    let games = state.games.read().await;
+                    games.get(&room_code).and_then(|game| {
+                        game.state.current_turn_player().map(|pid| {
+                            let name = game
+                                .state
+                                .get_player(pid)
+                                .map(|p| p.name.clone())
+                                .unwrap_or_else(|| "未知玩家".to_string());
+                            (pid, name, game.state.action_points_remaining, game.state.turn_order.clone())
+                        })
+                    })
+                };
+
+                if let Some((current_player_id, current_player_name, action_points, turn_order)) = turn_info {
+                    state
+                        .ws_hub
+                        .broadcast_to_room(
+                            &room_code,
+                            ServerMessage::TurnChanged {
+                                current_player_id,
+                                current_player_name,
+                                action_points,
+                                turn_order,
+                            },
+                        )
+                        .await;
+                }
+            }
+        }
+        Err(e) => {
+            let _ = sender.send(ServerMessage::error(error_codes::INVALID_ACTION, e));
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================
+// 觀戰者訊息處理
+// ============================================================
+
+/// 處理觀戰者加入
+async fn handle_spectator_join(
+    conn_id: Uuid,
+    user_id: Uuid,
+    room_code: &str,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    // 檢查是否已經是觀戰者
+    if state.ws_hub.is_spectator(conn_id).await {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "您已經在觀戰中",
+        ));
+        return Ok(());
+    }
+
+    // 檢查房間是否存在且允許觀戰
+    let can_spectate = SpectatorService::can_spectate(state, room_code).await?;
+    if !can_spectate {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "房間不存在或遊戲尚未開始，無法觀戰",
+        ));
+        return Ok(());
+    }
+
+    // 取得使用者名稱
+    let user_name = {
+        let users = state.users.read().await;
+        users
+            .get(&user_id)
+            .map(|u| u.username.clone())
+            .unwrap_or_else(|| format!("觀戰者_{}", &user_id.to_string()[..8]))
+    };
+
+    // 加入觀戰者集合
+    state
+        .ws_hub
+        .add_spectator(room_code, conn_id, user_id, user_name, sender.clone())
+        .await;
+
+    let spectator_count = state.ws_hub.get_spectator_count(room_code).await;
+
+    // 發送加入確認給觀戰者
+    let _ = sender.send(ServerMessage::SpectatorJoined {
+        room_code: room_code.to_string(),
+        spectator_count,
+    });
+
+    // 廣播觀戰人數更新給所有觀戰者
+    state
+        .ws_hub
+        .broadcast_to_spectators(
+            room_code,
+            ServerMessage::SpectatorCountUpdate {
+                count: spectator_count,
+            },
+        )
+        .await;
+
+    // 同時通知遊戲內玩家觀戰人數變更
     state
         .ws_hub
         .broadcast_to_room(
-            &room_code,
-            ServerMessage::VoteReceived {
-                player_id,
-                votes_count: 1, // TODO: 追蹤實際投票數
-                total_players,
+            room_code,
+            ServerMessage::SpectatorCountUpdate {
+                count: spectator_count,
             },
         )
+        .await;
+
+    // 發送當前遊戲狀態（延遲 10 秒後推送）
+    let state_clone = state.clone();
+    let room_code_owned = room_code.to_string();
+    let sender_clone = sender.clone();
+    tokio::spawn(async move {
+        // 延遲 10 秒推送遊戲狀態
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
+        if let Some((game_state, round, phase)) =
+            SpectatorService::get_spectator_game_state(&state_clone, &room_code_owned).await
+        {
+            let count = state_clone
+                .ws_hub
+                .get_spectator_count(&room_code_owned)
+                .await;
+            let _ = sender_clone.send(ServerMessage::SpectatorUpdate {
+                game_state,
+                spectator_count: count,
+                round,
+                phase,
+            });
+        }
+    });
+
+    tracing::info!(
+        conn_id = %conn_id,
+        room_code = %room_code,
+        user_id = %user_id,
+        "觀戰者加入房間"
+    );
+
+    Ok(())
+}
+
+/// 處理觀戰者離開
+async fn handle_spectator_leave(
+    conn_id: Uuid,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    if let Some(room_code) = state.ws_hub.remove_spectator(conn_id).await {
+        let count = state.ws_hub.get_spectator_count(&room_code).await;
+
+        // 廣播觀戰人數更新
+        state
+            .ws_hub
+            .broadcast_to_spectators(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+
+        // 同時通知遊戲內玩家
+        state
+            .ws_hub
+            .broadcast_to_room(
+                &room_code,
+                ServerMessage::SpectatorCountUpdate { count },
+            )
+            .await;
+
+        let _ = sender.send(ServerMessage::info("已離開觀戰"));
+    } else {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "您不在觀戰中",
+        ));
+    }
+
+    Ok(())
+}
+
+/// 處理觀戰者聊天
+async fn handle_spectator_chat(
+    conn_id: Uuid,
+    message: &str,
+    state: &AppState,
+    sender: &mpsc::UnboundedSender<ServerMessage>,
+) -> Result<(), AppError> {
+    // 檢查是否為觀戰者
+    let room_code = match state.ws_hub.get_spectator_room(conn_id).await {
+        Some(code) => code,
+        None => {
+            let _ = sender.send(ServerMessage::error(
+                error_codes::INVALID_ACTION,
+                "您不在觀戰中",
+            ));
+            return Ok(());
+        }
+    };
+
+    // 限制訊息長度（最多 200 字）
+    if message.chars().count() > 200 {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "觀戰聊天訊息不能超過 200 字",
+        ));
+        return Ok(());
+    }
+
+    // 空訊息檢查
+    let trimmed = message.trim();
+    if trimmed.is_empty() {
+        let _ = sender.send(ServerMessage::error(
+            error_codes::INVALID_ACTION,
+            "訊息不能為空",
+        ));
+        return Ok(());
+    }
+
+    // 取得觀戰者名稱
+    let user_name = state
+        .ws_hub
+        .get_spectator_name(conn_id)
+        .await
+        .unwrap_or_else(|| "匿名觀戰者".to_string());
+
+    // 廣播聊天訊息給所有觀戰者（聊天隔離：只在觀戰者之間可見）
+    let chat_msg = ServerMessage::SpectatorChatBroadcast {
+        user_name,
+        message: trimmed.to_string(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+
+    state
+        .ws_hub
+        .broadcast_to_spectators(&room_code, chat_msg)
         .await;
 
     Ok(())
@@ -929,15 +1654,15 @@ async fn handle_propose_alliance(
         }
     };
 
-    // 檢查遊戲狀態（只能在密謀階段提議同盟）
+    // 檢查遊戲狀態（只能在行動階段提議同盟）
     {
         let games = state.games.read().await;
         if let Some(game) = games.get(&room_code) {
             use crate::domain::GamePhase;
-            if game.state.phase != GamePhase::Conspiracy {
+            if game.state.phase != GamePhase::PlayerTurn {
                 let _ = sender.send(ServerMessage::error(
                     error_codes::INVALID_ACTION,
-                    "只能在密謀階段提議同盟",
+                    "只能在行動階段提議同盟",
                 ));
                 return Ok(());
             }
@@ -953,10 +1678,12 @@ async fn handle_propose_alliance(
     // 獲取玩家名稱
     let (proposer_name, target_name) = {
         let players = state.players.read().await;
-        let proposer_name = players.get(&player_id)
+        let proposer_name = players
+            .get(&player_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
-        let target_name = players.get(&target_id)
+        let target_name = players
+            .get(&target_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
         (proposer_name, target_name)
@@ -1025,10 +1752,12 @@ async fn handle_respond_to_alliance(
     // 獲取玩家名稱
     let (proposer_name, responder_name) = {
         let players = state.players.read().await;
-        let proposer_name = players.get(&proposer_id)
+        let proposer_name = players
+            .get(&proposer_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
-        let responder_name = players.get(&player_id)
+        let responder_name = players
+            .get(&player_id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| "未知玩家".to_string());
         (proposer_name, responder_name)
@@ -1103,6 +1832,165 @@ async fn handle_respond_to_alliance(
     Ok(())
 }
 
+/// 廣播遊戲效果到房間
+///
+/// 將 GameEffect 轉換為對應的 ServerMessage 並廣播
+async fn broadcast_game_effects(
+    state: &AppState,
+    room_code: &str,
+    effects: &[crate::game::GameEffect],
+) {
+    for effect in effects {
+        match effect {
+            crate::game::GameEffect::ReputationChange { player_id, amount } => {
+                let (player_name, new_reputation) = {
+                    let games = state.games.read().await;
+                    if let Some(game) = games.get(room_code) {
+                        game.state
+                            .get_player(*player_id)
+                            .map(|p| (p.name.clone(), p.reputation))
+                            .unwrap_or_else(|| ("未知玩家".to_string(), 0))
+                    } else {
+                        continue;
+                    }
+                };
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        room_code,
+                        ServerMessage::ReputationChanged {
+                            player_id: *player_id,
+                            new_reputation,
+                            change: *amount,
+                            reason: if *amount > 0 {
+                                "聲望恢復".to_string()
+                            } else {
+                                "受到傷害".to_string()
+                            },
+                        },
+                    )
+                    .await;
+            }
+            crate::game::GameEffect::GoldChange { player_id, amount } => {
+                let new_gold = {
+                    let games = state.games.read().await;
+                    games
+                        .get(room_code)
+                        .and_then(|g| g.state.get_player(*player_id).map(|p| p.gold))
+                        .unwrap_or(0)
+                };
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        room_code,
+                        ServerMessage::GoldChanged {
+                            player_id: *player_id,
+                            new_gold,
+                            change: *amount,
+                            reason: "技能效果".to_string(),
+                        },
+                    )
+                    .await;
+            }
+            crate::game::GameEffect::PoliticalDeath { player_id } => {
+                let player_name = {
+                    let players = state.players.read().await;
+                    players
+                        .get(player_id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_else(|| "未知玩家".to_string())
+                };
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        room_code,
+                        ServerMessage::PlayerPoliticalDeath {
+                            player_id: *player_id,
+                            player_name,
+                        },
+                    )
+                    .await;
+            }
+            crate::game::GameEffect::Silenced { player_id } => {
+                let player_name = {
+                    let players = state.players.read().await;
+                    players
+                        .get(player_id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_else(|| "未知玩家".to_string())
+                };
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        room_code,
+                        ServerMessage::info(format!("{} 被沉默了", player_name)),
+                    )
+                    .await;
+            }
+            crate::game::GameEffect::SkillRevealed {
+                player_id,
+                character,
+            } => {
+                let player_name = {
+                    let players = state.players.read().await;
+                    players
+                        .get(player_id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_else(|| "未知玩家".to_string())
+                };
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        room_code,
+                        ServerMessage::info(format!(
+                            "{} 的身份被揭露：{}",
+                            player_name,
+                            character.name()
+                        )),
+                    )
+                    .await;
+            }
+            crate::game::GameEffect::AllianceBroken {
+                betrayer_id,
+                victim_id,
+            } => {
+                let (betrayer_name, victim_name) = {
+                    let players = state.players.read().await;
+                    let bn = players
+                        .get(betrayer_id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_else(|| "未知玩家".to_string());
+                    let vn = players
+                        .get(victim_id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_else(|| "未知玩家".to_string());
+                    (bn, vn)
+                };
+
+                state
+                    .ws_hub
+                    .broadcast_to_room(
+                        room_code,
+                        ServerMessage::AllianceBetrayed {
+                            alliance_id: Uuid::new_v4(),
+                            betrayer_id: *betrayer_id,
+                            betrayer_name,
+                            victim_id: *victim_id,
+                            victim_name,
+                        },
+                    )
+                    .await;
+            }
+            _ => {} // PendingCounter, AllianceFormed handled elsewhere
+        }
+    }
+}
+
 /// 處理表情反應
 async fn handle_message_reaction(
     conn_id: Uuid,
@@ -1150,7 +2038,10 @@ async fn handle_message_reaction(
     };
 
     // 廣播表情反應到房間
-    state.ws_hub.broadcast_to_room_with_sequence(&room_code, reaction_msg).await;
+    state
+        .ws_hub
+        .broadcast_to_room_with_sequence(&room_code, reaction_msg)
+        .await;
 
     Ok(())
 }

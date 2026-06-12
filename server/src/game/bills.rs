@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::domain::player::CharacterType;
 use crate::domain::game::VoteChoice;
+use crate::domain::player::CharacterType;
 
 /// 議案
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,19 +62,17 @@ impl BillSystem {
                 effects: BillEffects {
                     passed_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::Thomas, 10);  // 工人聲望+10
-                        changes.insert(CharacterType::Richard, -10);  // 工廠主聲望-10
+                        changes.insert(CharacterType::Thomas, 10); // 工人聲望+10
+                        changes.insert(CharacterType::Richard, -10); // 工廠主聲望-10
                         changes
                     },
                     rejected_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::Thomas, -5);  // 工人聲望-5
-                        changes.insert(CharacterType::Richard, 5);  // 工廠主聲望+5
+                        changes.insert(CharacterType::Thomas, -5); // 工人聲望-5
+                        changes.insert(CharacterType::Richard, 5); // 工廠主聲望+5
                         changes
                     },
-                    special_effects: vec![
-                        "工人獲得額外抽牌機會".to_string(),
-                    ],
+                    special_effects: vec!["工人獲得額外抽牌機會".to_string()],
                 },
             },
             Bill {
@@ -84,23 +82,21 @@ impl BillSystem {
                 effects: BillEffects {
                     passed_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::Edward, -15);  // 記者聲望-15
-                        changes.insert(CharacterType::Thomas, 5);     // 其他人+5
+                        changes.insert(CharacterType::Edward, -15); // 記者聲望-15
+                        changes.insert(CharacterType::Thomas, 5); // 其他人+5
                         changes.insert(CharacterType::Richard, 5);
                         changes.insert(CharacterType::George, 5);
                         changes
                     },
                     rejected_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::Edward, 8);   // 記者聲望+8
-                        changes.insert(CharacterType::Thomas, -2);     // 其他人-2
+                        changes.insert(CharacterType::Edward, 8); // 記者聲望+8
+                        changes.insert(CharacterType::Thomas, -2); // 其他人-2
                         changes.insert(CharacterType::Richard, -2);
                         changes.insert(CharacterType::George, -2);
                         changes
                     },
-                    special_effects: vec![
-                        "記者技能效果減弱".to_string(),
-                    ],
+                    special_effects: vec!["記者技能效果減弱".to_string()],
                 },
             },
             Bill {
@@ -110,19 +106,17 @@ impl BillSystem {
                 effects: BillEffects {
                     passed_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::Richard, 10);  // 工廠主聲望+10
-                        changes.insert(CharacterType::Thomas, 5);     // 工人聲望+5
+                        changes.insert(CharacterType::Richard, 10); // 工廠主聲望+10
+                        changes.insert(CharacterType::Thomas, 5); // 工人聲望+5
                         changes
                     },
                     rejected_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::Richard, -5);  // 工廠主聲望-5
-                        changes.insert(CharacterType::Thomas, -3);    // 工人聲望-3
+                        changes.insert(CharacterType::Richard, -5); // 工廠主聲望-5
+                        changes.insert(CharacterType::Thomas, -3); // 工人聲望-3
                         changes
                     },
-                    special_effects: vec![
-                        "所有玩家金幣+5".to_string(),
-                    ],
+                    special_effects: vec!["所有玩家金幣+5".to_string()],
                 },
             },
             Bill {
@@ -132,19 +126,17 @@ impl BillSystem {
                 effects: BillEffects {
                     passed_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::George, 15);   // 盧德派聲望+15
+                        changes.insert(CharacterType::George, 15); // 盧德派聲望+15
                         changes.insert(CharacterType::Richard, -10); // 工廠主聲望-10
                         changes
                     },
                     rejected_reputation_changes: {
                         let mut changes = HashMap::new();
-                        changes.insert(CharacterType::George, -8);   // 盧德派聲望-8
-                        changes.insert(CharacterType::Richard, 5);   // 工廠主聲望+5
+                        changes.insert(CharacterType::George, -8); // 盧德派聲望-8
+                        changes.insert(CharacterType::Richard, 5); // 工廠主聲望+5
                         changes
                     },
-                    special_effects: vec![
-                        "盧德派技能效果增強".to_string(),
-                    ],
+                    special_effects: vec!["盧德派技能效果增強".to_string()],
                 },
             },
             Bill {
@@ -170,9 +162,7 @@ impl BillSystem {
                         changes.insert(CharacterType::George, -3);
                         changes
                     },
-                    special_effects: vec![
-                        "重新分配投票權重".to_string(),
-                    ],
+                    special_effects: vec!["重新分配投票權重".to_string()],
                 },
             },
         ]
@@ -298,16 +288,24 @@ mod tests {
     #[test]
     fn test_factory_act_effects() {
         let system = BillSystem::new();
-        let factory_act = system.available_bills.iter()
+        let factory_act = system
+            .available_bills
+            .iter()
             .find(|b| b.id == "factory_act")
             .unwrap();
 
         assert_eq!(
-            factory_act.effects.passed_reputation_changes.get(&CharacterType::Thomas),
+            factory_act
+                .effects
+                .passed_reputation_changes
+                .get(&CharacterType::Thomas),
             Some(&10)
         );
         assert_eq!(
-            factory_act.effects.passed_reputation_changes.get(&CharacterType::Richard),
+            factory_act
+                .effects
+                .passed_reputation_changes
+                .get(&CharacterType::Richard),
             Some(&-10)
         );
     }
@@ -316,13 +314,15 @@ mod tests {
     fn test_vote_effects_calculation() {
         let mut system = BillSystem::new();
         let mut rng = thread_rng();
-        
+
         // 選擇工廠法案
         system.current_bill = Some(
-            system.available_bills.iter()
+            system
+                .available_bills
+                .iter()
                 .find(|b| b.id == "factory_act")
                 .unwrap()
-                .clone()
+                .clone(),
         );
 
         let mut player_characters = HashMap::new();

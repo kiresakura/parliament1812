@@ -13,6 +13,9 @@ enum GamePhase {
   @JsonValue('preparation')
   preparation,
   
+  @JsonValue('player_turn')
+  playerTurn,
+  
   @JsonValue('conspiracy')
   conspiracy,
   
@@ -192,21 +195,17 @@ extension RoomExtension on Room {
     return (elapsed / totalDuration).clamp(0.0, 1.0);
   }
 
-  // 獲取階段總時間
+  // 獲取階段總時間（回合制：僅投票/結果有計時）
   int getPhaseDuration(GamePhase phase) {
     switch (phase) {
       case GamePhase.waiting:
-        return 0;
       case GamePhase.preparation:
-        return settings.preparationDuration;
+      case GamePhase.playerTurn:
       case GamePhase.conspiracy:
-        return settings.conspiracyDuration;
       case GamePhase.debate:
-        return settings.debateDuration;
       case GamePhase.event:
-        return settings.eventDuration;
       case GamePhase.finalSpeech:
-        return settings.finalSpeechDuration;
+        return 0; // 回合制不計時
       case GamePhase.voting:
         return settings.votingDuration;
       case GamePhase.result:

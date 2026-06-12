@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="8" fill="#1A1A2E"/>
+  <!-- Coin - Merchant Guild faction -->
+  <circle cx="32" cy="28" r="14" fill="none" stroke="#C9A84C" stroke-width="2"/>
+  <circle cx="32" cy="28" r="10" fill="none" stroke="#C9A84C" stroke-width="1" opacity="0.5"/>
+  <!-- Dollar/Currency symbol -->
+  <text x="32" y="34" text-anchor="middle" font-family="serif" font-size="16" font-weight="bold" fill="#C9A84C">$</text>
+  <!-- Stacked coins effect -->
+  <ellipse cx="34" cy="30" rx="14" ry="4" fill="none" stroke="#C9A84C" stroke-width="1" opacity="0.3"/>
+  <text x="32" y="58" text-anchor="middle" font-family="serif" font-size="8" fill="#C9A84C" opacity="0.7">商會</text>
+</svg>

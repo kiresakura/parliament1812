@@ -9,7 +9,8 @@ use crate::domain::{Player, Room, User};
 use crate::error::AppError;
 use crate::game::GameEngine;
 use crate::repository::{PlayerRepository, RoomRepository, UserRepository};
-use crate::websocket::WebSocketHub;
+use crate::single_player::session::SinglePlayerSession;
+use crate::websocket::{GameTimerManager, SharedTimerManager, WebSocketHub};
 use deadpool_redis::{Config as RedisConfig, Pool as RedisPool, Runtime};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
@@ -32,6 +33,9 @@ pub type RoomPlayersStore = Arc<RwLock<HashMap<String, Vec<Uuid>>>>;
 
 /// 遊戲引擎儲存（room_code -> GameEngine）
 pub type GameStore = Arc<RwLock<HashMap<String, GameEngine>>>;
+
+/// 單人遊戲 Session 儲存
+pub type SinglePlayerStore = Arc<RwLock<HashMap<Uuid, SinglePlayerSession>>>;
 
 /// 應用程式狀態
 ///
@@ -56,8 +60,12 @@ pub struct AppState {
     pub room_players: RoomPlayersStore,
     /// 遊戲引擎儲存（room_code -> GameEngine）
     pub games: GameStore,
+    /// 單人遊戲 Session 儲存
+    pub single_player_sessions: SinglePlayerStore,
     /// WebSocket Hub
     pub ws_hub: Arc<WebSocketHub>,
+    /// 遊戲計時器管理器
+    pub timers: SharedTimerManager,
 }
 
 impl AppState {
@@ -113,7 +121,9 @@ impl AppState {
             players: Arc::new(RwLock::new(HashMap::new())),
             room_players: Arc::new(RwLock::new(HashMap::new())),
             games: Arc::new(RwLock::new(HashMap::new())),
+            single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
+            timers: GameTimerManager::shared(),
         })
     }
 
@@ -149,7 +159,9 @@ impl AppState {
             players: Arc::new(RwLock::new(HashMap::new())),
             room_players: Arc::new(RwLock::new(HashMap::new())),
             games: Arc::new(RwLock::new(HashMap::new())),
+            single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
+            timers: GameTimerManager::shared(),
         })
     }
 
@@ -186,7 +198,9 @@ impl AppState {
             players: Arc::new(RwLock::new(HashMap::new())),
             room_players: Arc::new(RwLock::new(HashMap::new())),
             games: Arc::new(RwLock::new(HashMap::new())),
+            single_player_sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_hub: WebSocketHub::new(),
+            timers: GameTimerManager::shared(),
         }
     }
 
@@ -270,7 +284,9 @@ impl std::fmt::Debug for AppState {
             .field("players", &"PlayerStore { ... }")
             .field("room_players", &"RoomPlayersStore { ... }")
             .field("games", &"GameStore { ... }")
+            .field("single_player_sessions", &"SinglePlayerStore { ... }")
             .field("ws_hub", &"WebSocketHub { ... }")
+            .field("timers", &"SharedTimerManager { ... }")
             .finish()
     }
 }

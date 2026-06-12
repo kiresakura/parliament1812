@@ -135,12 +135,30 @@ pub enum ClientMessage {
         accept: bool,
     },
 
+    /// 結束回合（回合制）
+    EndTurn,
+
     /// 表情反應
     ReactToMessage {
         /// 目標消息 ID（房間內的消息序列號）
         message_seq: u64,
         /// 表情 emoji
         emoji: String,
+    },
+
+    /// 觀戰者加入房間
+    SpectatorJoin {
+        /// 房間代碼
+        room_code: String,
+    },
+
+    /// 觀戰者離開
+    SpectatorLeave,
+
+    /// 觀戰者聊天
+    SpectatorChat {
+        /// 聊天內容
+        message: String,
     },
 
     /// 心跳
@@ -223,6 +241,9 @@ pub enum ServerMessage {
         phase: GamePhase,
         /// 階段持續時間（秒）
         duration_secs: u32,
+        /// 回合順序（玩家 ID 列表）
+        #[serde(default)]
+        turn_order: Vec<Uuid>,
     },
 
     /// 階段變更
@@ -423,6 +444,42 @@ pub enum ServerMessage {
         message_type: SystemMessageType,
     },
 
+    /// 觀戰者遊戲狀態更新（延遲 10 秒）
+    SpectatorUpdate {
+        /// 經過淨化的遊戲狀態
+        game_state: serde_json::Value,
+        /// 觀戰者人數
+        spectator_count: u32,
+        /// 當前回合
+        round: i32,
+        /// 當前階段
+        phase: String,
+    },
+
+    /// 觀戰者聊天廣播
+    SpectatorChatBroadcast {
+        /// 發送者名稱
+        user_name: String,
+        /// 聊天內容
+        message: String,
+        /// 時間戳
+        timestamp: String,
+    },
+
+    /// 觀戰者人數更新
+    SpectatorCountUpdate {
+        /// 觀戰者人數
+        count: u32,
+    },
+
+    /// 觀戰者加入確認
+    SpectatorJoined {
+        /// 房間代碼
+        room_code: String,
+        /// 觀戰者人數
+        spectator_count: u32,
+    },
+
     /// 心跳回應
     Pong {
         /// 伺服器時間戳
@@ -435,6 +492,19 @@ pub enum ServerMessage {
         remaining_secs: u32,
     },
 
+    /// 回合變更（回合制：輪到某玩家行動）
+    TurnChanged {
+        /// 當前行動玩家 ID
+        current_player_id: Uuid,
+        /// 當前行動玩家名稱
+        current_player_name: String,
+        /// 剩餘行動點數
+        action_points: i32,
+        /// 回合順序（玩家 ID 列表）
+        #[serde(default)]
+        turn_order: Vec<Uuid>,
+    },
+
     /// 重連數據（發送完整遊戲狀態）
     ReconnectData {
         /// 房間資訊
@@ -442,7 +512,7 @@ pub enum ServerMessage {
         /// 玩家列表
         players: Vec<PlayerResponse>,
         /// 遊戲狀態（如果遊戲已開始）
-        game_state: Option<GameStateSnapshot>,
+        game_state: Box<Option<GameStateSnapshot>>,
         /// 最新序列號
         latest_seq: u64,
     },
@@ -599,6 +669,9 @@ pub struct GameStateSnapshot {
     pub vote_state: Option<VoteStateSnapshot>,
     /// 同盟關係
     pub alliances: Vec<AllianceSnapshot>,
+    /// 回合順序（玩家 ID 列表）
+    #[serde(default)]
+    pub turn_order: Vec<Uuid>,
 }
 
 /// 議案快照
@@ -706,7 +779,12 @@ impl ServerMessage {
 impl ClientMessage {
     /// 檢查訊息是否需要在房間內
     pub fn requires_room(&self) -> bool {
-        !matches!(self, ClientMessage::JoinRoom { .. } | ClientMessage::Ping)
+        !matches!(
+            self,
+            ClientMessage::JoinRoom { .. }
+                | ClientMessage::Ping
+                | ClientMessage::SpectatorJoin { .. }
+        )
     }
 
     /// 檢查訊息是否需要遊戲進行中
@@ -717,6 +795,7 @@ impl ClientMessage {
                 | ClientMessage::Counter
                 | ClientMessage::UseSkill { .. }
                 | ClientMessage::Vote { .. }
+                | ClientMessage::EndTurn
         )
     }
 }

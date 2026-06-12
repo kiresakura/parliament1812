@@ -1,9 +1,16 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
-import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../ui/theme/game_colors.dart' as gc;
+import '../../ui/theme/game_fonts.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -40,24 +47,131 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleGoogleLogin() async {
-    // Google Sign-In 整合（需要 google_sign_in package）
-    // 暫時用 mock token
-    final notifier = ref.read(authProvider.notifier);
-    final success =
-        await notifier.loginWithGoogleToken('mock_google_testuser');
-    if (success && mounted) {
-      context.go('/menu');
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        serverClientId:
+            '1071586546991-lglhakpba06p2ts3j5b50d2joa8ou7hj.apps.googleusercontent.com',
+      );
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+      if (account == null) return; // User cancelled
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+      final String? idToken = auth.idToken;
+
+      if (idToken == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Google 登入失敗：無法取得 Token')),
+          );
+        }
+        return;
+      }
+
+      final notifier = ref.read(authProvider.notifier);
+      final success = await notifier.loginWithGoogleToken(idToken);
+      if (success && mounted) {
+        context.go('/menu');
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text(ref.read(authProvider).error ?? 'Google 登入失敗')),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('=== GOOGLE SIGN-IN ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Type: ${e.runtimeType}');
+      debugPrint('Stack: $stackTrace');
+      debugPrint('============================');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google 登入錯誤: $e'),
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
     }
   }
 
+  static String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+        length, (_) => charset[random.nextInt(charset.length)]).join();
+  }
+
+  static String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   Future<void> _handleAppleLogin() async {
-    // Apple Sign-In 整合（需要 sign_in_with_apple package）
-    // 暫時用 mock token
-    final notifier = ref.read(authProvider.notifier);
-    final success =
-        await notifier.loginWithAppleToken('mock_apple_testuser');
-    if (success && mounted) {
-      context.go('/menu');
+    try {
+      final rawNonce = _generateNonce();
+      final nonce = _sha256ofString(rawNonce);
+
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
+      );
+
+      final identityToken = credential.identityToken;
+      if (identityToken == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Apple 登入失敗：無法取得 Token')),
+          );
+        }
+        return;
+      }
+
+      final displayName = [
+        credential.givenName,
+        credential.familyName,
+      ].where((n) => n != null).join(' ');
+
+      final notifier = ref.read(authProvider.notifier);
+      final success = await notifier.loginWithAppleToken(
+        identityToken,
+        displayName: displayName.isNotEmpty ? displayName : null,
+      );
+
+      if (success && mounted) {
+        context.go('/menu');
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text(ref.read(authProvider).error ?? 'Apple 登入失敗')),
+        );
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      // User cancelled or authorization failed
+      if (e.code != AuthorizationErrorCode.canceled && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Apple 授權失敗: ${e.message}'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Apple 登入錯誤: $e'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -73,15 +187,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.surface,
-              theme.colorScheme.surfaceContainer,
-            ],
-          ),
+        decoration: const BoxDecoration(
+          gradient: gc.GameColors.bgGradient,
         ),
         child: SafeArea(
           child: Center(
@@ -92,20 +199,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 標題
+                    // 標題 — 維多利亞金 + 陰影
                     Text(
                       '1812',
-                      style: theme.textTheme.displayLarge?.copyWith(
-                        color: Parliament1812Theme.darkRed,
+                      style: GameFont.gameTitle.copyWith(
+                        color: gc.GameColors.victorianGold,
                         fontSize: 56,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
+                        shadows: [
+                          Shadow(
+                            color: gc.GameColors.goldDim,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                     ),
                     Text(
                       '國會風雲',
-                      style: theme.textTheme.displayMedium?.copyWith(
-                        color: Parliament1812Theme.gold,
+                      style: GameFont.sectionTitle.copyWith(
+                        color: gc.GameColors.victorianGold,
+                        fontSize: 28,
                         letterSpacing: 4,
                       ),
                     ),
@@ -167,7 +280,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Text(
                           '忘記密碼？',
                           style: TextStyle(
-                            color: Parliament1812Theme.gold.withValues(alpha: 0.8),
+                            color: gc.GameColors.victorianGold.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -187,22 +300,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
 
-                    // 登入按鈕
+                    // 登入按鈕 — 金色漸層
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: authState.isLoading ? null : _handleLogin,
-                        child: authState.isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Parliament1812Theme.cream,
+                      height: 56,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: gc.GameColors.goldButtonGradient,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: gc.GameColors.goldLight.withValues(alpha: 0.5),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: gc.GameColors.victorianGold.withValues(alpha: 0.3),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: authState.isLoading ? null : _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: authState.isLoading
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: gc.GameColors.bgPrimary,
+                                  ),
+                                )
+                              : Text(
+                                  '登入',
+                                  style: GameFont.primaryButton.copyWith(
+                                    color: gc.GameColors.bgPrimary,
+                                  ),
                                 ),
-                              )
-                            : const Text('登入'),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -212,8 +353,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       children: [
                         Expanded(
                           child: Divider(
-                            color: Parliament1812Theme.lightBrown
-                                .withValues(alpha: 0.3),
+                            color: gc.GameColors.victorianGold
+                                .withValues(alpha: 0.2),
                           ),
                         ),
                         Padding(
@@ -221,15 +362,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: Text(
                             '或',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: Parliament1812Theme.cream
-                                  .withValues(alpha: 0.6),
+                              color: gc.GameColors.textMuted,
                             ),
                           ),
                         ),
                         Expanded(
                           child: Divider(
-                            color: Parliament1812Theme.lightBrown
-                                .withValues(alpha: 0.3),
+                            color: gc.GameColors.victorianGold
+                                .withValues(alpha: 0.2),
                           ),
                         ),
                       ],
@@ -247,19 +387,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         label: const Text('使用 Google 登入'),
                       ),
                     ),
-                    const SizedBox(height: 12),
 
-                    // Apple 登入
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            authState.isLoading ? null : _handleAppleLogin,
-                        icon: const Icon(Icons.apple, size: 24),
-                        label: const Text('使用 Apple 登入'),
+                    // Apple 登入（僅 iOS）
+                    if (Theme.of(context).platform == TargetPlatform.iOS) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              authState.isLoading ? null : _handleAppleLogin,
+                          icon: const Icon(Icons.apple, size: 24),
+                          label: const Text('使用 Apple 登入'),
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 24),
 
                     // 註冊連結
@@ -269,16 +411,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Text(
                           '沒有帳號？',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Parliament1812Theme.cream
-                                .withValues(alpha: 0.7),
+                            color: gc.GameColors.textSecondary,
                           ),
                         ),
                         TextButton(
                           onPressed: () => context.go('/register'),
-                          child: const Text(
+                          child: Text(
                             '立即註冊',
                             style: TextStyle(
-                              color: Parliament1812Theme.gold,
+                              color: gc.GameColors.victorianGold,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -292,8 +433,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: Text(
                         '以訪客身份進入',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Parliament1812Theme.cream
-                              .withValues(alpha: 0.5),
+                          color: gc.GameColors.textMuted,
                           decoration: TextDecoration.underline,
                         ),
                       ),

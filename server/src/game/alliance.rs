@@ -73,10 +73,8 @@ impl Alliance {
         if self.members.len() != 2 {
             return None;
         }
-        
-        self.members.iter()
-            .find(|&&id| id != player_id)
-            .copied()
+
+        self.members.iter().find(|&&id| id != player_id).copied()
     }
 
     /// 檢查同盟是否有效（已建立且未被背叛）
@@ -105,7 +103,11 @@ impl AllianceManager {
     /// 提議同盟
     ///
     /// 返回同盟 ID（如果創建成功）
-    pub fn propose_alliance(&mut self, proposer: Uuid, target: Uuid) -> Result<Uuid, AllianceError> {
+    pub fn propose_alliance(
+        &mut self,
+        proposer: Uuid,
+        target: Uuid,
+    ) -> Result<Uuid, AllianceError> {
         // 檢查是否已有同盟關係
         if self.are_allied(proposer, target) {
             return Err(AllianceError::AlreadyAllied);
@@ -131,7 +133,10 @@ impl AllianceManager {
         let alliance_id = alliance.id;
 
         self.alliances.insert(alliance_id, alliance);
-        self.pending_proposals.entry(target).or_insert_with(Vec::new).push(proposer);
+        self.pending_proposals
+            .entry(target)
+            .or_default()
+            .push(proposer);
 
         Ok(alliance_id)
     }
@@ -149,11 +154,13 @@ impl AllianceManager {
         }
 
         // 找到對應的同盟
-        let alliance_id = self.alliances.iter()
+        let alliance_id = self
+            .alliances
+            .iter()
             .find(|(_, alliance)| {
-                alliance.state == AllianceState::Proposed &&
-                alliance.members.contains(&proposer) &&
-                alliance.members.contains(&target)
+                alliance.state == AllianceState::Proposed
+                    && alliance.members.contains(&proposer)
+                    && alliance.members.contains(&target)
             })
             .map(|(id, _)| *id)
             .ok_or(AllianceError::ProposalNotFound)?;
@@ -164,7 +171,10 @@ impl AllianceManager {
 
             // 更新玩家映射
             for &member in &alliance.members {
-                self.player_alliances.entry(member).or_insert_with(Vec::new).push(alliance_id);
+                self.player_alliances
+                    .entry(member)
+                    .or_default()
+                    .push(alliance_id);
             }
 
             return Ok(alliance_id);
@@ -186,11 +196,13 @@ impl AllianceManager {
         }
 
         // 移除同盟記錄
-        let alliance_id = self.alliances.iter()
+        let alliance_id = self
+            .alliances
+            .iter()
             .find(|(_, alliance)| {
-                alliance.state == AllianceState::Proposed &&
-                alliance.members.contains(&proposer) &&
-                alliance.members.contains(&target)
+                alliance.state == AllianceState::Proposed
+                    && alliance.members.contains(&proposer)
+                    && alliance.members.contains(&target)
             })
             .map(|(id, _)| *id);
 
@@ -203,7 +215,8 @@ impl AllianceManager {
 
     /// 背叛同盟
     pub fn betray_alliance(&mut self, betrayer: Uuid, target: Uuid) -> Result<Uuid, AllianceError> {
-        let alliance_id = self.find_active_alliance(betrayer, target)
+        let alliance_id = self
+            .find_active_alliance(betrayer, target)
             .ok_or(AllianceError::NoActiveAlliance)?;
 
         if let Some(alliance) = self.alliances.get_mut(&alliance_id) {
@@ -243,7 +256,8 @@ impl AllianceManager {
     /// 獲取玩家的所有有效同盟
     pub fn get_player_alliances(&self, player_id: Uuid) -> Vec<&Alliance> {
         if let Some(alliance_ids) = self.player_alliances.get(&player_id) {
-            alliance_ids.iter()
+            alliance_ids
+                .iter()
                 .filter_map(|id| self.alliances.get(id))
                 .filter(|alliance| alliance.is_active())
                 .collect()
@@ -254,12 +268,16 @@ impl AllianceManager {
 
     /// 獲取玩家的待處理提議
     pub fn get_pending_proposals_for(&self, player_id: Uuid) -> Vec<Uuid> {
-        self.pending_proposals.get(&player_id).cloned().unwrap_or_default()
+        self.pending_proposals
+            .get(&player_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// 獲取所有有效同盟
     pub fn get_all_active_alliances(&self) -> Vec<&Alliance> {
-        self.alliances.values()
+        self.alliances
+            .values()
             .filter(|alliance| alliance.is_active())
             .collect()
     }
@@ -267,10 +285,12 @@ impl AllianceManager {
     /// 清理過期提議（超過 5 分鐘自動過期）
     pub fn cleanup_expired_proposals(&mut self) {
         let now = chrono::Utc::now().timestamp_millis();
-        let expired_alliances: Vec<Uuid> = self.alliances.iter()
+        let expired_alliances: Vec<Uuid> = self
+            .alliances
+            .iter()
             .filter(|(_, alliance)| {
-                alliance.state == AllianceState::Proposed &&
-                (now - alliance.created_at) > 300_000 // 5 分鐘
+                alliance.state == AllianceState::Proposed && (now - alliance.created_at) > 300_000
+                // 5 分鐘
             })
             .map(|(id, _)| *id)
             .collect();
@@ -307,7 +327,11 @@ impl AllianceManager {
     }
 
     /// 建立雙向提議的同盟
-    fn establish_mutual_alliance(&mut self, player1: Uuid, player2: Uuid) -> Result<Uuid, AllianceError> {
+    fn establish_mutual_alliance(
+        &mut self,
+        player1: Uuid,
+        player2: Uuid,
+    ) -> Result<Uuid, AllianceError> {
         let mut alliance = Alliance::new_proposal(player1, player2);
         alliance.accept(); // 直接建立
         let alliance_id = alliance.id;
@@ -330,8 +354,14 @@ impl AllianceManager {
         self.alliances.insert(alliance_id, alliance);
 
         // 更新玩家映射
-        self.player_alliances.entry(player1).or_insert_with(Vec::new).push(alliance_id);
-        self.player_alliances.entry(player2).or_insert_with(Vec::new).push(alliance_id);
+        self.player_alliances
+            .entry(player1)
+            .or_default()
+            .push(alliance_id);
+        self.player_alliances
+            .entry(player2)
+            .or_default()
+            .push(alliance_id);
 
         Ok(alliance_id)
     }
@@ -401,7 +431,7 @@ mod tests {
 
         // 應該直接建立同盟
         assert!(manager.are_allied(player1, player2));
-        
+
         let alliance = manager.alliances.get(&alliance_id).unwrap();
         assert_eq!(alliance.state, AllianceState::Established);
     }
@@ -438,10 +468,16 @@ mod tests {
         manager.accept_proposal(player2, player1).unwrap();
 
         // 盟友間傷害減半
-        assert_eq!(manager.calculate_damage_reduction(player1, player2, 100), 50);
-        
+        assert_eq!(
+            manager.calculate_damage_reduction(player1, player2, 100),
+            50
+        );
+
         // 非盟友傷害不變
-        assert_eq!(manager.calculate_damage_reduction(player1, player3, 100), 100);
+        assert_eq!(
+            manager.calculate_damage_reduction(player1, player3, 100),
+            100
+        );
     }
 
     #[test]

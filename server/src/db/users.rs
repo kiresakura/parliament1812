@@ -111,10 +111,7 @@ impl UserDb {
     }
 
     /// 更新最後登入時間
-    pub async fn update_last_login(
-        pool: &PgPool,
-        user_id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
+    pub async fn update_last_login(pool: &PgPool, user_id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             UPDATE users

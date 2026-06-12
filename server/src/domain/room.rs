@@ -72,8 +72,8 @@ impl Room {
 
     /// 檢查是否可以觀戰
     pub fn can_spectate(&self, current_spectator_count: usize) -> bool {
-        (current_spectator_count as i32) < self.max_spectators && 
-        (self.status == RoomStatus::Waiting || self.status == RoomStatus::Playing)
+        (current_spectator_count as i32) < self.max_spectators
+            && (self.status == RoomStatus::Waiting || self.status == RoomStatus::Playing)
     }
 
     /// 生成 6 位房間代碼

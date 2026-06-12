@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="8" fill="#1A1A2E"/>
+  <!-- Crown - Royalist faction -->
+  <path d="M18 38 L18 22 L26 30 L32 18 L38 30 L46 22 L46 38 Z" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Crown base -->
+  <rect x="16" y="38" width="32" height="4" rx="1" fill="none" stroke="#C9A84C" stroke-width="2"/>
+  <!-- Jewels -->
+  <circle cx="32" cy="22" r="2" fill="#C9A84C" opacity="0.6"/>
+  <circle cx="22" cy="28" r="1.5" fill="#C9A84C" opacity="0.4"/>
+  <circle cx="42" cy="28" r="1.5" fill="#C9A84C" opacity="0.4"/>
+  <text x="32" y="58" text-anchor="middle" font-family="serif" font-size="8" fill="#C9A84C" opacity="0.7">王黨</text>
+</svg>

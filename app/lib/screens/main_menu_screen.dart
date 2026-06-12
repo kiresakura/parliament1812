@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/auth_provider.dart';
 import '../providers/friends_provider.dart';
 import '../providers/quests_provider.dart';
 import '../services/audio_service.dart';
+import '../services/performance_service.dart';
+import '../config/theme.dart';
+import '../ui/theme/game_colors.dart' as gc;
+import '../ui/theme/game_fonts.dart';
+import '../widgets/stamina_bar.dart';
 
 class MainMenuScreen extends ConsumerWidget {
   const MainMenuScreen({super.key});
@@ -18,17 +24,16 @@ class MainMenuScreen extends ConsumerWidget {
       ref.read(audioServiceProvider).playBgm(BgmType.menu);
     });
 
+    final config = ref.watch(qualityConfigProvider);
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.surface,
-              theme.colorScheme.surfaceContainer,
-            ],
-          ),
+          // 低品質：純色替代漸層
+          color: !config.enableGradients ? gc.GameColors.bgPrimary : null,
+          gradient: config.enableGradients
+              ? gc.GameColors.bgGradient
+              : null,
         ),
         child: SafeArea(
           child: LayoutBuilder(
@@ -43,37 +48,53 @@ class MainMenuScreen extends ConsumerWidget {
                       children: [
                         const SizedBox(height: 24),
 
-                        // 標題
+                        // 標題 — 維多利亞金
                         Column(
                           children: [
                             Text(
                               '1812',
-                              style: theme.textTheme.displayLarge?.copyWith(
-                                color: theme.colorScheme.primary,
+                              style: GameFont.gameTitle.copyWith(
+                                color: gc.GameColors.victorianGold,
                                 fontSize: 56,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2,
+                                shadows: [
+                                  Shadow(
+                                    color: gc.GameColors.goldDim,
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
                             ),
                             Text(
                               '國會風雲',
-                              style: theme.textTheme.displayMedium?.copyWith(
-                                color: theme.colorScheme.secondary,
+                              style: GameFont.sectionTitle.copyWith(
+                                color: gc.GameColors.victorianGold,
+                                fontSize: 28,
                                 letterSpacing: 4,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               '政治角力與卡牌策略',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                              style: GameFont.billBody.copyWith(
+                                color: gc.GameColors.textSecondary,
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
                           ],
                         ),
 
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 24),
+
+                        // 用戶資訊區
+                        _UserInfoBanner(ref: ref),
+
+                        const SizedBox(height: 12),
+
+                        // 行動力顯示
+                        const StaminaBar(),
+
+                        const SizedBox(height: 24),
 
                         // 主選單
                         _MenuButton(
@@ -81,6 +102,13 @@ class MainMenuScreen extends ConsumerWidget {
                           title: '快速匹配',
                           subtitle: '立即開始一局遊戲',
                           onPressed: () => context.go('/rooms'),
+                        ),
+                        const SizedBox(height: 12),
+                        _MenuButton(
+                          icon: Icons.smart_toy,
+                          title: 'AI 對戰',
+                          subtitle: '挑戰 AI，每日 10 場免費',
+                          onPressed: () => context.go('/single-player/difficulty'),
                         ),
                         const SizedBox(height: 12),
                         _MenuButton(
@@ -109,26 +137,37 @@ class MainMenuScreen extends ConsumerWidget {
                         _FriendsMenuButton(ref: ref),
                         const SizedBox(height: 12),
                         _MenuButton(
+                          icon: Icons.auto_stories,
+                          title: '故事戰役',
+                          subtitle: '5 章節故事模式',
+                          onPressed: () => context.go('/campaign'),
+                        ),
+                        const SizedBox(height: 12),
+                        _MenuButton(
                           icon: Icons.school,
                           title: '遊戲教學',
                           subtitle: '學習遊戲規則與策略',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const TutorialScreen()),
-                            );
-                          },
+                          onPressed: () => context.go('/tutorial'),
                         ),
 
                         const SizedBox(height: 24),
 
-                        // 設定
-                        Center(
-                          child: OutlinedButton.icon(
-                            onPressed: () => context.go('/settings'),
-                            icon: const Icon(Icons.settings),
-                            label: const Text('設定'),
-                          ),
+                        // 設定 & 個人檔案
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => context.go('/profile'),
+                              icon: const Icon(Icons.person),
+                              label: const Text('個人檔案'),
+                            ),
+                            const SizedBox(width: 12),
+                            OutlinedButton.icon(
+                              onPressed: () => context.go('/settings'),
+                              icon: const Icon(Icons.settings),
+                              label: const Text('設定'),
+                            ),
+                          ],
                         ),
 
                         const Spacer(),
@@ -155,6 +194,148 @@ class MainMenuScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+// ============================================================
+// User Info Banner
+// ============================================================
+
+class _UserInfoBanner extends ConsumerWidget {
+  final WidgetRef ref;
+
+  const _UserInfoBanner({required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+
+    if (user == null) {
+      // 訪客模式：顯示登入提示
+      return Card(
+        child: InkWell(
+          onTap: () => context.go('/login'),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Parliament1812Theme.charcoal,
+                  child: Icon(
+                    Icons.account_circle,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    '登入以保存進度',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Parliament1812Theme.gold,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 已登入：顯示用戶資訊
+    final elo = user.eloRating ?? 1000;
+    final rankEmoji = _getRankEmoji(elo);
+
+    return Card(
+      child: InkWell(
+        onTap: () => context.go('/profile'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              // 頭像
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Parliament1812Theme.gold.withValues(alpha: 0.6),
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Parliament1812Theme.charcoal,
+                  backgroundImage: user.avatarUrl != null
+                      ? NetworkImage(user.avatarUrl!)
+                      : null,
+                  child: user.avatarUrl == null
+                      ? Text(
+                          _getInitial(user.displayName ?? user.username),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: Parliament1812Theme.gold,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 14),
+              // 名稱 + ELO
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.displayName ?? user.username,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$rankEmoji ELO $elo',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Parliament1812Theme.gold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getInitial(String name) {
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
+  String _getRankEmoji(int elo) {
+    if (elo >= 1800) return '👑';
+    if (elo >= 1600) return '💠';
+    if (elo >= 1400) return '💎';
+    if (elo >= 1200) return '🥇';
+    if (elo >= 1000) return '🥈';
+    return '🥉';
   }
 }
 
@@ -457,11 +638,11 @@ class CardCatalogScreen extends StatelessWidget {
 }
 
 // ============================================================
-// Tutorial Screen (遊戲教學)
+// Tutorial Screen (舊版靜態教學，保留供參考)
 // ============================================================
 
-class TutorialScreen extends StatelessWidget {
-  const TutorialScreen({super.key});
+class _OldTutorialScreen extends StatelessWidget {
+  const _OldTutorialScreen();
 
   @override
   Widget build(BuildContext context) {

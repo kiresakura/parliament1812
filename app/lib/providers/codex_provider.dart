@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../services/api_service.dart';
 
 // ═══════════════════════════════════════════
 // 圖鑑資料模型
@@ -31,6 +34,36 @@ class CodexCard {
     this.owned = false,
   });
 
+  /// 從 API JSON 建立（Rust snake_case → Dart camelCase）
+  factory CodexCard.fromJson(Map<String, dynamic> json) {
+    return CodexCard(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String,
+      cardType: json['card_type'] as String,
+      rarity: _parseRarity(json['rarity'] as String),
+      character: json['character'] as String?,
+      unlockCondition: json['unlock_condition'] as String,
+      flavorText: json['flavor_text'] as String,
+      owned: json['owned'] as bool? ?? false,
+    );
+  }
+
+  static CodexRarity _parseRarity(String value) {
+    switch (value) {
+      case 'common':
+        return CodexRarity.common;
+      case 'uncommon':
+        return CodexRarity.uncommon;
+      case 'rare':
+        return CodexRarity.rare;
+      case 'legendary':
+        return CodexRarity.legendary;
+      default:
+        return CodexRarity.common;
+    }
+  }
+
   CodexCard copyWith({bool? owned}) => CodexCard(
         id: id,
         name: name,
@@ -42,6 +75,28 @@ class CodexCard {
         flavorText: flavorText,
         owned: owned ?? this.owned,
       );
+
+  /// 取得卡牌美術資源路徑
+  String get imagePath {
+    // 角色簽名卡 & 傳說事件卡：特殊前綴
+    const specialMap = {
+      'thomas_unity': 'card_worker_thomas-unity_char.png',
+      'richard_bribe': 'card_industrial_richard-bribe_char.png',
+      'edward_scoop': 'card_radical_edward-scoop_char.png',
+      'george_fury': 'card_luddite_george-fury_char.png',
+      'legendary_peterloo': 'card_event_peterloo_char.png',
+      'legendary_magna_carta': 'card_event_magna-carta_char.png',
+    };
+
+    if (specialMap.containsKey(id)) {
+      return 'assets/images/cards/${specialMap[id]}';
+    }
+
+    // 一般卡：去掉稀有度前綴，底線轉連字號
+    final stripped = id.replaceFirst(RegExp(r'^(common|uncommon|rare|legendary)_'), '');
+    final hyphenated = stripped.replaceAll('_', '-');
+    return 'assets/images/cards/card_strategy_${hyphenated}_char.png';
+  }
 }
 
 /// 收藏統計
@@ -55,6 +110,15 @@ class CodexStats {
     required this.collectedCards,
     required this.collectionPercentage,
   });
+
+  /// 從 API JSON 建立
+  factory CodexStats.fromJson(Map<String, dynamic> json) {
+    return CodexStats(
+      totalCards: json['total_cards'] as int,
+      collectedCards: json['collected_cards'] as int,
+      collectionPercentage: (json['collection_percentage'] as num).toDouble(),
+    );
+  }
 }
 
 /// 圖鑑狀態
@@ -97,10 +161,55 @@ final codexProvider = StateNotifierProvider<CodexNotifier, CodexState>((ref) {
 
 class CodexNotifier extends StateNotifier<CodexState> {
   CodexNotifier() : super(const CodexState(isLoading: true)) {
-    _loadLocalData();
+    _init();
   }
 
-  /// 從本地靜態資料載入（離線模式 / 開發用）
+  /// 初始化：先嘗試 API，失敗則 fallback 到本地資料
+  Future<void> _init() async {
+    try {
+      await _loadFromApi();
+    } catch (e) {
+      debugPrint('[Codex] API 載入失敗，使用本地資料: $e');
+      _loadLocalData();
+    }
+  }
+
+  /// 從 API 載入卡牌列表與統計
+  Future<void> _loadFromApi() async {
+    final cardsResult = await ApiService().getCodexCards();
+    final statsResult = await ApiService().getCodexStats();
+
+    if (!cardsResult.success || cardsResult.data == null) {
+      throw Exception(cardsResult.error ?? 'API 回傳失敗');
+    }
+
+    final cardsJson = cardsResult.data!['cards'] as List<dynamic>;
+    final cards = cardsJson
+        .map((json) => CodexCard.fromJson(json as Map<String, dynamic>))
+        .toList();
+
+    CodexStats stats;
+    if (statsResult.success && statsResult.data != null) {
+      stats = CodexStats.fromJson(statsResult.data!);
+    } else {
+      // stats API 失敗時從卡牌資料計算
+      final owned = cards.where((c) => c.owned).length;
+      stats = CodexStats(
+        totalCards: cards.length,
+        collectedCards: owned,
+        collectionPercentage:
+            cards.isEmpty ? 0 : (owned / cards.length * 100).roundToDouble(),
+      );
+    }
+
+    state = CodexState(
+      allCards: cards,
+      stats: stats,
+      isLoading: false,
+    );
+  }
+
+  /// 從本地靜態資料載入（離線模式 / 開發用 fallback）
   void _loadLocalData() {
     final cards = _buildAllCards();
     // 模擬：初始擁有前 8 張（MVP 卡牌）
@@ -131,11 +240,15 @@ class CodexNotifier extends StateNotifier<CodexState> {
     );
   }
 
-  /// TODO: 從 API 載入
+  /// 重新載入（API 優先，fallback 本地資料）
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true);
-    // 目前使用本地資料
-    _loadLocalData();
+    try {
+      await _loadFromApi();
+    } catch (e) {
+      debugPrint('[Codex] refresh API 失敗，使用本地資料: $e');
+      _loadLocalData();
+    }
   }
 }
 

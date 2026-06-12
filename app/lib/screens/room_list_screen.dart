@@ -107,7 +107,7 @@ class _RoomListScreenState extends ConsumerState<RoomListScreen> {
                           labelText: '狀態篩選',
                           isDense: true,
                         ),
-                        value: 'all',
+                        initialValue: 'all',
                         items: const [
                           DropdownMenuItem(value: 'all', child: Text('全部')),
                           DropdownMenuItem(value: 'waiting', child: Text('等待中')),

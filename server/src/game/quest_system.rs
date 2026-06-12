@@ -9,6 +9,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::quests::{all_quest_templates, QuestReward, QuestTemplate, QuestType};
+use super::weekly_system;
+use super::weekly_challenges::WeeklyQuestType;
 
 // ============================================================
 // 資料模型
@@ -89,12 +91,12 @@ pub fn today_utc8() -> NaiveDate {
 pub fn seconds_until_reset() -> i64 {
     let now = Utc::now();
     let utc8_now = now + chrono::Duration::hours(8);
-    let tomorrow = utc8_now.date_naive().succ_opt().unwrap_or(utc8_now.date_naive());
-    let reset_time = tomorrow
-        .and_hms_opt(0, 0, 0)
-        .expect("valid time")
-        .and_utc()
-        - chrono::Duration::hours(8);
+    let tomorrow = utc8_now
+        .date_naive()
+        .succ_opt()
+        .unwrap_or(utc8_now.date_naive());
+    let reset_time =
+        tomorrow.and_hms_opt(0, 0, 0).expect("valid time").and_utc() - chrono::Duration::hours(8);
     (reset_time - now).num_seconds().max(0)
 }
 
@@ -135,7 +137,7 @@ pub async fn get_daily_quests(
     let quests: Vec<DailyQuest> = rows
         .iter()
         .filter_map(|row| {
-            let qt = QuestType::from_str(&row.quest_id)?;
+            let qt = QuestType::parse(&row.quest_id)?;
             let template = templates.iter().find(|t| t.quest_type == qt)?;
             Some(DailyQuest {
                 quest_id: row.quest_id.clone(),
@@ -233,7 +235,7 @@ pub async fn claim_quest_reward(
     }
 
     // 找到對應模板
-    let qt = QuestType::from_str(quest_id).ok_or(ClaimError::NotFound)?;
+    let qt = QuestType::parse(quest_id).ok_or(ClaimError::NotFound)?;
     let templates = all_quest_templates();
     let template = templates
         .iter()
@@ -312,7 +314,9 @@ pub async fn claim_quest_reward(
         .map_err(ClaimError::Db)?;
 
         // 更新連續紀錄
-        update_streak(&mut tx, user_id, today).await.map_err(ClaimError::Db)?;
+        update_streak(&mut tx, user_id, today)
+            .await
+            .map_err(ClaimError::Db)?;
     }
 
     tx.commit().await.map_err(ClaimError::Db)?;
@@ -320,9 +324,26 @@ pub async fn claim_quest_reward(
     Ok((reward_desc, bonus_gems))
 }
 
-/// 遊戲結束後批次更新所有玩家的任務進度
+/// 將每日任務類型映射到對應的週挑戰類型（如果存在）
+fn map_quest_to_weekly(quest_type: QuestType) -> Option<WeeklyQuestType> {
+    match quest_type {
+        QuestType::PlayGames => Some(WeeklyQuestType::WeeklyPlay10),
+        QuestType::WinGames => Some(WeeklyQuestType::WeeklyWin5),
+        QuestType::VoteOnBills => Some(WeeklyQuestType::WeeklyVote15),
+        QuestType::UseAttackCards => Some(WeeklyQuestType::WeeklyAttack15),
+        QuestType::UseDefenseCards => Some(WeeklyQuestType::WeeklyDefense10),
+        QuestType::FormAlliance => Some(WeeklyQuestType::WeeklyAlliance5),
+        QuestType::InitiateChallenge => Some(WeeklyQuestType::WeeklyChallenge8),
+        QuestType::DealReputationDamage => Some(WeeklyQuestType::WeeklyDamage100),
+        QuestType::EarnGold => Some(WeeklyQuestType::WeeklyGold200),
+        QuestType::PlayCardsInDebate => Some(WeeklyQuestType::WeeklyCards30),
+        _ => None, // 沒有對應的週挑戰
+    }
+}
+
+/// 遊戲結束後批次更新所有玩家的任務進度（包含週挑戰）
 ///
-/// 傳入參與遊戲的玩家資訊，自動追蹤相關任務。
+/// 傳入參與遊戲的玩家資訊，自動追蹤每日任務與週挑戰進度。
 pub async fn update_all_quest_progress(
     pool: &PgPool,
     game_result: &GameEndQuestData,
@@ -330,13 +351,20 @@ pub async fn update_all_quest_progress(
     for player in &game_result.players {
         // PlayGames +1
         update_quest_progress(pool, player.user_id, QuestType::PlayGames, 1).await?;
+        if let Some(weekly_type) = map_quest_to_weekly(QuestType::PlayGames) {
+            weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, 1).await?;
+        }
 
         // PlayAsCharacter +1
         update_quest_progress(pool, player.user_id, QuestType::PlayAsCharacter, 1).await?;
+        // 無對應週挑戰
 
         // WinGames +1 if won
         if player.is_winner {
             update_quest_progress(pool, player.user_id, QuestType::WinGames, 1).await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::WinGames) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, 1).await?;
+            }
         }
 
         // WinWithReputation if won with reputation >= 60
@@ -346,8 +374,16 @@ pub async fn update_all_quest_progress(
 
         // VoteOnBills
         if player.votes_cast > 0 {
-            update_quest_progress(pool, player.user_id, QuestType::VoteOnBills, player.votes_cast)
-                .await?;
+            update_quest_progress(
+                pool,
+                player.user_id,
+                QuestType::VoteOnBills,
+                player.votes_cast,
+            )
+            .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::VoteOnBills) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.votes_cast).await?;
+            }
         }
 
         // UseAttackCards
@@ -359,6 +395,9 @@ pub async fn update_all_quest_progress(
                 player.attack_cards_used,
             )
             .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::UseAttackCards) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.attack_cards_used).await?;
+            }
         }
 
         // UseDefenseCards
@@ -370,6 +409,9 @@ pub async fn update_all_quest_progress(
                 player.defense_cards_used,
             )
             .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::UseDefenseCards) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.defense_cards_used).await?;
+            }
         }
 
         // FormAlliance
@@ -381,6 +423,9 @@ pub async fn update_all_quest_progress(
                 player.alliances_formed,
             )
             .await?;
+            if let Some(weekly_type) = map_quest_to_weekly(QuestType::FormAlliance) {
+                weekly_system::update_weekly_progress(pool, player.user_id, weekly_type, player.alliances_formed).await?;
+            }
         }
 
         // InitiateChallenge
@@ -473,14 +518,24 @@ pub async fn update_all_quest_progress(
 
         // EarnGold
         if player.gold_earned > 0 {
-            update_quest_progress(pool, player.user_id, QuestType::EarnGold, player.gold_earned)
-                .await?;
+            update_quest_progress(
+                pool,
+                player.user_id,
+                QuestType::EarnGold,
+                player.gold_earned,
+            )
+            .await?;
         }
 
         // DrawCards
         if player.cards_drawn > 0 {
-            update_quest_progress(pool, player.user_id, QuestType::DrawCards, player.cards_drawn)
-                .await?;
+            update_quest_progress(
+                pool,
+                player.user_id,
+                QuestType::DrawCards,
+                player.cards_drawn,
+            )
+            .await?;
         }
 
         // SurviveToEnd
@@ -537,8 +592,9 @@ pub async fn get_quest_history(
     for row in &rows {
         if current_date != Some(row.quest_date) {
             if let Some(date) = current_date {
-                let all_completed =
-                    current_quests.iter().all(|q| q.progress >= q.target && q.claimed);
+                let all_completed = current_quests
+                    .iter()
+                    .all(|q| q.progress >= q.target && q.claimed);
                 days.push(QuestHistoryDay {
                     date,
                     quests: std::mem::take(&mut current_quests),
@@ -548,7 +604,7 @@ pub async fn get_quest_history(
             current_date = Some(row.quest_date);
         }
 
-        if let Some(qt) = QuestType::from_str(&row.quest_id) {
+        if let Some(qt) = QuestType::parse(&row.quest_id) {
             if let Some(template) = templates.iter().find(|t| t.quest_type == qt) {
                 current_quests.push(DailyQuest {
                     quest_id: row.quest_id.clone(),
@@ -566,8 +622,9 @@ pub async fn get_quest_history(
 
     // 最後一天
     if let Some(date) = current_date {
-        let all_completed =
-            current_quests.iter().all(|q| q.progress >= q.target && q.claimed);
+        let all_completed = current_quests
+            .iter()
+            .all(|q| q.progress >= q.target && q.claimed);
         days.push(QuestHistoryDay {
             date,
             quests: current_quests,
@@ -624,8 +681,7 @@ async fn generate_daily_quests(
 /// 加權隨機不重複選取
 fn weighted_random_pick(templates: &[QuestTemplate], count: usize) -> Vec<QuestTemplate> {
     let mut rng = rand::thread_rng();
-    let mut remaining: Vec<(usize, &QuestTemplate)> =
-        templates.iter().enumerate().collect();
+    let mut remaining: Vec<(usize, &QuestTemplate)> = templates.iter().enumerate().collect();
     let mut selected = Vec::new();
 
     for _ in 0..count {
@@ -862,10 +918,7 @@ mod tests {
         };
         assert!(q.is_completed());
 
-        let q2 = DailyQuest {
-            progress: 1,
-            ..q
-        };
+        let q2 = DailyQuest { progress: 1, ..q };
         assert!(!q2.is_completed());
     }
 }

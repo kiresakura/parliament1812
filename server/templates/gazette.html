@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>國會公報 — {{ headline }}</title>
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="國會公報：{{ headline }}" />
+    <meta property="og:description" content="{{ subheadline }}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://1812game.com/gazette/{{ share_token }}" />
+    <meta property="og:site_name" content="1812 國會風雲" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="國會公報：{{ headline }}" />
+    <meta name="twitter:description" content="{{ subheadline }}" />
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background: #f4e4c1;
+            color: #2c1810;
+            min-height: 100vh;
+        }
+        
+        .gazette {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 30px;
+            background: #faf0dc;
+            border: 3px double #8b7355;
+            box-shadow: 0 0 30px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        
+        .gazette::before {
+            content: '';
+            position: absolute;
+            top: 8px; left: 8px; right: 8px; bottom: 8px;
+            border: 1px solid #8b7355;
+            pointer-events: none;
+        }
+        
+        .gazette-header {
+            text-align: center;
+            border-bottom: 3px double #2c1810;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .gazette-title {
+            font-size: 14px;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            color: #8b7355;
+            margin-bottom: 5px;
+        }
+        
+        .gazette-name {
+            font-size: 48px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 10px;
+        }
+        
+        .gazette-date {
+            font-size: 12px;
+            color: #8b7355;
+            letter-spacing: 3px;
+        }
+        
+        .headline {
+            font-size: 32px;
+            font-weight: 900;
+            text-align: center;
+            margin: 30px 0 15px;
+            line-height: 1.3;
+        }
+        
+        .subheadline {
+            font-size: 18px;
+            text-align: center;
+            color: #5a4a3a;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        
+        .drama-badge {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .drama-score {
+            display: inline-block;
+            background: #2c1810;
+            color: #faf0dc;
+            padding: 8px 20px;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        .body-text {
+            column-count: 2;
+            column-gap: 30px;
+            column-rule: 1px solid #8b7355;
+            font-size: 15px;
+            line-height: 1.8;
+            text-align: justify;
+            margin: 20px 0;
+        }
+        
+        .body-text p { margin-bottom: 15px; text-indent: 2em; }
+        
+        .quote-block {
+            border-left: 3px solid #8b7355;
+            padding: 15px 20px;
+            margin: 20px 0;
+            font-style: italic;
+            background: rgba(139, 115, 85, 0.05);
+        }
+        
+        .quote-speaker {
+            font-weight: 700;
+            font-style: normal;
+            margin-top: 10px;
+            text-align: right;
+        }
+        
+        .stats-box {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            padding: 20px;
+            border-top: 1px solid #8b7355;
+            border-bottom: 1px solid #8b7355;
+        }
+        
+        .stat { text-align: center; }
+        .stat-number { font-size: 36px; font-weight: 900; }
+        .stat-label { font-size: 12px; color: #8b7355; letter-spacing: 1px; }
+        
+        .cta {
+            text-align: center;
+            margin: 30px 0 10px;
+        }
+        
+        .cta a {
+            display: inline-block;
+            background: #2c1810;
+            color: #faf0dc;
+            padding: 15px 40px;
+            text-decoration: none;
+            font-size: 16px;
+            letter-spacing: 2px;
+            font-family: 'Noto Serif TC', serif;
+            transition: background 0.3s;
+        }
+        
+        .cta a:hover { background: #5a4a3a; }
+        
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 11px;
+            color: #8b7355;
+        }
+        
+        @media (max-width: 600px) {
+            .gazette { padding: 20px 15px; }
+            .gazette-name { font-size: 32px; }
+            .headline { font-size: 24px; }
+            .body-text { column-count: 1; }
+            .stats-box { flex-direction: column; gap: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="gazette">
+        <div class="gazette-header">
+            <div class="gazette-title">The Parliament Chronicle</div>
+            <div class="gazette-name">國會公報</div>
+            <div class="gazette-date">{{ date }} — 第 {{ total_rounds }} 屆會期</div>
+        </div>
+        
+        <h1 class="headline">{{ headline }}</h1>
+        <p class="subheadline">{{ subheadline }}</p>
+        
+        <div class="drama-badge">
+            <span class="drama-score">✦ 戲劇指數 {{ drama_score }}/10 ✦</span>
+        </div>
+        
+        <div class="stats-box">
+            <div class="stat">
+                <div class="stat-number">{{ betrayal_count }}</div>
+                <div class="stat-label">背叛</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ expose_count }}</div>
+                <div class="stat-label">爆料</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">{{ alliance_count }}</div>
+                <div class="stat-label">結盟</div>
+            </div>
+        </div>
+        
+        <div class="body-text">
+            {% for paragraph in body_paragraphs %}
+            <p>{{ paragraph }}</p>
+            {% endfor %}
+        </div>
+        
+        {% for quote in quotes %}
+        <div class="quote-block">
+            <p>「{{ quote.text }}」</p>
+            <p class="quote-speaker">— {{ quote.speaker }}，{{ quote.context }}</p>
+        </div>
+        {% endfor %}
+        
+        {% if mvp_name %}
+        <div class="drama-badge">
+            <span class="drama-score">🏆 本屆 MVP：{{ mvp_name }} 🏆</span>
+        </div>
+        {% endif %}
+        
+        <div class="cta">
+            <a href="https://1812game.com">加入國會辯論 →</a>
+        </div>
+        
+        <div class="footer">
+            <p>1812 國會風雲 — 策略社交卡牌遊戲</p>
+            <p>👁 已有 {{ view_count }} 人閱覽此公報</p>
+        </div>
+    </div>
+</body>
+</html>

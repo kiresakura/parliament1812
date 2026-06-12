@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../providers/quests_provider.dart';
 import 'quest_card.dart';
@@ -76,6 +77,10 @@ class _DailyQuestsScreenState extends ConsumerState<DailyQuestsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/menu'),
+        ),
         title: const Text('每日任務'),
         actions: [
           // 重置倒數

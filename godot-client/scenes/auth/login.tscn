@@ -1,0 +1,121 @@
+[gd_scene load_steps=2 format=3 uid="uid://login001"]
+
+[ext_resource type="Script" path="res://scenes/auth/login.gd" id="1"]
+
+[node name="Login" type="Control"]
+script = ExtResource("1")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.102, 0.102, 0.18, 1)
+
+[node name="BackButton" type="Button" parent="."]
+layout_mode = 1
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 140.0
+offset_bottom = 56.0
+custom_minimum_size = Vector2(120, 44)
+text = "← 返回主選單"
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 0)
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/Panel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "登入"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+
+[node name="Spacer1" type="Control" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 12)
+
+[node name="EmailLabel" type="Label" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "電子郵件"
+
+[node name="EmailInput" type="LineEdit" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+placeholder_text = "example@email.com"
+
+[node name="PasswordLabel" type="Label" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "密碼"
+
+[node name="PasswordInput" type="LineEdit" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+placeholder_text = "輸入密碼"
+secret = true
+
+[node name="Spacer2" type="Control" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+
+[node name="ErrorLabel" type="Label" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+
+[node name="LoginButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 52)
+text = "登入"
+
+[node name="Spacer3" type="Control" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+
+[node name="OAuthBox" type="VBoxContainer" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="GoogleButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBox/OAuthBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Google 登入"
+
+[node name="AppleButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBox/OAuthBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Apple 登入"
+
+[node name="RegisterLink" type="Button" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+flat = true
+text = "還沒有帳號？立即註冊"
+
+[node name="GuestButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "跳過，以訪客身份進入"

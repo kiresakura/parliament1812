@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../providers/codex_provider.dart';
 import '../../providers/achievements_provider.dart';
 import 'card_grid_view.dart';
+import 'character_codex_view.dart';
 import 'achievements_list.dart';
 
 /// 卡牌收藏圖鑑主畫面
@@ -16,9 +18,13 @@ class CodexScreen extends ConsumerWidget {
     final achievementsState = ref.watch(achievementsProvider);
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/menu'),
+          ),
           title: const Text('卡牌圖鑑'),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(80),
@@ -37,6 +43,7 @@ class CodexScreen extends ConsumerWidget {
                   unselectedLabelColor: Colors.white54,
                   tabs: [
                     const Tab(text: '全部卡牌'),
+                    const Tab(text: '角色圖鑑'),
                     const Tab(text: '我的收藏'),
                     Tab(
                       child: Row(
@@ -70,9 +77,11 @@ class CodexScreen extends ConsumerWidget {
           children: [
             // Tab 1: 全部卡牌
             _AllCardsTab(codexState: codexState),
-            // Tab 2: 我的收藏
+            // Tab 2: 角色圖鑑
+            const CharacterCodexView(),
+            // Tab 3: 我的收藏
             _MyCollectionTab(codexState: codexState),
-            // Tab 3: 成就
+            // Tab 4: 成就
             const AchievementsListView(),
           ],
         ),

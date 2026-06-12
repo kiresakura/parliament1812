@@ -53,17 +53,30 @@ class PlayerAvatar extends StatelessWidget {
                   ]
                 : null,
           ),
+          clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
-              // 角色圖標
-              Center(
-                child: Text(
-                  _getCharacterEmoji(character),
-                  style: TextStyle(
-                    fontSize: size * 0.4,
+              // 角色圖像（有圖用圖，沒有用 emoji fallback）
+              if (_getCharacterPortrait(character) != null)
+                Positioned.fill(
+                  child: Image.asset(
+                    _getCharacterPortrait(character)!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(
+                        _getCharacterEmoji(character),
+                        style: TextStyle(fontSize: size * 0.4),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Center(
+                  child: Text(
+                    _getCharacterEmoji(character),
+                    style: TextStyle(fontSize: size * 0.4),
                   ),
                 ),
-              ),
               
               // 死亡遮罩
               if (isDead)
@@ -130,6 +143,25 @@ class PlayerAvatar extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  String? _getCharacterPortrait(CharacterType? character) {
+    switch (character) {
+      case CharacterType.thomasWorker:
+        return 'assets/images/characters/portrait_thomas.png';
+      case CharacterType.richardFactory:
+        return 'assets/images/characters/portrait_richard.png';
+      case CharacterType.georgeLuddite:
+        return 'assets/images/characters/portrait_george.png';
+      case CharacterType.robertReformer:
+        return 'assets/images/characters/portrait_robert.png';
+      case CharacterType.williamMp:
+        return 'assets/images/characters/portrait_william.png';
+      case CharacterType.edwardJournalist:
+      case CharacterType.georgeKing:
+      case null:
+        return null;
+    }
   }
 
   String _getCharacterEmoji(CharacterType? character) {

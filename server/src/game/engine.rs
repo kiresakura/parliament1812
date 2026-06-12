@@ -13,18 +13,14 @@ use super::alliance::{AllianceError, AllianceManager};
 use super::bills::{BillSystem, VoteEffectResult};
 use super::cards;
 use super::characters::{CharacterSkills, GameError};
-use super::state::{GameState, PendingChallenge, PlayerState};
+use super::state::{EngineState, PendingChallenge, PlayerState};
 use crate::domain::card::{CardType, GameCard};
 use crate::domain::{CharacterType, GamePhase, Player, VoteChoice};
 
 /// 遊戲設定
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameConfig {
-    /// 密謀階段時長（秒）
-    pub conspiracy_duration_secs: u32,
-    /// 辯論階段時長（秒）
-    pub debate_duration_secs: u32,
-    /// 投票階段時長（秒）
+    /// 投票階段時長（秒）— 回合制中僅投票保留計時
     pub voting_duration_secs: u32,
     /// 結果階段時長（秒）
     pub result_duration_secs: u32,
@@ -38,13 +34,15 @@ pub struct GameConfig {
     pub counter_cost: i32,
     /// 收買技能費用
     pub bribe_cost: i32,
+    /// 每回合行動點數
+    pub action_points_per_turn: i32,
+    /// 最大回合數
+    pub max_rounds: i32,
 }
 
 impl Default for GameConfig {
     fn default() -> Self {
         Self {
-            conspiracy_duration_secs: 120,
-            debate_duration_secs: 300,
             voting_duration_secs: 60,
             result_duration_secs: 30,
             counter_timeout_secs: 10,
@@ -52,6 +50,8 @@ impl Default for GameConfig {
             challenge_cost: 10,
             counter_cost: 5,
             bribe_cost: 30,
+            action_points_per_turn: 3,
+            max_rounds: 5,
         }
     }
 }
@@ -60,7 +60,7 @@ impl Default for GameConfig {
 #[derive(Debug)]
 pub struct GameEngine {
     /// 遊戲狀態
-    pub state: GameState,
+    pub state: EngineState,
     /// 遊戲設定
     pub config: GameConfig,
     /// AI 管理器
@@ -105,7 +105,7 @@ impl GameEngine {
             })
             .collect();
 
-        let state = GameState::new(room_code, player_states);
+        let state = EngineState::new(room_code, player_states);
 
         Self {
             state,
@@ -126,7 +126,7 @@ impl GameEngine {
             .map(|(id, name, character)| PlayerState::new(id, name, character))
             .collect();
 
-        let state = GameState::new(room_code, player_states);
+        let state = EngineState::new(room_code, player_states);
 
         Self {
             state,
@@ -171,9 +171,16 @@ impl GameEngine {
             }
         }
 
-        self.state.phase = GamePhase::Conspiracy;
+        // 設定回合制參數
+        self.state.max_action_points = self.config.action_points_per_turn;
+        self.state.action_points_remaining = self.config.action_points_per_turn;
+
+        self.state.phase = GamePhase::PlayerTurn;
         self.state.phase_start_time = Utc::now();
         self.state.current_round = 1;
+
+        // 重置回合順序到第一位存活玩家
+        self.state.reset_turn_order();
 
         // 選擇第一回合的議案
         self.select_round_bill();
@@ -188,15 +195,18 @@ impl GameEngine {
 
         // 轉換到下一階段
         self.state.phase = match self.state.phase {
-            GamePhase::Waiting => GamePhase::Conspiracy,
-            GamePhase::Conspiracy => GamePhase::Debate,
-            GamePhase::Debate => GamePhase::Voting,
+            GamePhase::Waiting => GamePhase::PlayerTurn,
+            GamePhase::PlayerTurn => GamePhase::Voting,
             GamePhase::Voting => GamePhase::Result,
             GamePhase::Result => {
-                self.state.current_round += 1;
-                self.clear_round_effects();
-                self.start_new_round();
-                GamePhase::Conspiracy
+                if self.state.current_round >= self.config.max_rounds {
+                    GamePhase::Finished
+                } else {
+                    self.state.current_round += 1;
+                    self.clear_round_effects();
+                    self.start_new_round();
+                    GamePhase::PlayerTurn
+                }
             }
             GamePhase::Finished => GamePhase::Finished,
         };
@@ -208,28 +218,22 @@ impl GameEngine {
     /// 處理階段結束
     fn handle_phase_end(&mut self) {
         match self.state.phase {
-            GamePhase::Conspiracy => {
-                // AI 在密謀階段的行動
-                let _ai_results = self.process_ai_actions();
-            }
-            GamePhase::Debate => {
+            GamePhase::PlayerTurn => {
                 // 處理未決的質詢
                 if self.state.pending_challenge.is_some() {
                     let _ = self.resolve_challenge();
                 }
-                // AI 在辯論階段的行動
-                let _ai_results = self.process_ai_actions();
             }
             GamePhase::Voting => {
                 // AI 投票
                 let _ai_results = self.process_ai_actions();
-                
+
                 // 計算投票結果並應用議案效果
                 if !self.state.votes.is_empty() {
                     // 計算獲勝選項
                     let vote_counts = self.calculate_vote_counts();
                     let winning_choice = vote_counts.get_winner();
-                    
+
                     if let Some(choice) = winning_choice {
                         // 應用議案效果
                         let _effects = self.apply_bill_effects(choice);
@@ -238,6 +242,65 @@ impl GameEngine {
             }
             _ => {}
         }
+    }
+
+    /// 處理玩家結束回合
+    /// 回傳 true 表示所有玩家行動完畢，已自動進入投票階段
+    pub fn end_turn(&mut self, player_id: Uuid) -> Result<bool, GameError> {
+        if self.state.phase != GamePhase::PlayerTurn {
+            return Err(GameError::InvalidAction(
+                "只能在行動階段結束回合".to_string(),
+            ));
+        }
+
+        // 檢查是否為當前行動玩家
+        let current_player = self
+            .state
+            .current_turn_player()
+            .ok_or(GameError::InvalidAction("沒有當前行動玩家".to_string()))?;
+
+        if current_player != player_id {
+            return Err(GameError::InvalidAction("還沒輪到你".to_string()));
+        }
+
+        // 記錄結束回合行動
+        self.state.action_log.push(GameAction::EndTurn {
+            player_id,
+            timestamp: Utc::now(),
+        });
+
+        // 推進到下一位玩家
+        let has_next = self.state.advance_to_next_player();
+
+        if !has_next {
+            // 所有玩家都行動完畢，自動進入投票階段
+            self.advance_phase();
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// 檢查行動點數並消耗（供行動方法內部使用）
+    fn check_and_consume_action_point(&mut self, player_id: Uuid) -> Result<(), GameError> {
+        // 檢查是否為當前行動玩家
+        let current_player = self
+            .state
+            .current_turn_player()
+            .ok_or(GameError::InvalidAction("沒有當前行動玩家".to_string()))?;
+
+        if current_player != player_id {
+            return Err(GameError::InvalidAction("還沒輪到你".to_string()));
+        }
+
+        // 消耗行動點數
+        if !self.state.consume_action_point() {
+            return Err(GameError::InvalidAction(
+                "行動點數不足，請結束回合".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 
     /// 清除回合效果
@@ -267,6 +330,9 @@ impl GameEngine {
             }
         }
 
+        // 重置回合順序
+        self.state.reset_turn_order();
+
         // 選擇新回合的議案
         self.select_round_bill();
     }
@@ -282,11 +348,9 @@ impl GameEngine {
 
     /// 獲取當前議案信息
     pub fn get_current_bill_info(&self) -> Option<(String, String)> {
-        if let Some(bill) = self.bill_system.get_current_bill() {
-            Some((bill.name.clone(), bill.description.clone()))
-        } else {
-            None
-        }
+        self.bill_system
+            .get_current_bill()
+            .map(|bill| (bill.name.clone(), bill.description.clone()))
     }
 
     /// 應用投票結果的議案效果到遊戲狀態
@@ -297,7 +361,7 @@ impl GameEngine {
             .iter()
             .map(|(id, p)| (*id, p.character))
             .collect();
-        
+
         let player_reputations: std::collections::HashMap<Uuid, i32> = self
             .state
             .players
@@ -353,16 +417,19 @@ impl GameEngine {
         }
     }
 
-    /// 取得階段剩餘時間（秒）
+    /// 取得階段剩餘時間（秒）— 僅投票/結果階段有計時
     pub fn get_phase_remaining_secs(&self) -> u32 {
         let duration = match self.state.phase {
             GamePhase::Waiting => 0,
-            GamePhase::Conspiracy => self.config.conspiracy_duration_secs,
-            GamePhase::Debate => self.config.debate_duration_secs,
+            GamePhase::PlayerTurn => 0, // 回合制不計時
             GamePhase::Voting => self.config.voting_duration_secs,
             GamePhase::Result => self.config.result_duration_secs,
             GamePhase::Finished => 0,
         };
+
+        if duration == 0 {
+            return 0;
+        }
 
         let elapsed = Utc::now()
             .signed_duration_since(self.state.phase_start_time)
@@ -371,9 +438,12 @@ impl GameEngine {
         duration.saturating_sub(elapsed)
     }
 
-    /// 檢查並處理階段超時
+    /// 檢查並處理階段超時（僅投票/結果階段有超時）
     pub fn check_phase_timeout(&mut self) -> bool {
-        if self.get_phase_remaining_secs() == 0 && self.state.phase != GamePhase::Finished {
+        // 只有投票和結果階段有計時超時
+        if (self.state.phase == GamePhase::Voting || self.state.phase == GamePhase::Result)
+            && self.get_phase_remaining_secs() == 0
+        {
             self.advance_phase();
             true
         } else {
@@ -388,10 +458,15 @@ impl GameEngine {
         target_id: Uuid,
     ) -> Result<ActionResult, GameError> {
         // 檢查階段
-        if self.state.phase != GamePhase::Debate {
+        if self.state.phase != GamePhase::PlayerTurn {
             return Err(GameError::InvalidAction(
-                "只能在辯論階段發起質詢".to_string(),
+                "只能在行動階段發起質詢".to_string(),
             ));
+        }
+
+        // 檢查行動點數（AI 玩家不需要檢查回合順序）
+        if !self.is_ai_player(attacker_id) {
+            self.check_and_consume_action_point(attacker_id)?;
         }
 
         // 檢查是否已有待處理的質詢
@@ -434,7 +509,11 @@ impl GameEngine {
         }
 
         // 計算考慮同盟的傷害
-        let actual_damage = self.calculate_alliance_damage(attacker_id, target_id, self.config.base_challenge_damage);
+        let actual_damage = self.calculate_alliance_damage(
+            attacker_id,
+            target_id,
+            self.config.base_challenge_damage,
+        );
 
         // 設定待處理的質詢
         self.state.pending_challenge = Some(PendingChallenge {
@@ -453,8 +532,15 @@ impl GameEngine {
         });
 
         Ok(ActionResult::success_with_effects(
-            format!("質詢 {}，等待反駁{}", target_name, 
-                    if actual_damage < self.config.base_challenge_damage { "（盟友減傷）" } else { "" }),
+            format!(
+                "質詢 {}，等待反駁{}",
+                target_name,
+                if actual_damage < self.config.base_challenge_damage {
+                    "（盟友減傷）"
+                } else {
+                    ""
+                }
+            ),
             vec![
                 GameEffect::ReputationChange {
                     player_id: attacker_id,
@@ -472,9 +558,10 @@ impl GameEngine {
     /// 處理反駁
     pub fn process_counter(&mut self, defender_id: Uuid) -> Result<ActionResult, GameError> {
         // 檢查階段
-        if self.state.phase != GamePhase::Debate {
-            return Err(GameError::InvalidAction("只能在辯論階段反駁".to_string()));
+        if self.state.phase != GamePhase::PlayerTurn {
+            return Err(GameError::InvalidAction("只能在行動階段反駁".to_string()));
         }
+        // 反駁不需要消耗行動點數，也不需要是當前行動玩家（被動反應）
 
         // 檢查是否有待處理的質詢
         let pending = self
@@ -632,10 +719,15 @@ impl GameEngine {
         target_id: Option<Uuid>,
     ) -> Result<ActionResult, GameError> {
         // 檢查階段
-        if self.state.phase != GamePhase::Debate {
+        if self.state.phase != GamePhase::PlayerTurn {
             return Err(GameError::InvalidAction(
-                "只能在辯論階段使用技能".to_string(),
+                "只能在行動階段使用技能".to_string(),
             ));
+        }
+
+        // 檢查行動點數（AI 不需要檢查）
+        if !self.is_ai_player(player_id) {
+            self.check_and_consume_action_point(player_id)?;
         }
 
         let character = {
@@ -885,7 +977,7 @@ impl GameEngine {
 
         // 檢查背叛（盟友投對方反對票）
         let mut betrayal_effects = Vec::new();
-        
+
         // 先收集需要背叛的盟友ID
         let betrayal_targets: Vec<Uuid> = {
             let player_alliances = self.get_player_alliances(player_id);
@@ -903,10 +995,10 @@ impl GameEngine {
             }
             targets
         };
-        
+
         // 處理背叛
         for partner_id in betrayal_targets {
-            if let Ok(_) = self.betray_alliance(player_id, partner_id) {
+            if self.betray_alliance(player_id, partner_id).is_ok() {
                 betrayal_effects.push(GameEffect::AllianceBroken {
                     betrayer_id: player_id,
                     victim_id: partner_id,
@@ -927,7 +1019,10 @@ impl GameEngine {
             result_message.push_str("（觸發背叛）");
         }
 
-        Ok(ActionResult::success_with_effects(result_message, betrayal_effects))
+        Ok(ActionResult::success_with_effects(
+            result_message,
+            betrayal_effects,
+        ))
     }
 
     /// 處理結盟
@@ -936,11 +1031,16 @@ impl GameEngine {
         player_a: Uuid,
         player_b: Uuid,
     ) -> Result<ActionResult, GameError> {
-        // 結盟可以在密謀和辯論階段
-        if self.state.phase != GamePhase::Conspiracy && self.state.phase != GamePhase::Debate {
+        // 結盟在行動階段進行
+        if self.state.phase != GamePhase::PlayerTurn {
             return Err(GameError::InvalidAction(
-                "只能在密謀或辯論階段結盟".to_string(),
+                "只能在行動階段結盟".to_string(),
             ));
+        }
+
+        // 檢查行動點數（AI 不需要檢查）
+        if !self.is_ai_player(player_a) {
+            self.check_and_consume_action_point(player_a)?;
         }
 
         // 檢查雙方
@@ -1057,7 +1157,7 @@ impl GameEngine {
                 .iter()
                 .map(|(id, p)| (*id, p.character))
                 .collect();
-            
+
             let player_reputations: std::collections::HashMap<Uuid, i32> = self
                 .state
                 .players
@@ -1090,7 +1190,7 @@ impl GameEngine {
                 let bill_reputation_change = reputation_adjustments.get(&p.id).unwrap_or(&0);
                 let adjusted_reputation = p.reputation + bill_reputation_change;
                 let base_score = adjusted_reputation + p.gold;
-                
+
                 // 如果投票給獲勝選項，加分
                 let vote_bonus = self
                     .state
@@ -1146,7 +1246,7 @@ impl GameEngine {
         let player = self
             .state
             .get_player(player_id)
-            .ok_or_else(|| GameError::PlayerNotFound)?;
+            .ok_or(GameError::PlayerNotFound)?;
 
         if !player.can_act() {
             return Err(GameError::InvalidAction("玩家無法行動".to_string()));
@@ -1156,11 +1256,16 @@ impl GameEngine {
             return Err(GameError::InvalidAction("手牌中沒有此卡牌".to_string()));
         }
 
-        // 2. 驗證階段（只能在 Debate 階段使用卡牌）
-        if self.state.phase != GamePhase::Debate {
+        // 2. 驗證階段（只能在行動階段使用卡牌）
+        if self.state.phase != GamePhase::PlayerTurn {
             return Err(GameError::InvalidAction(
-                "只能在辯論階段使用卡牌".to_string(),
+                "只能在行動階段使用卡牌".to_string(),
             ));
+        }
+
+        // 檢查行動點數（AI 不需要檢查）
+        if !self.is_ai_player(player_id) {
+            self.check_and_consume_action_point(player_id)?;
         }
 
         // 3. 獲取卡牌資料
@@ -1185,7 +1290,7 @@ impl GameEngine {
             Some(
                 self.state
                     .get_player(target_id)
-                    .ok_or_else(|| GameError::PlayerNotFound)?,
+                    .ok_or(GameError::PlayerNotFound)?,
             )
         } else {
             None
@@ -1193,7 +1298,9 @@ impl GameEngine {
 
         // 6. 執行卡牌效果
         let mut effects = Vec::new();
+        #[allow(unused_assignments)]
         let mut damage_dealt = 0;
+        #[allow(unused_assignments)]
         let mut healing_done = 0;
 
         match card.card_type {
@@ -1318,7 +1425,7 @@ impl GameEngine {
         let player = self
             .state
             .get_player(player_id)
-            .ok_or_else(|| GameError::PlayerNotFound)?;
+            .ok_or(GameError::PlayerNotFound)?;
 
         if !player.can_act() {
             return Err(GameError::InvalidAction("玩家無法行動".to_string()));
@@ -1359,7 +1466,7 @@ impl GameEngine {
         let player = self
             .state
             .get_player(player_id)
-            .ok_or_else(|| GameError::PlayerNotFound)?;
+            .ok_or(GameError::PlayerNotFound)?;
 
         if !player.can_act() {
             return Err(GameError::InvalidAction("玩家無法行動".to_string()));
@@ -1442,7 +1549,7 @@ impl GameEngine {
             player_states.push(PlayerState::new(*ai_id, ai_name.to_string(), ai_character));
         }
 
-        let state = GameState::new(room_code, player_states);
+        let state = EngineState::new(room_code, player_states);
 
         Self {
             state,
@@ -1487,9 +1594,8 @@ impl GameEngine {
                 AIAction::Betray { target_id } => self.process_betray(ai_id, target_id),
             };
 
-            match result {
-                Ok(action_result) => results.push(action_result),
-                Err(_) => {} // AI 行動失敗，忽略
+            if let Ok(action_result) = result {
+                results.push(action_result);
             }
         }
 
@@ -1511,23 +1617,43 @@ impl GameEngine {
     // ============================================================
 
     /// 提議同盟
-    pub fn propose_alliance(&mut self, proposer_id: Uuid, target_id: Uuid) -> Result<Uuid, AllianceError> {
-        self.alliance_manager.propose_alliance(proposer_id, target_id)
+    pub fn propose_alliance(
+        &mut self,
+        proposer_id: Uuid,
+        target_id: Uuid,
+    ) -> Result<Uuid, AllianceError> {
+        self.alliance_manager
+            .propose_alliance(proposer_id, target_id)
     }
 
     /// 接受同盟提議
-    pub fn accept_alliance(&mut self, target_id: Uuid, proposer_id: Uuid) -> Result<Uuid, AllianceError> {
-        self.alliance_manager.accept_proposal(target_id, proposer_id)
+    pub fn accept_alliance(
+        &mut self,
+        target_id: Uuid,
+        proposer_id: Uuid,
+    ) -> Result<Uuid, AllianceError> {
+        self.alliance_manager
+            .accept_proposal(target_id, proposer_id)
     }
 
     /// 拒絕同盟提議
-    pub fn reject_alliance(&mut self, target_id: Uuid, proposer_id: Uuid) -> Result<(), AllianceError> {
-        self.alliance_manager.reject_proposal(target_id, proposer_id)
+    pub fn reject_alliance(
+        &mut self,
+        target_id: Uuid,
+        proposer_id: Uuid,
+    ) -> Result<(), AllianceError> {
+        self.alliance_manager
+            .reject_proposal(target_id, proposer_id)
     }
 
     /// 背叛同盟（在投票階段投反對票觸發）
-    pub fn betray_alliance(&mut self, betrayer_id: Uuid, target_id: Uuid) -> Result<Uuid, AllianceError> {
-        self.alliance_manager.betray_alliance(betrayer_id, target_id)
+    pub fn betray_alliance(
+        &mut self,
+        betrayer_id: Uuid,
+        target_id: Uuid,
+    ) -> Result<Uuid, AllianceError> {
+        self.alliance_manager
+            .betray_alliance(betrayer_id, target_id)
     }
 
     /// 檢查兩個玩家是否有同盟關係
@@ -1536,8 +1662,14 @@ impl GameEngine {
     }
 
     /// 計算考慮同盟的傷害
-    pub fn calculate_alliance_damage(&self, attacker_id: Uuid, target_id: Uuid, base_damage: i32) -> i32 {
-        self.alliance_manager.calculate_damage_reduction(attacker_id, target_id, base_damage)
+    pub fn calculate_alliance_damage(
+        &self,
+        attacker_id: Uuid,
+        target_id: Uuid,
+        base_damage: i32,
+    ) -> i32 {
+        self.alliance_manager
+            .calculate_damage_reduction(attacker_id, target_id, base_damage)
     }
 
     /// 獲取玩家的所有有效同盟
@@ -1548,6 +1680,197 @@ impl GameEngine {
     /// 清理過期的同盟提議
     pub fn cleanup_expired_alliances(&mut self) {
         self.alliance_manager.cleanup_expired_proposals();
+    }
+
+    // ============================================================
+    // 事件收集系統
+    // ============================================================
+
+    /// 從回合結果中收集事件日誌
+    ///
+    /// 遍歷 action_log 收集當前回合的所有事件，轉換為 `CreateEventLog` 格式。
+    /// 此方法為純讀取輔助方法，不修改任何遊戲狀態。
+    ///
+    /// # Arguments
+    /// * `game_id` - 遊戲 ID（對應 rooms 表的 id）
+    ///
+    /// # Returns
+    /// 當前回合產生的事件日誌列表
+    pub fn collect_round_events(&self, game_id: Uuid) -> Vec<crate::domain::event::CreateEventLog> {
+        use crate::domain::event::CreateEventLog;
+
+        let round = self.state.current_round;
+        let phase = format!("{}", self.state.phase);
+        let mut events = Vec::new();
+
+        for action in &self.state.action_log {
+            match action {
+                GameAction::CardUsed {
+                    player_id,
+                    card_name,
+                    target_id,
+                    ..
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "card_played".to_string(),
+                        actor_id: Some(*player_id),
+                        target_id: *target_id,
+                        card_type: Some(card_name.clone()),
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Challenge {
+                    attacker_id,
+                    target_id,
+                    damage,
+                    was_countered,
+                } => {
+                    let event_type = if *was_countered {
+                        "challenge_blocked"
+                    } else {
+                        "challenge_success"
+                    };
+                    // 檢查攻擊者與目標是否曾為盟友
+                    let was_ally = self.state.are_allies(*attacker_id, *target_id);
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: event_type.to_string(),
+                        actor_id: Some(*attacker_id),
+                        target_id: Some(*target_id),
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "damage": damage,
+                            "was_countered": was_countered,
+                            "was_ally": was_ally,
+                        }),
+                        reputation_change: if *was_countered { 0 } else { -*damage },
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Counter { defender_id } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "challenge_blocked".to_string(),
+                        actor_id: Some(*defender_id),
+                        target_id: None,
+                        card_type: None,
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::UseSkill {
+                    player_id,
+                    skill,
+                    target_id,
+                    effect,
+                } => {
+                    let event_type = match skill.as_str() {
+                        "爆料" => "expose",
+                        "收買" => "skill_used",
+                        "怒火" => "skill_used",
+                        _ => "skill_used",
+                    };
+                    let was_ally = target_id
+                        .map(|tid| self.state.are_allies(*player_id, tid))
+                        .unwrap_or(false);
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: event_type.to_string(),
+                        actor_id: Some(*player_id),
+                        target_id: *target_id,
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "skill": skill,
+                            "effect": effect,
+                            "was_ally": was_ally,
+                        }),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Vote { player_id, choice } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "vote_cast".to_string(),
+                        actor_id: Some(*player_id),
+                        target_id: None,
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "choice": format!("{:?}", choice),
+                        }),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::FormAlliance {
+                    player_a,
+                    player_b,
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "alliance_formed".to_string(),
+                        actor_id: Some(*player_a),
+                        target_id: Some(*player_b),
+                        card_type: None,
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Betray {
+                    betrayer_id,
+                    target_id,
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "alliance_betrayed".to_string(),
+                        actor_id: Some(*betrayer_id),
+                        target_id: Some(*target_id),
+                        card_type: None,
+                        metadata: serde_json::json!({
+                            "was_ally": true,
+                        }),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                GameAction::Chat {
+                    from_id,
+                    content: _,
+                    is_private: _,
+                    to_id,
+                } => {
+                    events.push(CreateEventLog {
+                        game_id,
+                        event_type: "speech".to_string(),
+                        actor_id: Some(*from_id),
+                        target_id: *to_id,
+                        card_type: None,
+                        metadata: serde_json::json!({}),
+                        reputation_change: 0,
+                        round_number: round,
+                        phase: phase.clone(),
+                    });
+                }
+                // 抽牌、棄牌、結束回合不記錄為事件
+                GameAction::CardDrawn { .. }
+                | GameAction::CardDiscarded { .. }
+                | GameAction::EndTurn { .. } => {}
+            }
+        }
+
+        events
     }
 }
 
@@ -1599,20 +1922,17 @@ mod tests {
 
         let result = engine.start_game();
         assert!(result.is_ok());
-        assert_eq!(engine.state.phase, GamePhase::Conspiracy);
+        assert_eq!(engine.state.phase, GamePhase::PlayerTurn);
     }
 
     #[test]
     fn test_advance_phase() {
         let mut engine = create_test_engine();
 
-        // Start the game first (transitions from Waiting to Conspiracy)
+        // Start the game first (transitions from Waiting to PlayerTurn)
         engine.start_game().unwrap();
-        assert_eq!(engine.state.phase, GamePhase::Conspiracy);
+        assert_eq!(engine.state.phase, GamePhase::PlayerTurn);
         assert_eq!(engine.state.current_round, 1);
-
-        engine.advance_phase();
-        assert_eq!(engine.state.phase, GamePhase::Debate);
 
         engine.advance_phase();
         assert_eq!(engine.state.phase, GamePhase::Voting);
@@ -1621,24 +1941,35 @@ mod tests {
         assert_eq!(engine.state.phase, GamePhase::Result);
 
         engine.advance_phase();
-        assert_eq!(engine.state.phase, GamePhase::Conspiracy);
+        assert_eq!(engine.state.phase, GamePhase::PlayerTurn);
         assert_eq!(engine.state.current_round, 2);
+    }
+
+    /// 將引擎設置為某個玩家的行動回合（測試用）
+    fn set_current_turn(engine: &mut GameEngine, player_id: Uuid) {
+        engine.state.phase = GamePhase::PlayerTurn;
+        // 找到該玩家在 turn_order 中的位置
+        if let Some(idx) = engine.state.turn_order.iter().position(|&id| id == player_id) {
+            engine.state.current_turn_index = idx;
+        }
+        engine.state.action_points_remaining = engine.state.max_action_points;
     }
 
     #[test]
     fn test_challenge_and_counter() {
         let mut engine = create_test_engine();
-        engine.state.phase = GamePhase::Debate;
 
         let george_id = find_player_by_character(&engine, CharacterType::George);
         let edward_id = find_player_by_character(&engine, CharacterType::Edward);
+
+        set_current_turn(&mut engine, george_id);
 
         // 發起質詢
         let result = engine.process_challenge(george_id, edward_id);
         assert!(result.is_ok());
         assert!(engine.state.pending_challenge.is_some());
 
-        // 反駁
+        // 反駁（不需要是反駁者的回合）
         let result = engine.process_counter(edward_id);
         assert!(result.is_ok());
         assert!(engine.state.pending_challenge.is_none());
@@ -1647,10 +1978,11 @@ mod tests {
     #[test]
     fn test_challenge_resolve() {
         let mut engine = create_test_engine();
-        engine.state.phase = GamePhase::Debate;
 
         let george_id = find_player_by_character(&engine, CharacterType::George);
         let edward_id = find_player_by_character(&engine, CharacterType::Edward);
+
+        set_current_turn(&mut engine, george_id);
 
         let edward_initial_rep = engine.state.get_player(edward_id).unwrap().reputation;
 
@@ -1672,10 +2004,11 @@ mod tests {
     #[test]
     fn test_bribe_skill() {
         let mut engine = create_test_engine();
-        engine.state.phase = GamePhase::Debate;
 
         let richard_id = find_player_by_character(&engine, CharacterType::Richard);
         let thomas_id = find_player_by_character(&engine, CharacterType::Thomas);
+
+        set_current_turn(&mut engine, richard_id);
 
         let result = engine.process_skill(richard_id, Some(thomas_id));
         assert!(result.is_ok());
@@ -1685,10 +2018,11 @@ mod tests {
     #[test]
     fn test_expose_skill() {
         let mut engine = create_test_engine();
-        engine.state.phase = GamePhase::Debate;
 
         let edward_id = find_player_by_character(&engine, CharacterType::Edward);
         let george_id = find_player_by_character(&engine, CharacterType::George);
+
+        set_current_turn(&mut engine, edward_id);
 
         let result = engine.process_skill(edward_id, Some(george_id));
         assert!(result.is_ok());
@@ -1702,10 +2036,11 @@ mod tests {
     #[test]
     fn test_rage_skill() {
         let mut engine = create_test_engine();
-        engine.state.phase = GamePhase::Debate;
 
         let george_id = find_player_by_character(&engine, CharacterType::George);
         let richard_id = find_player_by_character(&engine, CharacterType::Richard);
+
+        set_current_turn(&mut engine, george_id);
 
         let george_initial_rep = engine.state.get_player(george_id).unwrap().reputation;
         let richard_initial_rep = engine.state.get_player(richard_id).unwrap().reputation;
@@ -1767,10 +2102,13 @@ mod tests {
     #[test]
     fn test_alliance() {
         let mut engine = create_test_engine();
-        engine.start_game().unwrap(); // Start the game to enter Conspiracy phase
+        engine.start_game().unwrap(); // Start the game to enter PlayerTurn phase
 
         let thomas_id = find_player_by_character(&engine, CharacterType::Thomas);
         let richard_id = find_player_by_character(&engine, CharacterType::Richard);
+
+        // 設置當前回合為 thomas
+        set_current_turn(&mut engine, thomas_id);
 
         let result = engine.process_alliance(thomas_id, richard_id);
         assert!(result.is_ok());
@@ -1780,10 +2118,13 @@ mod tests {
     #[test]
     fn test_betray() {
         let mut engine = create_test_engine();
-        engine.start_game().unwrap(); // Start the game to enter Conspiracy phase
+        engine.start_game().unwrap(); // Start the game to enter PlayerTurn phase
 
         let thomas_id = find_player_by_character(&engine, CharacterType::Thomas);
         let richard_id = find_player_by_character(&engine, CharacterType::Richard);
+
+        // 設置當前回合為 thomas
+        set_current_turn(&mut engine, thomas_id);
 
         // 先結盟
         engine.process_alliance(thomas_id, richard_id).unwrap();
@@ -1797,10 +2138,10 @@ mod tests {
     #[test]
     fn test_config_default() {
         let config = GameConfig::default();
-        assert_eq!(config.conspiracy_duration_secs, 120);
-        assert_eq!(config.debate_duration_secs, 300);
         assert_eq!(config.voting_duration_secs, 60);
         assert_eq!(config.base_challenge_damage, 15);
+        assert_eq!(config.action_points_per_turn, 3);
+        assert_eq!(config.max_rounds, 5);
     }
 
     #[test]
@@ -1835,11 +2176,12 @@ mod tests {
     fn test_use_card_attack() {
         let mut engine = create_test_engine();
         engine.start_game().unwrap();
-        engine.state.phase = GamePhase::Debate; // 切換到可以使用卡牌的階段
 
         let player_ids: Vec<Uuid> = engine.state.players.keys().cloned().collect();
         let attacker_id = player_ids[0];
         let target_id = player_ids[1];
+
+        set_current_turn(&mut engine, attacker_id);
 
         // 檢查攻擊者是否已有卡牌（起始手牌中）
         let attacker = engine.state.get_player(attacker_id).unwrap();
@@ -1872,9 +2214,9 @@ mod tests {
     fn test_insufficient_resources() {
         let mut engine = create_test_engine();
         engine.start_game().unwrap();
-        engine.state.phase = GamePhase::Debate;
 
         let player_id = engine.state.players.keys().next().unwrap().clone();
+        set_current_turn(&mut engine, player_id);
 
         // 清空玩家影響力
         engine.state.get_player_mut(player_id).unwrap().influence = 0;
@@ -1902,7 +2244,6 @@ mod tests {
 
         let mut engine = create_test_engine();
         engine.start_game().unwrap();
-        engine.state.phase = GamePhase::Debate;
 
         let ai_id = engine.state.players.keys().next().unwrap().clone();
         let ai = AIPlayer::new(ai_id, CharacterType::Thomas, AIDifficulty::Easy);
@@ -1927,14 +2268,10 @@ mod tests {
 
         // 開始遊戲
         engine.start_game().unwrap();
-        assert_eq!(engine.state.phase, GamePhase::Conspiracy);
+        assert_eq!(engine.state.phase, GamePhase::PlayerTurn);
         assert_eq!(engine.state.current_round, 1);
 
-        // 密謀階段 → 辯論階段
-        engine.advance_phase();
-        assert_eq!(engine.state.phase, GamePhase::Debate);
-
-        // 辯論階段 → 投票階段
+        // 行動階段 → 投票階段
         engine.advance_phase();
         assert_eq!(engine.state.phase, GamePhase::Voting);
 
@@ -1945,6 +2282,41 @@ mod tests {
         // 結果階段 → 下一回合或遊戲結束
         let next_phase = engine.advance_phase();
         // 遊戲可能結束或進入下一回合
-        assert!(next_phase == GamePhase::Finished || next_phase == GamePhase::Conspiracy);
+        assert!(next_phase == GamePhase::Finished || next_phase == GamePhase::PlayerTurn);
+    }
+
+    #[test]
+    fn test_end_turn() {
+        let mut engine = create_test_engine();
+        engine.start_game().unwrap();
+
+        let current_player = engine.state.current_turn_player().unwrap();
+
+        // 結束當前玩家回合
+        let result = engine.end_turn(current_player);
+        assert!(result.is_ok());
+
+        // 確認切換到下一位玩家
+        let new_player = engine.state.current_turn_player().unwrap();
+        assert_ne!(current_player, new_player);
+    }
+
+    #[test]
+    fn test_action_points() {
+        let mut engine = create_test_engine();
+        engine.start_game().unwrap();
+
+        let current_player = engine.state.current_turn_player().unwrap();
+        assert_eq!(
+            engine.state.action_points_remaining,
+            engine.config.action_points_per_turn
+        );
+
+        // 消耗行動點數
+        assert!(engine.state.consume_action_point());
+        assert_eq!(
+            engine.state.action_points_remaining,
+            engine.config.action_points_per_turn - 1
+        );
     }
 }

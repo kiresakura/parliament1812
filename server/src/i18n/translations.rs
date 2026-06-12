@@ -95,7 +95,10 @@ impl I18n {
 
     /// 取得成就描述
     pub fn achievement_description(&self, locale: Locale, achievement_id: &str) -> String {
-        self.get_or_fallback(locale, &format!("achievements.{}.description", achievement_id))
+        self.get_or_fallback(
+            locale,
+            &format!("achievements.{}.description", achievement_id),
+        )
     }
 
     /// 取得任務名稱
@@ -151,20 +154,14 @@ mod tests {
     fn test_load_translations() {
         let i18n = I18n::global();
         // zh_TW
-        assert_eq!(
-            i18n.card_name(Locale::ZhTw, "common_interrogate"),
-            "質詢"
-        );
+        assert_eq!(i18n.card_name(Locale::ZhTw, "common_interrogate"), "質詢");
         // en
         assert_eq!(
             i18n.card_name(Locale::En, "common_interrogate"),
             "Interrogation"
         );
         // zh_CN
-        assert_eq!(
-            i18n.card_name(Locale::ZhCn, "common_interrogate"),
-            "质询"
-        );
+        assert_eq!(i18n.card_name(Locale::ZhCn, "common_interrogate"), "质询");
     }
 
     #[test]
@@ -172,34 +169,81 @@ mod tests {
         let i18n = I18n::global();
         // 確認所有 56 張卡牌都有翻譯
         let card_ids = [
-            "common_interrogate", "common_rebut", "common_brief_speech",
-            "common_procedural_motion", "common_gather_intel", "common_public_appeal",
-            "common_pamphlet", "common_lobby", "common_filibuster",
-            "common_point_of_order", "common_withdraw", "common_petition",
-            "common_compromise", "common_rumor", "common_tax_debate",
-            "common_moral_appeal", "common_backroom_deal", "common_call_to_order",
-            "common_quick_wit", "common_opening_statement",
-            "common_expose_scandal", "common_endorse",
-            "uncommon_coalition", "uncommon_whip", "uncommon_propaganda",
-            "uncommon_double_agent", "uncommon_crisis", "uncommon_amnesty",
-            "uncommon_royal_favor", "uncommon_press_leak", "uncommon_strike",
-            "uncommon_embargo", "uncommon_charity", "uncommon_inspection",
+            "common_interrogate",
+            "common_rebut",
+            "common_brief_speech",
+            "common_procedural_motion",
+            "common_gather_intel",
+            "common_public_appeal",
+            "common_pamphlet",
+            "common_lobby",
+            "common_filibuster",
+            "common_point_of_order",
+            "common_withdraw",
+            "common_petition",
+            "common_compromise",
+            "common_rumor",
+            "common_tax_debate",
+            "common_moral_appeal",
+            "common_backroom_deal",
+            "common_call_to_order",
+            "common_quick_wit",
+            "common_opening_statement",
+            "common_expose_scandal",
+            "common_endorse",
+            "uncommon_coalition",
+            "uncommon_whip",
+            "uncommon_propaganda",
+            "uncommon_double_agent",
+            "uncommon_crisis",
+            "uncommon_amnesty",
+            "uncommon_royal_favor",
+            "uncommon_press_leak",
+            "uncommon_strike",
+            "uncommon_embargo",
+            "uncommon_charity",
+            "uncommon_inspection",
             "uncommon_war_debt",
-            "rare_impeachment", "rare_martial_law", "rare_revolution",
-            "rare_political_assassination", "rare_reform_act", "rare_corn_law",
-            "rare_factory_act", "rare_habeas_corpus", "rare_no_confidence",
-            "rare_grand_coalition", "rare_espionage", "rare_public_trial",
-            "rare_royal_decree", "rare_blockade", "rare_diplomatic_immunity",
-            "thomas_unity", "richard_bribe", "edward_scoop", "george_fury",
-            "legendary_peterloo", "legendary_magna_carta",
+            "rare_impeachment",
+            "rare_martial_law",
+            "rare_revolution",
+            "rare_political_assassination",
+            "rare_reform_act",
+            "rare_corn_law",
+            "rare_factory_act",
+            "rare_habeas_corpus",
+            "rare_no_confidence",
+            "rare_grand_coalition",
+            "rare_espionage",
+            "rare_public_trial",
+            "rare_royal_decree",
+            "rare_blockade",
+            "rare_diplomatic_immunity",
+            "thomas_unity",
+            "richard_bribe",
+            "edward_scoop",
+            "george_fury",
+            "legendary_peterloo",
+            "legendary_magna_carta",
         ];
 
         for id in &card_ids {
             for locale in [Locale::ZhTw, Locale::En, Locale::ZhCn] {
                 let name = i18n.card_name(locale, id);
-                assert!(!name.starts_with("cards."), "Missing card name for {} in {:?}: got '{}'", id, locale, name);
+                assert!(
+                    !name.starts_with("cards."),
+                    "Missing card name for {} in {:?}: got '{}'",
+                    id,
+                    locale,
+                    name
+                );
                 let desc = i18n.card_description(locale, id);
-                assert!(!desc.starts_with("cards."), "Missing card description for {} in {:?}", id, locale);
+                assert!(
+                    !desc.starts_with("cards."),
+                    "Missing card description for {} in {:?}",
+                    id,
+                    locale
+                );
             }
         }
     }
@@ -208,17 +252,41 @@ mod tests {
     fn test_achievement_translations() {
         let i18n = I18n::global();
         let ids = [
-            "FIRST_MATCH", "FIRST_WIN", "PLAY_10", "COLLECT_50", "BUILD_DECK",
-            "FIRST_IAP", "ADD_FRIEND", "TUTORIAL_DONE", "ATTACK_STREAK_5",
-            "WIN_50", "GOLD_10K", "COLLECT_200", "PERFECT_VOTE", "WIN_STREAK_5",
-            "ALL_ROLES", "DEFENSE_MASTER", "COMEBACK_WIN", "WIN_100",
-            "WIN_STREAK_10", "COLLECT_ALL", "GOLD_100K", "TOP_LEADERBOARD",
-            "PACIFIST", "ALL_ATTACK", "EASTER_EGG",
+            "FIRST_MATCH",
+            "FIRST_WIN",
+            "PLAY_10",
+            "COLLECT_50",
+            "BUILD_DECK",
+            "FIRST_IAP",
+            "ADD_FRIEND",
+            "TUTORIAL_DONE",
+            "ATTACK_STREAK_5",
+            "WIN_50",
+            "GOLD_10K",
+            "COLLECT_200",
+            "PERFECT_VOTE",
+            "WIN_STREAK_5",
+            "ALL_ROLES",
+            "DEFENSE_MASTER",
+            "COMEBACK_WIN",
+            "WIN_100",
+            "WIN_STREAK_10",
+            "COLLECT_ALL",
+            "GOLD_100K",
+            "TOP_LEADERBOARD",
+            "PACIFIST",
+            "ALL_ATTACK",
+            "EASTER_EGG",
         ];
         for id in &ids {
             for locale in [Locale::ZhTw, Locale::En, Locale::ZhCn] {
                 let name = i18n.achievement_name(locale, id);
-                assert!(!name.contains("achievements."), "Missing achievement {} in {:?}", id, locale);
+                assert!(
+                    !name.contains("achievements."),
+                    "Missing achievement {} in {:?}",
+                    id,
+                    locale
+                );
             }
         }
     }
@@ -227,17 +295,36 @@ mod tests {
     fn test_quest_translations() {
         let i18n = I18n::global();
         let types = [
-            "play_games", "win_games", "play_as_character", "vote_on_bills",
-            "use_attack_cards", "use_defense_cards", "play_cards_in_debate",
-            "draw_cards", "initiate_challenge", "successful_counter",
-            "deal_reputation_damage", "heal_reputation", "form_alliance",
-            "betray_alliance", "use_character_skill", "win_with_reputation",
-            "vote_for_winner", "survive_to_end", "earn_gold", "spectate_games",
+            "play_games",
+            "win_games",
+            "play_as_character",
+            "vote_on_bills",
+            "use_attack_cards",
+            "use_defense_cards",
+            "play_cards_in_debate",
+            "draw_cards",
+            "initiate_challenge",
+            "successful_counter",
+            "deal_reputation_damage",
+            "heal_reputation",
+            "form_alliance",
+            "betray_alliance",
+            "use_character_skill",
+            "win_with_reputation",
+            "vote_for_winner",
+            "survive_to_end",
+            "earn_gold",
+            "spectate_games",
         ];
         for qt in &types {
             for locale in [Locale::ZhTw, Locale::En, Locale::ZhCn] {
                 let name = i18n.quest_name(locale, qt);
-                assert!(!name.contains("quests."), "Missing quest {} in {:?}", qt, locale);
+                assert!(
+                    !name.contains("quests."),
+                    "Missing quest {} in {:?}",
+                    qt,
+                    locale
+                );
             }
         }
     }
@@ -248,7 +335,12 @@ mod tests {
         for id in ["thomas", "richard", "edward", "george"] {
             for locale in [Locale::ZhTw, Locale::En, Locale::ZhCn] {
                 let name = i18n.character_name(locale, id);
-                assert!(!name.contains("characters."), "Missing character {} in {:?}", id, locale);
+                assert!(
+                    !name.contains("characters."),
+                    "Missing character {} in {:?}",
+                    id,
+                    locale
+                );
             }
         }
     }

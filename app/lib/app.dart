@@ -18,7 +18,12 @@ import 'screens/codex/codex_screen.dart';
 import 'screens/quests/daily_quests_screen.dart';
 import 'screens/friends/friends_screen.dart';
 import 'screens/rankings/leaderboard_screen.dart';
+import 'screens/tutorial/tutorial_screen.dart';
+import 'screens/campaign/campaign_screen.dart';
+import 'screens/single_player/difficulty_select_screen.dart';
+import 'screens/single_player/single_player_game_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/profile/profile_screen.dart';
 import 'providers/game_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -74,6 +79,33 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/tutorial',
+        name: 'tutorial',
+        builder: (context, state) => TutorialScreen(
+          onComplete: () => GoRouter.of(context).go('/menu'),
+        ),
+      ),
+      GoRoute(
+        path: '/campaign',
+        name: 'campaign',
+        builder: (context, state) => const CampaignScreen(),
+      ),
+      GoRoute(
+        path: '/single-player/difficulty',
+        name: 'difficulty_select',
+        builder: (context, state) => const DifficultySelectScreen(),
+      ),
+      GoRoute(
+        path: '/single-player/game',
+        name: 'single_player_game',
+        builder: (context, state) => const SinglePlayerGameScreen(),
       ),
       GoRoute(
         path: '/rooms',

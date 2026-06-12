@@ -18,7 +18,12 @@ pub enum CardType {
     Signature,
 }
 
-/// 卡牌稀有度
+/// 卡牌稀有度（遊戲內機制用）
+///
+/// 用於遊戲對局中的卡牌效果分級（Normal / Rare / SuperRare / Legendary）。
+/// 注意：與 `CodexRarity`（圖鑑收藏用）是不同概念。
+/// - `CardRarity` → 對局卡牌的強度分級（N / R / SR / SSR）
+/// - `CodexRarity` → 圖鑑收藏品的稀有度分級（Common / Uncommon / Rare / Legendary）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CardRarity {
