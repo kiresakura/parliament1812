@@ -1,6 +1,7 @@
 # 1812 國會風雲 — 開發環境設定
 
-> _最後更新：2026-02-08_
+> _最後更新：2026-06-12_
+> 開發手冊：`CLAUDE.md`｜設計權威：`docs/GDD_v3_Design_Response.md`
 
 ---
 
@@ -54,9 +55,11 @@ parliament1812/
 │   │   └── widgets/     # 可複用元件
 │   └── pubspec.yaml
 │
-├── backend/             # ⚠️ Node.js 後端（已棄用，僅供參考）
-├── docs/                # 設計文件
-└── parliament_assets/   # 美術素材
+├── backend/             # 【封存】Node.js 後端（已棄用，僅供參考）
+├── godot-client/        # 【封存】Godot 4.6 試作（停止開發，保留參考）
+├── docs/                # 設計文件（archive/ 為歷史封存）
+├── assets/              # 遊戲素材（卡牌、角色、音樂）
+└── parliament_assets/   # 美術素材、UI 主題
 ```
 
 ---

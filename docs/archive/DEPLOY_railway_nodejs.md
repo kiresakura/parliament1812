@@ -1,4 +1,7 @@
-# 1812 國會風雲 部署指南
+# 1812 國會風雲 部署指南【已封存 2026-06-12】
+
+> ⚠️ 本文件為 Node.js + Railway 時代的部署指南，已過時。
+> 現行部署：Rust 後端 → Fly.io，見根目錄 `README.md` 與 `.github/workflows/deploy-server.yml`。
 
 ## Railway 後端部署
 

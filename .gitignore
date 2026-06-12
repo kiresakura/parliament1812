@@ -20,7 +20,7 @@
 # Prompt files (do not commit)
 *PROMPT*.md
 *prompt*.md
-CLAUDE_CODE_STEPS.md
+*Prompt*.md
 
 # Large binary files
 *.apk
@@ -57,10 +57,9 @@ Pods/
 local.properties
 *.hprof
 
-# 文檔（AI 生成的暫存文件忽略，但保留上架文件）
-docs/
-!docs/appstore/
-!docs/steam/
+# 文檔：設計文件入版控，只忽略暫存檔與 prompt 檔（見上方規則）
+docs/**/*.tmp
+.~lock.*#
 target/
 server/target/
 app/.dart_tool/
